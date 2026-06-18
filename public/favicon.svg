@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Sturdy Volley">
+  <rect width="64" height="64" rx="14" fill="#0b1b2b" />
+  <path d="M4 44 Q16 38 32 42 T60 44 V64 H4 Z" fill="#10516a" />
+  <circle cx="32" cy="26" r="13" fill="#eaf4f4" />
+  <path d="M32 13 A13 13 0 0 1 45 26" fill="none" stroke="#7fd1c4" stroke-width="2.4" />
+  <path d="M22 18 Q32 28 28 39" fill="none" stroke="#7fd1c4" stroke-width="2.4" />
+  <path d="M44 21 Q34 27 38 38" fill="none" stroke="#7fd1c4" stroke-width="2.4" />
+</svg>

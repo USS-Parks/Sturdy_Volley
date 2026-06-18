@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+.vite/
+
+# Test artifacts
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# Editor / OS
+.DS_Store
+*.local
+*.log
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Claude Code worktrees + agent scratch nested under this folder (unrelated repo)
+.claude/
