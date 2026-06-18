@@ -1,0 +1,6 @@
+[
+  { "id": "spring-netraising", "name": "Spring Netraising", "season": "spring", "day": 13, "description": "The town raises a new court net to open the season." },
+  { "id": "summer-glowball-night", "name": "Summer Glowball Night", "season": "summer", "day": 18, "description": "Lantern-lit beach volleyball under the stars." },
+  { "id": "fall-harvest-rally", "name": "Fall Harvest Rally", "season": "fall", "day": 16, "description": "A harvest market wrapped around a doubles bracket." },
+  { "id": "winter-icecourt-classic", "name": "Winter Icecourt Classic", "season": "winter", "day": 8, "description": "Slick footing and warm cider at the indoor classic." }
+]

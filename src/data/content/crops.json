@@ -1,0 +1,6 @@
+[
+  { "id": "bell-peas", "name": "Bell Peas", "seedItemId": "bell-pea-seeds", "produceItemId": "bell-peas", "seasons": ["spring"], "growthDays": 6, "regrowDays": 3 },
+  { "id": "tide-turnip", "name": "Tide Turnip", "seedItemId": "tide-turnip-seeds", "produceItemId": "tide-turnip", "seasons": ["spring"], "growthDays": 5 },
+  { "id": "blush-radish", "name": "Blush Radish", "seedItemId": "blush-radish-seeds", "produceItemId": "blush-radish", "seasons": ["spring", "fall"], "growthDays": 7 },
+  { "id": "sunmelon", "name": "Sunmelon", "seedItemId": "sunmelon-seeds", "produceItemId": "sunmelon", "seasons": ["summer"], "growthDays": 12 }
+]

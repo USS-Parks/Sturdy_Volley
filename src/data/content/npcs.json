@@ -1,0 +1,20 @@
+[
+  {
+    "id": "mara-vale",
+    "name": "Mara Vale",
+    "role": "Harbor mechanic and former league setter",
+    "description": "Direct, funny, and precise. Rebuilding trust after a match-fixing accusation she did not earn.",
+    "birthday": { "season": "summer", "day": 14 },
+    "lovedGiftItemIds": ["goat-cheese", "driftwood"],
+    "romanceable": true
+  },
+  {
+    "id": "jun-park",
+    "name": "Jun Park",
+    "role": "Bakery owner and beach cleanup organizer",
+    "description": "Gentle, stubborn, and secretly competitive. Torn between family expectations and civic leadership.",
+    "birthday": { "season": "fall", "day": 7 },
+    "lovedGiftItemIds": ["garden-omelet", "blush-radish"],
+    "romanceable": true
+  }
+]

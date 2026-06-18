@@ -1,0 +1,4 @@
+[
+  { "id": "mooncalf-hen", "name": "Mooncalf Hen", "species": "hen", "habitat": "coop", "produceItemId": "mooncalf-egg", "daysToMature": 3 },
+  { "id": "bluff-goat", "name": "Bluff Goat", "species": "goat", "habitat": "barn", "produceItemId": "bluff-goat-milk", "daysToMature": 5 }
+]

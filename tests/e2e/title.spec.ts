@@ -32,4 +32,14 @@ test.describe('Title screen', () => {
     await page.goto('/');
     await expect(page.locator('#game-root canvas')).toBeVisible();
   });
+
+  // The dev data-validation screen only exists in dev builds; Playwright runs
+  // against the Vite dev server, so the entry is present here.
+  test('dev data validation screen reports all collections OK', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('title-dev-data').click();
+    await expect(page.getByRole('heading', { name: 'Data validation' })).toBeVisible();
+    await expect(page.getByTestId('dev-data-report')).toContainText('items');
+    await expect(page.locator('.report-fail')).toHaveCount(0);
+  });
 });

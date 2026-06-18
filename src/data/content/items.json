@@ -1,0 +1,16 @@
+[
+  { "id": "bell-pea-seeds", "name": "Bell Pea Seeds", "description": "A handful of chiming spring seeds.", "category": "seed", "sellPrice": 8, "stackable": true, "tags": ["spring"] },
+  { "id": "bell-peas", "name": "Bell Peas", "description": "Sweet pods that rattle softly when ripe.", "category": "crop", "sellPrice": 24, "stackable": true, "tags": ["spring"] },
+  { "id": "tide-turnip-seeds", "name": "Tide Turnip Seeds", "description": "Salt-tolerant seeds from the tide flats.", "category": "seed", "sellPrice": 6, "stackable": true, "tags": ["spring"] },
+  { "id": "tide-turnip", "name": "Tide Turnip", "description": "A brisk, briny root vegetable.", "category": "crop", "sellPrice": 18, "stackable": true, "tags": ["spring"] },
+  { "id": "blush-radish-seeds", "name": "Blush Radish Seeds", "description": "Pink-streaked radish seeds.", "category": "seed", "sellPrice": 10, "stackable": true, "tags": ["spring", "fall"] },
+  { "id": "blush-radish", "name": "Blush Radish", "description": "Crisp and faintly peppery.", "category": "crop", "sellPrice": 30, "stackable": true, "tags": ["spring", "fall"] },
+  { "id": "sunmelon-seeds", "name": "Sunmelon Seeds", "description": "Plump seeds that love long summer days.", "category": "seed", "sellPrice": 20, "stackable": true, "tags": ["summer"] },
+  { "id": "sunmelon", "name": "Sunmelon", "description": "A heavy melon with a sunrise rind.", "category": "crop", "sellPrice": 80, "stackable": true, "tags": ["summer"] },
+  { "id": "mooncalf-egg", "name": "Mooncalf Egg", "description": "A pale egg with a faint shimmer.", "category": "animal", "sellPrice": 25, "stackable": true, "tags": [] },
+  { "id": "bluff-goat-milk", "name": "Bluff Goat Milk", "description": "Rich milk from the cliff-grazing goats.", "category": "animal", "sellPrice": 40, "stackable": true, "tags": [] },
+  { "id": "goat-cheese", "name": "Goat Cheese", "description": "Tangy cheese pressed in a cheese drum.", "category": "artisan", "sellPrice": 95, "stackable": true, "tags": ["artisan"] },
+  { "id": "garden-omelet", "name": "Garden Omelet", "description": "A fluffy omelet folded with garden veg.", "category": "cooking", "sellPrice": 120, "stackable": true, "tags": ["cooked", "buff"] },
+  { "id": "driftwood", "name": "Driftwood", "description": "Storm-smoothed wood washed up on the bay.", "category": "material", "sellPrice": 5, "stackable": true, "tags": ["material"] },
+  { "id": "tide-shell", "name": "Tide Shell", "description": "An iridescent shell from the low-tide line.", "category": "forage", "sellPrice": 12, "stackable": true, "tags": ["beach", "forage"] }
+]

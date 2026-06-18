@@ -1,0 +1,18 @@
+[
+  {
+    "id": "mara-vale-greeting",
+    "npcId": "mara-vale",
+    "lines": [
+      "Morning. The winch is still seized, but the court frame is square again.",
+      "Bring me a clean set and I'll show you a real one."
+    ]
+  },
+  {
+    "id": "jun-park-greeting",
+    "npcId": "jun-park",
+    "lines": [
+      "Smells like the ovens are finally warm enough.",
+      "If you're heading to the beach, the cleanup crew could use a fourth."
+    ]
+  }
+]

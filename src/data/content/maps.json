@@ -1,0 +1,4 @@
+[
+  { "id": "breakpoint-farm", "name": "Breakpoint Farm", "region": "Breakpoint Farm", "width": 40, "height": 40 },
+  { "id": "ballast-bay-town", "name": "Ballast Bay", "region": "Ballast Bay", "width": 50, "height": 40 }
+]

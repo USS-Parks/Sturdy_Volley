@@ -43,3 +43,34 @@ SwiftShader is explicitly enabled. Phaser's WebGL renderer threw
 WebGL `AUTO` renderer in production).
 
 Resolved versions: phaser 3.90.0, vite 6.4.3, vitest 3.2.6.
+
+---
+
+## Prompt 002 — Game design constants and typed data pipeline (2026-06-18)
+
+Added a **typed, validated, data-driven content pipeline** (zod 3.25).
+
+- `src/data/schemas.ts` — `.strict()` zod schemas + inferred TS types for all
+  twelve content kinds: items, crops, animals, recipes, npcs, skills, weather,
+  festivals, quests, shops, maps, dialogue. IDs constrained to kebab-case.
+- `src/data/content/*.json` — original Ballast Bay sample data: 14 items,
+  4 crops, 2 animals, 2 recipes, 2 NPCs (Mara Vale, Jun Park), 8 skills,
+  4 weather, 4 festivals, 2 quests, 2 shops, 2 maps, 2 dialogue sets.
+- `src/data/content.ts` — `validateContent()` runs schema validation +
+  id-uniqueness + **cross-collection referential integrity** (a crop's seed
+  must be a real item, dialogue.npcId a real NPC, etc.); `loadGameContent()`
+  throws a `ContentValidationError` with human-readable issues; `getContentReport()`
+  powers the dev screen. Content is loaded fail-fast in `PreloadScene`.
+- **Developer-only data validation screen**: in dev builds the Title menu shows
+  "Dev · Validate data", opening a pass/fail report per collection.
+
+**Acceptance criteria**
+
+- [x] Invalid data fails tests with useful errors (missing field, bad id,
+  unknown key, broken cross-reference, duplicate id — all covered)
+- [x] ≥10 items (14), ≥4 crops, ≥2 NPCs, ≥2 animals, ≥2 recipes load from data
+- [x] Data IDs are stable and human-readable (kebab-case, enforced + tested)
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest `19/19`
+(3 files) · build `dist/` (bundle ~1.55 MB / 358 KB gzip) · Playwright `8/8`
+(desktop + mobile, incl. the dev data screen).

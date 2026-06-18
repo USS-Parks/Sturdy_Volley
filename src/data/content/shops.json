@@ -1,0 +1,14 @@
+[
+  {
+    "id": "ballast-general",
+    "name": "Ballast General Store",
+    "npcId": null,
+    "stockItemIds": ["bell-pea-seeds", "tide-turnip-seeds", "blush-radish-seeds", "sunmelon-seeds"]
+  },
+  {
+    "id": "driftwood-market",
+    "name": "Driftwood Market",
+    "npcId": null,
+    "stockItemIds": ["driftwood", "tide-shell"]
+  }
+]

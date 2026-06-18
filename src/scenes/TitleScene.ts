@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { buildTitleMenu } from '../ui/menuModel';
 import { UIOverlay } from '../ui/overlay';
 import { hasSaveGame } from '../engine/save';
+import { getContentReport } from '../data/content';
 
 /**
  * Title screen. Draws an original placeholder coastal backdrop on the canvas
@@ -41,12 +42,30 @@ export class TitleScene extends Phaser.Scene {
   }
 
   private showMenu(): void {
+    const items = buildTitleMenu(hasSaveGame());
+    if (import.meta.env.DEV) {
+      items.push({
+        id: 'dev-data',
+        label: 'Dev · Validate data',
+        enabled: true,
+        testId: 'title-dev-data',
+      });
+    }
     this.overlay.showMenu(
       'Sturdy Volley',
-      buildTitleMenu(hasSaveGame()),
+      items,
       (id) => this.onSelect(id),
       'Ballast Bay · rebuild the storm-worn coast',
     );
+  }
+
+  private showDataReport(): void {
+    const rows = getContentReport().map((summary) => ({
+      label: `${summary.name} (${summary.count})`,
+      ok: summary.ok,
+      detail: summary.ok ? undefined : summary.issues.slice(0, 3).join('; '),
+    }));
+    this.overlay.showReport('Data validation', rows, () => this.showMenu(), 'dev-data-report');
   }
 
   private onSelect(id: string): void {
@@ -57,6 +76,9 @@ export class TitleScene extends Phaser.Scene {
         break;
       case 'continue':
         // Enabled only once a save exists.
+        break;
+      case 'dev-data':
+        this.showDataReport();
         break;
       case 'settings':
         this.overlay.showPanel(

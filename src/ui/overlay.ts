@@ -68,6 +68,56 @@ export class UIOverlay {
     this.focusFirstEnabled(panel);
   }
 
+  /** Developer report panel: a scrollable list of pass/fail rows. */
+  showReport(
+    title: string,
+    rows: Array<{ label: string; ok: boolean; detail?: string }>,
+    onBack: () => void,
+    testId?: string,
+  ): void {
+    this.clear();
+    const panel = this.createPanel(title);
+    panel.classList.add('report-panel');
+
+    const list = document.createElement('ul');
+    list.className = 'report-list';
+    if (testId) list.dataset.testid = testId;
+
+    for (const row of rows) {
+      const li = document.createElement('li');
+      li.className = 'report-row';
+
+      const badge = document.createElement('span');
+      badge.className = `report-badge ${row.ok ? 'report-ok' : 'report-fail'}`;
+      badge.textContent = row.ok ? 'OK' : 'FAIL';
+
+      const label = document.createElement('span');
+      label.className = 'report-label';
+      label.textContent = row.label;
+
+      li.append(badge, label);
+      if (row.detail) {
+        const detail = document.createElement('span');
+        detail.className = 'report-detail';
+        detail.textContent = row.detail;
+        li.appendChild(detail);
+      }
+      list.appendChild(li);
+    }
+    panel.appendChild(list);
+
+    const back = document.createElement('button');
+    back.className = 'menu-button';
+    back.type = 'button';
+    back.textContent = 'Back';
+    back.dataset.testid = 'panel-back';
+    back.addEventListener('click', onBack);
+    panel.appendChild(back);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
   private createPanel(title: string, subtitle?: string): HTMLDivElement {
     const panel = document.createElement('div');
     panel.className = 'menu-panel';

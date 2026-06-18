@@ -1,0 +1,21 @@
+[
+  {
+    "id": "goat-cheese",
+    "name": "Goat Cheese",
+    "type": "crafting",
+    "outputItemId": "goat-cheese",
+    "outputQty": 1,
+    "ingredients": [{ "itemId": "bluff-goat-milk", "qty": 1 }]
+  },
+  {
+    "id": "garden-omelet",
+    "name": "Garden Omelet",
+    "type": "cooking",
+    "outputItemId": "garden-omelet",
+    "outputQty": 1,
+    "ingredients": [
+      { "itemId": "mooncalf-egg", "qty": 1 },
+      { "itemId": "blush-radish", "qty": 1 }
+    ]
+  }
+]

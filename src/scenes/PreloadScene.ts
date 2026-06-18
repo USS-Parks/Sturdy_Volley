@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { loadGameContent } from '../data/content';
 
 /**
  * Loads global assets and shows a progress bar. No real assets exist yet
@@ -33,6 +34,15 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Fail fast if bundled content is invalid (throws ContentValidationError).
+    const content = loadGameContent();
+    if (import.meta.env.DEV) {
+      console.info(
+        `[Sturdy Volley] content loaded: ${content.items.length} items, ` +
+          `${content.crops.length} crops, ${content.npcs.length} NPCs, ` +
+          `${content.animals.length} animals, ${content.recipes.length} recipes.`,
+      );
+    }
     this.scene.start('Title');
   }
 }
