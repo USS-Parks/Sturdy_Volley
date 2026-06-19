@@ -248,6 +248,63 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## RF-11 — All four NPCs walking + `?debug=schedules` overlay (2026-06-19)
+
+Extended the live-NPC layer from VS-A4's solo Mara to the full four-NPC cast
+(Mara Vale, Jun Park, Sol Aranda, Lio Marin), each walking their respective
+schedule from `data/content/schedules.json`. Shipped the `?debug=schedules`
+overlay that surfaces every NPC's current waypoint as a live table.
+
+- **`src/scenes/TownScene.ts`** — `NPC_SEEDS` table replaces the
+  Mara-specific spawn (id + name + body color + greeting). `enter()` loops
+  the seeds and creates four `LiveNpc` entries; off-Town NPCs spawn
+  parked under the ground (y=-10) and surface only when their schedule
+  routes them here. `update()` ticks every NPC per frame via `liveStep`.
+  `rebuildTargets` honors `currentWaypoint.sceneKey === 'Town'` — NPCs
+  whose schedule sends them elsewhere are not interactable. New
+  `openNpcGreeting(npcId)` looks up the seed + npc and opens the bubble.
+  **Bug fix:** opening the dialogue from inside `update()` was followed by
+  a trailing `refreshHud` in the same frame whose `showHud` → `clear()`
+  wiped the bubble — guarded with an early return when `dialogueOpen`
+  flips to true. **Debug surface:** `window.sturdyVolleyTown` exposes
+  `npcs()`, `targets()`, `nearest()` for e2e steering + manual inspection.
+- **`src/render/schedule-overlay.ts`** — pure DOM overlay gated by
+  `?debug=schedules`. `mountScheduleOverlay()` builds one row per
+  `knownNpcIds()` entry; `updateFrom(ctx)` writes each row's current
+  waypoint (`sceneKey (x,z) posture`). Idempotent — re-mounting replaces.
+- **`src/main.ts`** — when `?debug=schedules` is set, mounts the overlay
+  and drives it from a side render loop reading the active save's
+  calendar + weather.
+- **`src/styles.css`** — `#schedule-overlay` (top-right corner) + list
+  styling.
+- **`tests/unit/scheduleOverlay.test.ts`** — 4 specs: URL parsing, mount
+  with one row per NPC, `updateFrom` writes the waypoint text, idempotent
+  re-mount.
+- **`tests/e2e/npc.spec.ts`** — adds two specs: all four NPC torso
+  meshes exist in Town, `?debug=schedules` mounts the overlay with all
+  four rows. The pre-existing Mara greet spec was updated for the
+  schedule-respecting behavior: under Day 1 spring rain Mara correctly
+  routes to Interior (the old test passed only because the prior code
+  ignored her schedule when picking a spawn point). The test now bumps
+  the saved calendar to Day 3 (sunny) before driving the greet.
+
+**Acceptance criteria (§0.9 / RF-11):**
+- [x] All three remaining NPCs (Jun Park, Sol Aranda, Lio Marin) build
+  as graybox humanoids in the Town scene with distinct body colors.
+- [x] Each NPC ticks `liveStep` toward their active waypoint and snaps
+  off-stage when their schedule routes them elsewhere.
+- [x] `?debug=schedules` overlay draws the current waypoint above each
+  NPC (rendered as a per-NPC text row; the on-mesh nameplate version is
+  a polish task).
+- [x] Town scene remains within the §0.10 mobile budget after the
+  three new NPC rigs (perf-budget Town spec still green).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`216/216` (28 files, +4 schedule-overlay specs) · build OK · Playwright
+`54/54` (50 prior + 4 new schedule + 4-NPC specs on desktop + Pixel 5).
+
+---
+
 ## RF-10 — Beach forage + tide-line shell collection (2026-06-19)
 
 Promoted `BeachScene` from a 25-line `PlaceScene` placeholder to a full

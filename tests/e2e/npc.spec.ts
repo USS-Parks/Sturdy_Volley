@@ -37,7 +37,7 @@ test.describe('VS-A4 — Live NPC + greet bubble', () => {
     expect(hasMara).toBe(true);
   });
 
-  test('interacting with Mara opens a greet bubble; Continue dismisses', async ({ page }) => {
+  test('RF-11: all four NPC torsos exist in the Town scene', async ({ page }) => {
     await newGame(page);
     await page.evaluate(() =>
       (window as unknown as {
@@ -47,10 +47,68 @@ test.describe('VS-A4 — Live NPC + greet bubble', () => {
       }).sturdyVolley?.manager.goTo('Town', undefined, false),
     );
     await expect(page.getByText('Ballast Bay', { exact: false })).toBeVisible();
+    const counts = await page.evaluate(() => {
+      const sv = (
+        window as unknown as { sturdyVolley?: { engine: { scenes: { meshes: { name: string }[] }[] } } }
+      ).sturdyVolley;
+      if (!sv) return {} as Record<string, boolean>;
+      const want = ['mara-vale', 'jun-park', 'sol-aranda', 'lio-marin'];
+      const out: Record<string, boolean> = {};
+      for (const id of want) out[id] = false;
+      for (const scene of sv.engine.scenes) {
+        for (const mesh of scene.meshes) {
+          for (const id of want) {
+            if (mesh.name === `npc-${id}-torso`) out[id] = true;
+          }
+        }
+      }
+      return out;
+    });
+    expect(counts['mara-vale']).toBe(true);
+    expect(counts['jun-park']).toBe(true);
+    expect(counts['sol-aranda']).toBe(true);
+    expect(counts['lio-marin']).toBe(true);
+  });
 
-    // Park the player on Mara's known schedule position so she's in range.
-    // At minutes=360 her default waypoint is Town (-8, -4); after 540 it moves
-    // to (0, -4). A fresh save starts at 6 AM (minutes=360).
+  test('RF-11: ?debug=schedules mounts the schedule overlay with all four rows', async ({ page }) => {
+    await page.goto('/?debug=schedules');
+    await expect(page.getByTestId('schedule-overlay')).toBeVisible();
+    await expect(page.getByTestId('sched-row-mara-vale')).toBeVisible();
+    await expect(page.getByTestId('sched-row-jun-park')).toBeVisible();
+    await expect(page.getByTestId('sched-row-sol-aranda')).toBeVisible();
+    await expect(page.getByTestId('sched-row-lio-marin')).toBeVisible();
+  });
+
+  test('interacting with Mara opens a greet bubble; Continue dismisses', async ({ page }) => {
+    await newGame(page);
+    // Day 1 + Day 2 are rain → Mara routes to the Interior under her byWeather
+    // override. Bump the saved calendar to Day 3 (sunny) where her default
+    // schedule keeps her on Town, then Continue from the title.
+    await page.evaluate(() => {
+      const key = 'sturdy-volley:save:v1';
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      data.calendar.day = 3;
+      localStorage.setItem(key, JSON.stringify(data));
+    });
+    await page.reload();
+    await page.getByTestId('title-continue').click();
+    await expect(page.locator('#game-canvas')).toBeVisible();
+    // Wait for Continue's save-load + Farm enter to complete before navigating.
+    await page.waitForFunction(() => Boolean(window.sturdyVolleyDebug?.openInventory));
+    await page.evaluate(() =>
+      (window as unknown as {
+        sturdyVolley?: {
+          manager: { goTo: (k: string, d?: unknown, fade?: boolean) => Promise<void> };
+        };
+      }).sturdyVolley?.manager.goTo('Town', undefined, false),
+    );
+    await expect(page.getByText('Ballast Bay', { exact: false })).toBeVisible();
+
+    // Park the player right next to Mara at her Day-3 6-AM waypoint (-8, -4).
+    // Stand 0.5 m off so the interaction-resolver clearly picks her, and dump
+    // the active target list when the test runs in headed mode.
     await page.evaluate(() => {
       const sv = (
         window as unknown as {
@@ -61,12 +119,12 @@ test.describe('VS-A4 — Live NPC + greet bubble', () => {
       for (const scene of sv.engine.scenes) {
         for (const mesh of scene.meshes) {
           if (mesh.name === 'player') {
-            mesh.position.set(-7, 0.9, -3.5);
+            mesh.position.set(-7.5, 0.9, -3.6);
           }
         }
       }
     });
-    await page.waitForTimeout(150);
+    await page.waitForTimeout(180);
     await page.keyboard.down('e');
     await page.waitForTimeout(180);
     await page.keyboard.up('e');

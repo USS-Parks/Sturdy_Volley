@@ -62,6 +62,20 @@ interface LiveNpc {
 
 const NPC_WALK_SPEED = 1.6; // m/s; deliberately slower than the player
 
+interface NpcSeed {
+  id: string;
+  name: string;
+  bodyColor: Color3;
+  greeting: string;
+}
+
+const NPC_SEEDS: NpcSeed[] = [
+  { id: 'mara-vale', name: 'Mara Vale', bodyColor: PALETTE.player, greeting: 'Morning, neighbor. The harbor winch is still rattling — come find me when you have a spare hour.' },
+  { id: 'jun-park', name: 'Jun Park', bodyColor: PALETTE.roof, greeting: "Loaves are on the rack at noon — drop in if the day gets long." },
+  { id: 'sol-aranda', name: 'Sol Aranda', bodyColor: PALETTE.grass, greeting: 'I logged a thaw-stripe in the bluff seeds — best planted before the next windstorm.' },
+  { id: 'lio-marin', name: 'Lio Marin', bodyColor: PALETTE.accent, greeting: 'Tide pulled three crab pots loose last night. Storm season is early this year.' },
+];
+
 /**
  * Ballast Bay (VS-A4). Promoted from a placeholder PlaceScene into a full
  * walkable GameScene with player movement, camera, interaction, and one live
@@ -90,8 +104,7 @@ export class TownScene extends GameScene {
 
   private flag: AbstractMesh | null = null;
   private flagAge = 0;
-  private mara: LiveNpc | null = null;
-  private maraName = 'Mara Vale';
+  private readonly npcs = new Map<string, LiveNpc>();
 
   build(): Scene {
     const scene = makeScene(this.ctx.engine, PALETTE.sky);
@@ -215,21 +228,30 @@ export class TownScene extends GameScene {
     this.clock = createTimeClock(getGameTime(save));
     this.refreshWorldState();
 
-    // Mara Vale — the one live NPC in the Town slice. Other NPCs land at RF-11.
-    const maraSchedule = loadSchedule('mara-vale');
-    if (maraSchedule) {
-      const ctx = this.scheduleContext();
-      const wp = activeWaypoint(maraSchedule, ctx);
-      const start = wp?.sceneKey === 'Town'
+    // RF-11: build all four NPCs at scene-enter; off-Town ones spawn parked
+    // below the ground and surface only when their schedule routes them here.
+    for (const seed of NPC_SEEDS) {
+      const schedule = loadSchedule(seed.id);
+      if (!schedule) continue;
+      const wp = activeWaypoint(schedule, this.scheduleContext());
+      const onTown = wp?.sceneKey === 'Town';
+      const start = onTown
         ? new Vector3(wp.x, 0.9, wp.z)
-        : new Vector3(-8, 0.9, -3); // off-stage default
+        : new Vector3(-8, -10, -3); // off-stage; raise on schedule-tick
       const handles = buildNpcGraybox({
         scene: this.scene,
-        npcId: 'mara-vale',
+        npcId: seed.id,
         position: { x: start.x, z: start.z },
-        bodyColor: PALETTE.player,
+        bodyColor: seed.bodyColor,
       });
-      this.mara = { id: 'mara-vale', name: this.maraName, handles, position: start.clone(), currentWaypoint: wp };
+      if (!onTown) handles.root.position.y = -10;
+      this.npcs.set(seed.id, {
+        id: seed.id,
+        name: seed.name,
+        handles,
+        position: start.clone(),
+        currentWaypoint: wp,
+      });
     }
 
     this.rebuildTargets();
@@ -238,6 +260,30 @@ export class TownScene extends GameScene {
     this.menuOpen = false;
     this.dialogueOpen = false;
     this.refreshHud();
+
+    // RF-11 debug surface — the e2e + a curious developer can read live state.
+    (window as unknown as {
+      sturdyVolleyTown?: {
+        npcs: () => Array<{ id: string; pos: { x: number; z: number }; sceneKey: string }>;
+        targets: () => Array<{ id: string; label: string; x: number; z: number; radius: number }>;
+        nearest: () => string | null;
+      };
+    }).sturdyVolleyTown = {
+      npcs: () => {
+        const out: Array<{ id: string; pos: { x: number; z: number }; sceneKey: string }> = [];
+        for (const npc of this.npcs.values()) {
+          out.push({
+            id: npc.id,
+            pos: { x: npc.position.x, z: npc.position.z },
+            sceneKey: npc.currentWaypoint?.sceneKey ?? '—',
+          });
+        }
+        return out;
+      },
+      targets: () =>
+        this.targets.map((t) => ({ id: t.id, label: t.label, x: t.x, z: t.z, radius: t.radius })),
+      nearest: () => this.nearest?.id ?? null,
+    };
   }
 
   private scheduleContext() {
@@ -253,13 +299,16 @@ export class TownScene extends GameScene {
 
   private rebuildTargets(): void {
     const base: InteractTarget[] = [];
-    if (this.mara) {
+    for (const npc of this.npcs.values()) {
+      // Only interactable while she's actually on the Town map.
+      const wp = npc.currentWaypoint;
+      if (!wp || wp.sceneKey !== 'Town') continue;
       base.push({
-        id: 'npc:mara-vale',
+        id: `npc:${npc.id}`,
         kind: 'npc',
-        label: `Talk to ${this.maraName}`,
-        x: this.mara.position.x,
-        z: this.mara.position.z,
+        label: `Talk to ${npc.name}`,
+        x: npc.position.x,
+        z: npc.position.z,
         radius: 1.8,
         priority: 4,
       });
@@ -290,27 +339,26 @@ export class TownScene extends GameScene {
       this.player.moveWithCollisions(new Vector3(dir.x, 0, dir.z).scale(this.controller.speed * dt));
     }
 
-    // NPC tick.
-    if (this.mara) {
-      const schedule = loadSchedule('mara-vale');
-      if (schedule) {
-        const ctx = this.scheduleContext();
-        const wp = activeWaypoint(schedule, ctx);
-        this.mara.currentWaypoint = wp ?? null;
-        if (wp && wp.sceneKey === 'Town') {
-          const stepResult = liveStep({
-            position: { x: this.mara.position.x, z: this.mara.position.z },
-            target: wp,
-            speed: NPC_WALK_SPEED,
-            dt,
-          });
-          this.mara.position.set(stepResult.x, 0.9, stepResult.z);
-          this.mara.handles.root.position.set(stepResult.x, 0.85, stepResult.z);
-          faceTo(this.mara.handles.root, wp);
-        } else if (wp) {
-          // Off-stage — hide her by parking the rig under the ground.
-          this.mara.handles.root.position.y = -10;
-        }
+    // NPC tick — walk every live NPC toward their active waypoint or park
+    // them off-stage when their schedule routes them elsewhere.
+    const ctx = this.scheduleContext();
+    for (const npc of this.npcs.values()) {
+      const schedule = loadSchedule(npc.id);
+      if (!schedule) continue;
+      const wp = activeWaypoint(schedule, ctx);
+      npc.currentWaypoint = wp ?? null;
+      if (wp && wp.sceneKey === 'Town') {
+        const stepResult = liveStep({
+          position: { x: npc.position.x, z: npc.position.z },
+          target: wp,
+          speed: NPC_WALK_SPEED,
+          dt,
+        });
+        npc.position.set(stepResult.x, 0.9, stepResult.z);
+        npc.handles.root.position.set(stepResult.x, 0.85, stepResult.z);
+        faceTo(npc.handles.root, wp);
+      } else {
+        npc.handles.root.position.y = -10;
       }
     }
     this.rebuildTargets();
@@ -320,7 +368,7 @@ export class TownScene extends GameScene {
     // Interaction.
     const interact = this.pressed.has('e') || this.pressed.has(' ');
     if (interact && !this.ePrev && this.nearest) {
-      if (this.nearest.id === 'npc:mara-vale') this.openMaraGreeting();
+      if (this.nearest.id.startsWith('npc:')) this.openNpcGreeting(this.nearest.id.slice('npc:'.length));
       else {
         this.actionLabel = this.nearest.label;
         this.actionTimer = 1.6;
@@ -328,6 +376,10 @@ export class TownScene extends GameScene {
     }
     this.ePrev = interact;
     if (this.actionTimer > 0) this.actionTimer -= dt;
+
+    // If a dialogue just opened, bail before the trailing HUD refresh — its
+    // showHud() calls clear() which would wipe the bubble in the same frame.
+    if (this.dialogueOpen) return;
 
     // Time tick — Town has no day-summary path of its own (sleep happens at
     // the farmhouse bed); time still advances, and a 2-AM collapse here
@@ -440,16 +492,15 @@ export class TownScene extends GameScene {
     }
   }
 
-  private openMaraGreeting(): void {
+  private openNpcGreeting(npcId: string): void {
+    const seed = NPC_SEEDS.find((s) => s.id === npcId);
+    const npc = this.npcs.get(npcId);
+    if (!seed || !npc) return;
     this.dialogueOpen = true;
-    this.ctx.overlay.showDialogue(
-      this.maraName,
-      'Morning, neighbor. The harbor winch is still rattling — come find me when you have a spare hour.',
-      () => {
-        this.dialogueOpen = false;
-        this.refreshHud();
-      },
-    );
+    this.ctx.overlay.showDialogue(seed.name, seed.greeting, () => {
+      this.dialogueOpen = false;
+      this.refreshHud();
+    });
   }
 
   override dispose(): void {

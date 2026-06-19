@@ -9,6 +9,13 @@ import {
   mountPerfOverlay,
   sampleScene,
 } from './render/perf-overlay';
+import {
+  isScheduleOverlayEnabled,
+  mountScheduleOverlay,
+} from './render/schedule-overlay';
+import { getActiveSave } from './engine/gameState';
+import { forecastFor } from './engine/weather';
+import { loadGameContent } from './data/content';
 import './styles.css';
 
 /**
@@ -49,6 +56,35 @@ function bootstrap(): void {
         lastLabel = sceneKey;
       }
       overlayCtrl.updateFrom(sampleScene(engine, scene), sceneKey ? budgetFor(sceneKey) : undefined);
+    });
+  }
+
+  // Schedule-debug overlay (RF-11) — only mounted when `?debug=schedules` is
+  // set. Refreshes from the active save's calendar + weather so every NPC's
+  // current waypoint is visible during a play session.
+  if (isScheduleOverlayEnabled()) {
+    const overlayCtrl = mountScheduleOverlay();
+    engine.runRenderLoop(() => {
+      const save = getActiveSave();
+      if (!save) return;
+      const content = loadGameContent();
+      const weather = forecastFor(
+        {
+          year: save.calendar.year,
+          season: save.calendar.season,
+          day: save.calendar.day,
+          minutes: save.calendar.timeMinutes,
+        },
+        content.weather,
+      );
+      overlayCtrl.updateFrom({
+        minutes: save.calendar.timeMinutes,
+        season: save.calendar.season,
+        weatherId: weather?.id ?? null,
+        festivalId: null,
+        relationshipLevel: 0,
+        activeEventFlags: [],
+      });
     });
   }
 
