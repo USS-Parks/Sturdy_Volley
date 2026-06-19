@@ -120,6 +120,11 @@ export function resolveDay(input: ResolveDayInput): ResolveDayResult {
   });
   save.worldEntities = worldResult.entities;
 
+  // RF-13: reset weekly gift counters at the start of a new week (Monday).
+  if (absoluteDay(nextTime) % 7 === 0) {
+    save.giftsThisWeek = {};
+  }
+
   const tomorrowFestival = festivalOn(nextTime, festivals);
   const tomorrowBirthdays = birthdaysOn(nextTime, npcs).map((n) => n.name);
 

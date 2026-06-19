@@ -36,6 +36,15 @@ import {
   type DialogueState,
   type RunResult,
 } from '../engine/dialogue';
+import {
+  applyGift,
+  buildTastingTable,
+  isBirthdayToday,
+  relationshipLevel,
+  type TastingTable,
+} from '../engine/friendship';
+import { recordRelationshipChange } from '../engine/gameState';
+import { removeItem } from '../engine/inventory';
 
 interface TownBuilding {
   id: string;
@@ -177,6 +186,7 @@ export class TownScene extends GameScene {
   private flag: AbstractMesh | null = null;
   private flagAge = 0;
   private readonly npcs = new Map<string, LiveNpc>();
+  private tastingTable: TastingTable = {};
 
   build(): Scene {
     const scene = makeScene(this.ctx.engine, PALETTE.sky);
@@ -299,6 +309,8 @@ export class TownScene extends GameScene {
     this.controller = createControllerState();
     this.clock = createTimeClock(getGameTime(save));
     this.refreshWorldState();
+    const content = loadGameContent();
+    this.tastingTable = buildTastingTable(content.npcs);
 
     // RF-11: build all four NPCs at scene-enter; off-Town ones spawn parked
     // below the ground and surface only when their schedule routes them here.
@@ -595,7 +607,11 @@ export class TownScene extends GameScene {
     };
   }
 
-  private renderDialogueRun(seed: NpcSeed, run: RunResult): void {
+  private renderDialogueRun(
+    seed: NpcSeed,
+    run: RunResult,
+    tierFlash?: { tier: string; deltaText: string },
+  ): void {
     // Find the most recent "line" event and the awaiting choice (if any).
     let lastLine: string | null = null;
     for (const evt of run.events) {
@@ -606,13 +622,29 @@ export class TownScene extends GameScene {
       this.refreshHud();
       return;
     }
-    const choices = (run.awaitChoice ?? []).map((c: DialogueChoice) => ({ id: c.id, label: c.label }));
+    const baseChoices = (run.awaitChoice ?? []).map((c: DialogueChoice) => ({ id: c.id, label: c.label }));
+
+    // RF-13: append a "Give <item>" choice when the player has a giftable
+    // stack in the active hotbar slot AND the dialogue is at a choice node.
+    const giftEntry = this.activeGiftStack();
+    if (baseChoices.length > 0 && giftEntry) {
+      baseChoices.push({ id: '__gift__', label: `Give ${giftEntry.label}` });
+    }
+
+    const points = this.save.relationships[seed.id] ?? 0;
     this.ctx.overlay.showDialoguePanel({
       speaker: seed.name,
       portraitColor: seed.portraitCss,
       body: lastLine,
-      choices: choices.length > 0 ? choices : undefined,
+      rapportLevel: relationshipLevel(points),
+      rapportMaxLevel: 10,
+      tierFlash,
+      choices: baseChoices.length > 0 ? baseChoices : undefined,
       onSelect: (choiceId) => {
+        if (choiceId === '__gift__' && giftEntry) {
+          this.handleGiftHandoff(seed, giftEntry, run);
+          return;
+        }
         const choice = (run.awaitChoice ?? []).find((c) => c.id === choiceId);
         if (!choice) return;
         const next = pickChoice(seed.graph, choice, run.state);
@@ -623,6 +655,54 @@ export class TownScene extends GameScene {
         this.refreshHud();
       },
     });
+  }
+
+  private activeGiftStack(): { itemId: string; label: string } | null {
+    const stack = this.save.inventory.slots[0]; // hotbar slot 0 is canonical
+    if (!stack) return null;
+    const content = loadGameContent();
+    const item = content.items.find((i) => i.id === stack.itemId);
+    return { itemId: stack.itemId, label: item?.name ?? stack.itemId };
+  }
+
+  private handleGiftHandoff(
+    seed: NpcSeed,
+    giftEntry: { itemId: string; label: string },
+    run: RunResult,
+  ): void {
+    const content = loadGameContent();
+    const npc = content.npcs.find((n) => n.id === seed.id);
+    const isBirthday = npc ? isBirthdayToday(npc, this.save.calendar) : false;
+    const giftsThisWeek = this.save.giftsThisWeek[seed.id] ?? 0;
+    const result = applyGift(this.tastingTable, {
+      npcId: seed.id,
+      itemId: giftEntry.itemId,
+      isBirthday,
+      giftsThisWeek,
+    });
+    let flash: { tier: string; deltaText: string };
+    if (!result.accepted) {
+      flash = { tier: 'neutral', deltaText: 'gift limit reached this week' };
+    } else {
+      this.save.relationships[seed.id] =
+        Math.max(0, (this.save.relationships[seed.id] ?? 0) + result.delta);
+      this.save.giftsThisWeek[seed.id] = giftsThisWeek + 1;
+      const removed = removeItem(this.save.inventory, giftEntry.itemId, 1);
+      this.save.inventory = removed.container;
+      recordRelationshipChange(result.delta);
+      const sign = result.delta >= 0 ? '+' : '';
+      flash = { tier: result.tier, deltaText: `${sign}${result.delta} rapport` };
+      persistActiveSave();
+      this.refreshHotbarVoid();
+    }
+    this.renderDialogueRun(seed, run, flash);
+  }
+
+  /** No-op stub for the hotbar refresh — TownScene doesn't render the
+   * hotbar (FarmScene owns it), but persisting + clearing the active stack
+   * means re-entering the Farm will see the updated state. */
+  private refreshHotbarVoid(): void {
+    // intentionally empty
   }
 
   override dispose(): void {

@@ -44,6 +44,11 @@ export interface DialoguePanelOptions {
   choices?: DialogueChoiceOption[];
   onSelect?: (choiceId: string) => void;
   onDismiss?: () => void;
+  /** RF-13: rapport level (0..maxLevel) shown as a horizontal pip bar. */
+  rapportLevel?: number;
+  rapportMaxLevel?: number;
+  /** RF-13: transient tier feedback after a gift handoff. */
+  tierFlash?: { tier: string; deltaText: string };
 }
 
 function initialsFor(name: string): string {
@@ -51,6 +56,10 @@ function initialsFor(name: string): string {
   if (parts.length === 0) return '?';
   if (parts.length === 1) return parts[0]!.slice(0, 1).toUpperCase();
   return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
+}
+
+function capitalizeTier(tier: string): string {
+  return tier.charAt(0).toUpperCase() + tier.slice(1);
 }
 
 /**
@@ -308,6 +317,30 @@ export class UIOverlay {
     row.appendChild(text);
 
     panel.appendChild(row);
+
+    // RF-13: rapport bar — N filled pips out of `rapportMaxLevel`.
+    if (typeof opts.rapportLevel === 'number') {
+      const max = opts.rapportMaxLevel ?? 10;
+      const bar = document.createElement('div');
+      bar.className = 'dialogue-rapport';
+      bar.dataset.testid = 'dialogue-rapport';
+      for (let i = 0; i < max; i++) {
+        const pip = document.createElement('span');
+        pip.className = 'dialogue-pip';
+        if (i < opts.rapportLevel) pip.classList.add('dialogue-pip-on');
+        bar.appendChild(pip);
+      }
+      panel.appendChild(bar);
+    }
+
+    // RF-13: tier flash after a gift handoff.
+    if (opts.tierFlash) {
+      const flash = document.createElement('div');
+      flash.className = `dialogue-tier dialogue-tier-${opts.tierFlash.tier}`;
+      flash.dataset.testid = 'dialogue-tier-flash';
+      flash.textContent = `${capitalizeTier(opts.tierFlash.tier)} — ${opts.tierFlash.deltaText}`;
+      panel.appendChild(flash);
+    }
 
     // Typewriter — reveals the body progressively, skips to full on click.
     const fullBody = opts.body;

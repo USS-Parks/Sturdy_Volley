@@ -248,6 +248,60 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## RF-13 — Gift handoff + rapport bar (2026-06-19)
+
+Wired `engine/friendship.ts`'s gift engine into the live dialogue surface.
+The player can hand a held item to any NPC through the dialogue panel; the
+panel shows a rapport pip bar and a per-handoff tier flash; weekly gift
+counters reset on the Monday boundary.
+
+- **`src/engine/saveModel.ts`** — `giftsThisWeek: Record<string, number>`
+  added to the save schema and `createNewSave` seed.
+- **`src/engine/dayResolution.ts`** — when `absoluteDay(nextTime) % 7 === 0`
+  (every Monday after the calendar roll), `save.giftsThisWeek` resets to
+  an empty record. Honored by the friendship engine's `applyGift` weekly
+  limit check.
+- **`src/ui/overlay.ts`** — `DialoguePanelOptions` extended with
+  `rapportLevel`, `rapportMaxLevel`, and `tierFlash`. The panel renders an
+  N-pip horizontal bar (filled = current level) above the choice list,
+  and a tier-colored flash row (`Loved / Liked / Neutral / Disliked /
+  Hated — +N rapport`) when the gift just landed.
+- **`src/styles.css`** — `.dialogue-rapport` + `.dialogue-pip` + per-tier
+  `.dialogue-tier-*` styling.
+- **`src/scenes/TownScene.ts`** — builds a `TastingTable` from
+  `loadGameContent().npcs` at scene-enter. `renderDialogueRun` reads
+  `save.relationships[seed.id]` for the pip bar; appends a `Give <item>`
+  choice when hotbar slot 0 has anything. The new `handleGiftHandoff`
+  routes through `applyGift` with the live `giftsThisWeek` counter +
+  the NPC's `isBirthdayToday`, updates `save.relationships`,
+  `save.giftsThisWeek`, calls `removeItem` to drop the stack, records
+  the relationship change via the ledger, persists, and re-renders the
+  dialogue with the tier flash. Gift-limited cases surface as the
+  "neutral — gift limit reached this week" flash.
+- **`tests/e2e/gift.spec.ts`** — fresh save → Day 3 (sunny) → goat-cheese
+  in hotbar slot 0 → walk to Mara → open dialogue → click "Give Goat
+  Cheese" → asserts the "Loved" tier flash, the rapport bar visibility,
+  the saved `relationships['mara-vale'] ≥ 80`, `giftsThisWeek['mara-vale']
+  === 1`, and the now-empty hotbar slot 0.
+
+**Acceptance criteria (§0.9 / RF-13):**
+- [x] Gift handoff interaction surface (dialogue panel `Give <item>`
+  choice when the player has a stack in hotbar slot 0).
+- [x] `applyGift` wired through the live save — relationship points
+  bump, weekly counter increments, item leaves the inventory, ledger
+  records the change.
+- [x] Rapport bar on the dialogue panel (`relationshipLevel(points)` of
+  `rapportMaxLevel = 10`).
+- [x] Birthday × multiplier honored (`isBirthdayToday(npc, now)` from
+  the friendship engine is passed into `applyGift`; effective at
+  runtime, regression-tested by the engine's unit suite).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`218/218` (unchanged — RF-13 is integration code) · build OK · Playwright
+`56/56` (54 prior + 2 new gift specs on desktop + Pixel 5).
+
+---
+
 ## RF-12 — Full dialogue panel + branching graph integration (2026-06-19)
 
 Upgraded the minimal one-line greet bubble from VS-A4 into the full dialogue

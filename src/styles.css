@@ -564,6 +564,37 @@ body {
   margin-top: 4px;
 }
 
+.dialogue-rapport {
+  display: flex;
+  gap: 3px;
+  padding: 6px 2px;
+}
+
+.dialogue-pip {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.dialogue-pip-on {
+  background: var(--sv-brass);
+}
+
+.dialogue-tier {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.dialogue-tier-loved { background: rgba(201, 162, 75, 0.32); color: #f6dca8; }
+.dialogue-tier-liked { background: rgba(84, 185, 172, 0.22); color: #b6f0e8; }
+.dialogue-tier-neutral { background: rgba(255, 255, 255, 0.08); color: var(--sv-muted); }
+.dialogue-tier-disliked { background: rgba(231, 111, 111, 0.20); color: #ff9d9d; }
+.dialogue-tier-hated { background: rgba(231, 111, 111, 0.32); color: #ff8484; }
+
 /* Schedule-debug overlay (RF-11) — only mounted when ?debug=schedules is set. */
 #schedule-overlay {
   position: absolute;
