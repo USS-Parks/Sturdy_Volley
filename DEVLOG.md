@@ -248,6 +248,60 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## RF-12 — Full dialogue panel + branching graph integration (2026-06-19)
+
+Upgraded the minimal one-line greet bubble from VS-A4 into the full dialogue
+panel: portrait placeholder + typewritten body + branching choice list, all
+driven by `engine/dialogue.ts`'s runner with a per-NPC `DialogueGraph`.
+
+- **`src/ui/overlay.ts`** — new `showDialoguePanel(opts)` renders the
+  portrait initials chip (colored by per-NPC `portraitColor`), a typewriter
+  body (~35 chars/sec, tap-to-skip), and either a vertical choice list
+  (when `opts.choices` is present) or a single Continue button. The old
+  `showDialogue(speaker, body, onDismiss)` API is retained as a thin
+  wrapper that maps onto the new panel — no callers needed to change.
+  `DialoguePanelOptions` + `DialogueChoiceOption` exported.
+- **`src/scenes/TownScene.ts`** — `NPC_SEEDS` entries gain a typed
+  `DialogueGraph` per NPC (greet → choice between "Tell me more" → a
+  follow-up node + "See you around" → end). New `openNpcGreeting`
+  builds a `DialogueState`, runs the graph, and routes the result
+  through `renderDialogueRun(seed, run)` which feeds the most recent
+  `line` body + the awaiting `choice` set into `showDialoguePanel`.
+  Picking a choice calls `pickChoice(graph, choice, state)` and re-
+  enters `renderDialogueRun` with the next event stream. `makeDialogueState`
+  derives `inventoryCount` from the live save inventory, and `now`
+  from the calendar + weather so condition predicates in the engine
+  (`hasItem`, `weather`, `season`) work the moment a follow-up needs them.
+- **`src/styles.css`** — `.dialogue-row` grid (portrait + body), circular
+  `.dialogue-portrait` with bordered chip, vertical `.dialogue-choices`
+  button list, body has `cursor: pointer` for the skip affordance.
+- **`tests/unit/overlay.test.ts`** — 2 new specs: portrait + initials +
+  Continue path; branching choice list + `onSelect` callback. Total
+  unit tests: 218 (24 in overlay).
+- **`tests/e2e/npc.spec.ts`** — Mara greet spec extended to cover the
+  branching path: asserts the portrait + choice list, picks
+  "Tell me more", waits for the follow-up body, then dismisses.
+
+**Acceptance criteria (§0.9 / RF-12):**
+- [x] Portrait placeholder (NPC initials chip with `portraitColor` background).
+- [x] Typewriter pacing (configurable `charsPerSecond`, skip-on-click).
+- [x] Branching choices (per-NPC `DialogueGraph` with at least one
+  `choices` node; e2e covers picking + advancing).
+- [x] Line-seen-today tracking — supported by the engine's
+  `markLineSeenToday` + `lineNotSeenToday` condition; the runner
+  state survives the round-trip via `pickChoice(graph, choice, state)`.
+- [ ] `startQuest` / `startCutscene` effect routing — engine emits
+  `DialogueEvent { kind: 'effect' }` for these; the renderer wave
+  consumes them once the quest engine (Prompt 028) + cutscene
+  scene-renderer (RF-14) land. Until then the events are recorded in
+  `run.events` and observable for tests.
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`218/218` (28 files, +2 dialogue-panel specs) · build OK · Playwright
+`54/54` (unchanged total — the Mara spec deepens but stays a single test).
+
+---
+
 ## RF-11 — All four NPCs walking + `?debug=schedules` overlay (2026-06-19)
 
 Extended the live-NPC layer from VS-A4's solo Mara to the full four-NPC cast

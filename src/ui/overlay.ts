@@ -30,6 +30,29 @@ export interface HotbarOptions {
   onSelect: (index: number) => void;
 }
 
+export interface DialogueChoiceOption {
+  id: string;
+  label: string;
+}
+
+export interface DialoguePanelOptions {
+  speaker: string;
+  /** CSS color string; defaults to the accent palette. */
+  portraitColor?: string;
+  body: string;
+  charsPerSecond?: number;
+  choices?: DialogueChoiceOption[];
+  onSelect?: (choiceId: string) => void;
+  onDismiss?: () => void;
+}
+
+function initialsFor(name: string): string {
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0]!.slice(0, 1).toUpperCase();
+  return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
+}
+
 /**
  * Manages the HTML overlay layer (#ui-root) rendered above the Phaser canvas.
  * Using real DOM keeps menus accessible (focus order, keyboard, screen readers)
@@ -243,29 +266,98 @@ export class UIOverlay {
   }
 
   /**
-   * Minimal dialogue bubble (VS-A4). One line + dismiss button. The full panel
-   * with portrait + typewriter + branching choices arrives at RF-12. Idempotent
-   * via `clear()` — opens replace any prior bubble cleanly.
+   * Minimal dialogue bubble (VS-A4 compat). One line + dismiss. Kept so older
+   * callers don't break; new code should use `showDialoguePanel` (RF-12).
    */
   showDialogue(speaker: string, body: string, onDismiss: () => void): void {
+    this.showDialoguePanel({
+      speaker,
+      body,
+      onDismiss,
+    });
+  }
+
+  /**
+   * Full dialogue panel (RF-12). Portrait placeholder + speaker name +
+   * typewritten body + optional branching choices. The typewriter reveals
+   * the body at ~35 chars/sec; tapping the body skips to the full line. When
+   * `choices` is present, the Continue button is replaced with a vertical
+   * list of choice buttons; `onSelect(choiceId)` fires when one is picked.
+   */
+  showDialoguePanel(opts: DialoguePanelOptions): void {
     this.clear();
-    const panel = this.createPanel(speaker);
-    panel.classList.add('dialogue-bubble');
+    const panel = this.createPanel(opts.speaker);
+    panel.classList.add('dialogue-bubble', 'dialogue-panel');
     panel.dataset.testid = 'dialogue-bubble';
+
+    // Portrait placeholder — colored circle with the speaker initials.
+    const row = document.createElement('div');
+    row.className = 'dialogue-row';
+
+    const portrait = document.createElement('div');
+    portrait.className = 'dialogue-portrait';
+    portrait.dataset.testid = 'dialogue-portrait';
+    portrait.style.background = opts.portraitColor ?? 'var(--sv-accent)';
+    portrait.textContent = initialsFor(opts.speaker);
+    row.appendChild(portrait);
 
     const text = document.createElement('p');
     text.className = 'dialogue-body';
     text.dataset.testid = 'dialogue-body';
-    text.textContent = body;
-    panel.appendChild(text);
+    text.textContent = '';
+    row.appendChild(text);
 
-    const dismiss = document.createElement('button');
-    dismiss.className = 'menu-button';
-    dismiss.type = 'button';
-    dismiss.textContent = 'Continue';
-    dismiss.dataset.testid = 'dialogue-dismiss';
-    dismiss.addEventListener('click', onDismiss);
-    panel.appendChild(dismiss);
+    panel.appendChild(row);
+
+    // Typewriter — reveals the body progressively, skips to full on click.
+    const fullBody = opts.body;
+    let revealed = 0;
+    const speed = opts.charsPerSecond ?? 35;
+    let active = true;
+    const tick = (): void => {
+      if (!active) return;
+      revealed = Math.min(fullBody.length, revealed + Math.max(1, Math.ceil(speed / 30)));
+      text.textContent = fullBody.slice(0, revealed);
+      if (revealed < fullBody.length) {
+        window.setTimeout(tick, 1000 / 30);
+      }
+    };
+    text.addEventListener('click', () => {
+      revealed = fullBody.length;
+      text.textContent = fullBody;
+    });
+    window.setTimeout(tick, 1000 / 30);
+
+    // Choices: vertical button list when present; Continue otherwise.
+    if (opts.choices && opts.choices.length > 0) {
+      const list = document.createElement('div');
+      list.className = 'dialogue-choices';
+      list.dataset.testid = 'dialogue-choices';
+      for (const choice of opts.choices) {
+        const btn = document.createElement('button');
+        btn.className = 'menu-button';
+        btn.type = 'button';
+        btn.textContent = choice.label;
+        btn.dataset.testid = `dialogue-choice-${choice.id}`;
+        btn.addEventListener('click', () => {
+          active = false;
+          opts.onSelect?.(choice.id);
+        });
+        list.appendChild(btn);
+      }
+      panel.appendChild(list);
+    } else {
+      const dismiss = document.createElement('button');
+      dismiss.className = 'menu-button';
+      dismiss.type = 'button';
+      dismiss.textContent = 'Continue';
+      dismiss.dataset.testid = 'dialogue-dismiss';
+      dismiss.addEventListener('click', () => {
+        active = false;
+        opts.onDismiss?.();
+      });
+      panel.appendChild(dismiss);
+    }
 
     this.root.appendChild(panel);
     this.focusFirstEnabled(panel);

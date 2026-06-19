@@ -28,6 +28,14 @@ import type { Weather } from '../data/schemas';
 import { activeWaypoint, liveStep, type Waypoint } from '../engine/npcSchedule';
 import { loadSchedule } from '../engine/schedules';
 import { buildNpcGraybox, faceTo, type NpcGrayboxHandles } from '../render/npc-graybox';
+import {
+  pickChoice,
+  run as runDialogue,
+  type DialogueChoice,
+  type DialogueGraph,
+  type DialogueState,
+  type RunResult,
+} from '../engine/dialogue';
 
 interface TownBuilding {
   id: string;
@@ -66,14 +74,78 @@ interface NpcSeed {
   id: string;
   name: string;
   bodyColor: Color3;
-  greeting: string;
+  /** CSS color string used for the dialogue portrait — derived from bodyColor. */
+  portraitCss: string;
+  graph: DialogueGraph;
+}
+
+function buildGreetGraph(npcId: string, greet: string, followUp: string): DialogueGraph {
+  return {
+    startNodeId: 'greet',
+    nodes: {
+      greet: {
+        id: 'greet',
+        speakerNpcId: npcId,
+        body: greet,
+        choices: [
+          { id: 'tell-more', label: 'Tell me more', next: 'more' },
+          { id: 'wave-off', label: 'See you around' },
+        ],
+      },
+      more: {
+        id: 'more',
+        speakerNpcId: npcId,
+        body: followUp,
+      },
+    },
+  };
 }
 
 const NPC_SEEDS: NpcSeed[] = [
-  { id: 'mara-vale', name: 'Mara Vale', bodyColor: PALETTE.player, greeting: 'Morning, neighbor. The harbor winch is still rattling — come find me when you have a spare hour.' },
-  { id: 'jun-park', name: 'Jun Park', bodyColor: PALETTE.roof, greeting: "Loaves are on the rack at noon — drop in if the day gets long." },
-  { id: 'sol-aranda', name: 'Sol Aranda', bodyColor: PALETTE.grass, greeting: 'I logged a thaw-stripe in the bluff seeds — best planted before the next windstorm.' },
-  { id: 'lio-marin', name: 'Lio Marin', bodyColor: PALETTE.accent, greeting: 'Tide pulled three crab pots loose last night. Storm season is early this year.' },
+  {
+    id: 'mara-vale',
+    name: 'Mara Vale',
+    bodyColor: PALETTE.player,
+    portraitCss: '#2e5c8a',
+    graph: buildGreetGraph(
+      'mara-vale',
+      'Morning, neighbor. The harbor winch is still rattling — come find me when you have a spare hour.',
+      'Once the lighthouse beacon is back lit, the whole harbor schedule clicks. Take your time getting there.',
+    ),
+  },
+  {
+    id: 'jun-park',
+    name: 'Jun Park',
+    bodyColor: PALETTE.roof,
+    portraitCss: '#8c402f',
+    graph: buildGreetGraph(
+      'jun-park',
+      "Loaves are on the rack at noon — drop in if the day gets long.",
+      'Try a thumb of harborlime in your bread water sometime. Brightens the crumb.',
+    ),
+  },
+  {
+    id: 'sol-aranda',
+    name: 'Sol Aranda',
+    bodyColor: PALETTE.grass,
+    portraitCss: '#3d7e48',
+    graph: buildGreetGraph(
+      'sol-aranda',
+      'I logged a thaw-stripe in the bluff seeds — best planted before the next windstorm.',
+      "Bring me a Bell Pea pod and I'll show you the press notes from the storm year.",
+    ),
+  },
+  {
+    id: 'lio-marin',
+    name: 'Lio Marin',
+    bodyColor: PALETTE.accent,
+    portraitCss: '#54b9ac',
+    graph: buildGreetGraph(
+      'lio-marin',
+      'Tide pulled three crab pots loose last night. Storm season is early this year.',
+      'Watch the pier at low tide tomorrow — I might let you help reset the pots.',
+    ),
+  },
 ];
 
 /**
@@ -497,9 +569,59 @@ export class TownScene extends GameScene {
     const npc = this.npcs.get(npcId);
     if (!seed || !npc) return;
     this.dialogueOpen = true;
-    this.ctx.overlay.showDialogue(seed.name, seed.greeting, () => {
+    const startState = this.makeDialogueState();
+    const run = runDialogue(seed.graph, startState);
+    this.renderDialogueRun(seed, run);
+  }
+
+  private makeDialogueState(): DialogueState {
+    return {
+      flags: {},
+      relationships: {},
+      lineSeenToday: {},
+      lineSeenEver: {},
+      inventoryCount: (itemId) => {
+        let total = 0;
+        for (const slot of this.save.inventory.slots) {
+          if (slot?.itemId === itemId) total += slot.qty;
+        }
+        return total;
+      },
+      now: {
+        season: this.save.calendar.season,
+        day: this.save.calendar.day,
+        weatherId: this.weather?.id ?? null,
+      },
+    };
+  }
+
+  private renderDialogueRun(seed: NpcSeed, run: RunResult): void {
+    // Find the most recent "line" event and the awaiting choice (if any).
+    let lastLine: string | null = null;
+    for (const evt of run.events) {
+      if (evt.kind === 'line') lastLine = evt.body;
+    }
+    if (!lastLine) {
       this.dialogueOpen = false;
       this.refreshHud();
+      return;
+    }
+    const choices = (run.awaitChoice ?? []).map((c: DialogueChoice) => ({ id: c.id, label: c.label }));
+    this.ctx.overlay.showDialoguePanel({
+      speaker: seed.name,
+      portraitColor: seed.portraitCss,
+      body: lastLine,
+      choices: choices.length > 0 ? choices : undefined,
+      onSelect: (choiceId) => {
+        const choice = (run.awaitChoice ?? []).find((c) => c.id === choiceId);
+        if (!choice) return;
+        const next = pickChoice(seed.graph, choice, run.state);
+        this.renderDialogueRun(seed, next);
+      },
+      onDismiss: () => {
+        this.dialogueOpen = false;
+        this.refreshHud();
+      },
     });
   }
 

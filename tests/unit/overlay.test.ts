@@ -288,6 +288,41 @@ describe('UIOverlay', () => {
     });
   });
 
+  it('RF-12: showDialoguePanel renders portrait + body + Continue when no choices', () => {
+    const overlay = new UIOverlay();
+    let dismissed = false;
+    overlay.showDialoguePanel({
+      speaker: 'Mara Vale',
+      portraitColor: '#2e5c8a',
+      body: 'Morning.',
+      onDismiss: () => {
+        dismissed = true;
+      },
+    });
+    expect(document.querySelector('[data-testid="dialogue-bubble"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="dialogue-portrait"]')?.textContent).toBe('MV');
+    document.querySelector<HTMLButtonElement>('[data-testid="dialogue-dismiss"]')?.click();
+    expect(dismissed).toBe(true);
+  });
+
+  it('RF-12: showDialoguePanel renders branching choice buttons when present', () => {
+    const overlay = new UIOverlay();
+    const picks: string[] = [];
+    overlay.showDialoguePanel({
+      speaker: 'Mara Vale',
+      body: 'Need help with the harbor?',
+      choices: [
+        { id: 'yes', label: 'Sure' },
+        { id: 'no', label: 'Not today' },
+      ],
+      onSelect: (id) => picks.push(id),
+    });
+    expect(document.querySelector('[data-testid="dialogue-choices"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="dialogue-choice-yes"]')).toBeTruthy();
+    document.querySelector<HTMLButtonElement>('[data-testid="dialogue-choice-no"]')?.click();
+    expect(picks).toEqual(['no']);
+  });
+
   it('showReport renders pass/fail rows and a Back button', () => {
     const overlay = new UIOverlay();
     let backed = false;

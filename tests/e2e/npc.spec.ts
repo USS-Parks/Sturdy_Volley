@@ -130,7 +130,14 @@ test.describe('VS-A4 — Live NPC + greet bubble', () => {
     await page.keyboard.up('e');
 
     await expect(page.getByTestId('dialogue-bubble')).toBeVisible();
-    await expect(page.getByTestId('dialogue-body')).toContainText('Morning');
+    await expect(page.getByTestId('dialogue-portrait')).toBeVisible();
+    // RF-12: the panel surfaces choice buttons instead of Continue.
+    await expect(page.getByTestId('dialogue-choices')).toBeVisible();
+    await expect(page.getByTestId('dialogue-choice-tell-more')).toBeVisible();
+
+    // Pick "Tell me more" — the follow-up line appears + has a Continue button.
+    await page.getByTestId('dialogue-choice-tell-more').click();
+    await expect(page.getByTestId('dialogue-body')).toContainText('lighthouse', { timeout: 4000 });
     await page.getByTestId('dialogue-dismiss').click();
     await expect(page.getByTestId('dialogue-bubble')).not.toBeVisible();
   });
