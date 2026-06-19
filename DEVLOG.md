@@ -118,3 +118,44 @@ detached → timeouts). Preview is static + deterministic and tests the shipped
 artifact. The dev-only data-validation screen isn't in the prod build, so its UI
 moved to jsdom unit tests (`UIOverlay.showReport`). Added `optimizeDeps.include`
 for a smoother `npm run dev` too.
+
+---
+
+## Prompt 004 — Tilemap renderer and collision (2026-06-18)
+
+Replaced the Farm placeholder card with the first real playable tilemap scene.
+
+- **Procedural placeholder art** (`engine/textures.ts`): a generated tileset
+  (grass/soil/sand/water×2/cliff/path) plus player/tree/rock/house/fence/court/
+  tuft sprites — all original code-drawn shapes, no external assets.
+- **Map** (`maps/breakpointFarm.ts`, `maps/tiles.ts`): deterministic 40×30 farm —
+  grass field, northern cliff edge, tide-fed water channel, tilled soil patch,
+  sandy corner, and 12 objects (house, trees, rocks, fence, court). Pure data,
+  unit-tested.
+- **FarmScene**: Phaser tilemap + tile collision (water/cliff), static-body
+  collision for solid objects, depth sorting by y, animated water (tile swap)
+  and swaying grass tufts, a follow camera bounded to the map (lerp +
+  roundPixels = no jitter), and world-bounds clamping.
+- **Player movement** (`engine/movement.ts`): pure `computeMoveVector` (keyboard
+  axes, normalized diagonals, pointer fallback with deadzone), unit-tested.
+  Keyboard (arrows + WASD) + touch (drag toward pointer).
+- **HUD + pause menu**: top-bar HUD (location + status + Menu) and a pause menu
+  preserving navigation (Town/Court/Mine) + Save & quit until proper map exits
+  arrive.
+
+**Acceptance criteria**
+
+- [x] Player can walk around the farm with keyboard and touch (keyboard
+  e2e-verified; touch logic unit-tested + wired)
+- [x] Collision correct for fences, water, rocks, trees, house, cliffs
+- [x] Camera follows without jitter (lerp follow + roundPixels)
+- [x] Mobile viewport keeps player + UI readable (Scale.FIT; mobile e2e passes)
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest `48/48`
+(8 files) · build `dist/` (bundle ~1.57 MB / 363 KB gzip) · Playwright `12/12`
+(desktop + mobile).
+
+**Note (e2e workers):** capped Playwright to 2 workers locally / 1 in CI. The
+heavier Farm scene under software WebGL (SwiftShader) saturated the CPU at 8
+parallel instances, stalling in-page actionability checks. Serial/low-worker
+runs are deterministic.

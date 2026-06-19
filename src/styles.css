@@ -121,6 +121,43 @@ body {
   background: transparent;
 }
 
+/* In-game HUD (top bar) */
+.hud-bar {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top));
+  left: 8px;
+  right: 8px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.hud-info {
+  pointer-events: auto;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--sv-panel);
+  border: 1px solid var(--sv-panel-border);
+}
+
+.hud-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.hud-status {
+  font-size: 12px;
+  color: var(--sv-muted);
+}
+
+.hud-menu-button {
+  pointer-events: auto;
+  min-height: 44px;
+  min-width: 88px;
+}
+
 /* Forms */
 .menu-form {
   display: flex;

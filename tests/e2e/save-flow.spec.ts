@@ -10,25 +10,25 @@ test.describe('Save bootstrap', () => {
     await page.getByTestId('field-farmName').fill('Saltbreak');
     await page.getByTestId('form-submit').click();
 
-    // Lands on the Farm with the player's status line.
-    await expect(page.getByRole('heading', { name: 'Breakpoint Farm' })).toBeVisible();
+    // Lands on the Farm: canvas renders and the HUD shows the player's status.
+    await expect(page.locator('#game-root canvas')).toBeVisible();
     await expect(page.getByText('Wren', { exact: false })).toBeVisible();
 
     // A save now exists.
     const saved = await page.evaluate(() => localStorage.getItem('sturdy-volley:save:v1'));
     expect(saved).toBeTruthy();
 
-    // Scene transitions: Farm -> Town -> Farm.
+    // Pause menu navigation: Farm -> Town -> Farm.
+    await page.getByTestId('hud-menu').click();
     await page.getByTestId('nav-town').click();
     await expect(page.getByRole('heading', { name: 'Ballast Bay' })).toBeVisible();
     await page.getByTestId('nav-farm').click();
-    await expect(page.getByRole('heading', { name: 'Breakpoint Farm' })).toBeVisible();
+    await expect(page.getByText('Wren', { exact: false })).toBeVisible();
 
-    // Reload: Continue is enabled and restores the save.
+    // Reload: Continue is enabled and restores the save into the Farm.
     await page.reload();
     await expect(page.getByTestId('title-continue')).toBeEnabled();
     await page.getByTestId('title-continue').click();
-    await expect(page.getByRole('heading', { name: 'Breakpoint Farm' })).toBeVisible();
     await expect(page.getByText('Wren', { exact: false })).toBeVisible();
   });
 

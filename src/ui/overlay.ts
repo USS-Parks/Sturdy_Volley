@@ -68,6 +68,33 @@ export class UIOverlay {
     this.focusFirstEnabled(panel);
   }
 
+  /** Compact in-game HUD: a top bar with the location, status, and a Menu button. */
+  showHud(title: string, status: string, onMenu: () => void): void {
+    this.clear();
+    const bar = document.createElement('div');
+    bar.className = 'hud-bar';
+
+    const info = document.createElement('div');
+    info.className = 'hud-info';
+    const heading = document.createElement('div');
+    heading.className = 'hud-title';
+    heading.textContent = title;
+    const statusLine = document.createElement('div');
+    statusLine.className = 'hud-status';
+    statusLine.textContent = status;
+    info.append(heading, statusLine);
+
+    const menu = document.createElement('button');
+    menu.className = 'menu-button hud-menu-button';
+    menu.type = 'button';
+    menu.textContent = 'Menu';
+    menu.dataset.testid = 'hud-menu';
+    menu.addEventListener('click', onMenu);
+
+    bar.append(info, menu);
+    this.root.appendChild(bar);
+  }
+
   /** A simple form panel with text fields, a submit button, and Cancel. */
   showForm(
     title: string,
