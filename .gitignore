@@ -26,3 +26,7 @@ Thumbs.db
 
 # Claude Code worktrees + agent scratch nested under this folder (unrelated repo)
 .claude/
+
+# Working art-production folder (source art / style boards), generated separately.
+# Excluded until the art is ready to apply; runtime-ready assets live in public/assets/.
+art-production/
