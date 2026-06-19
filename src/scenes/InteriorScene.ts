@@ -36,7 +36,21 @@ import type { Weather } from '../data/schemas';
 interface InteriorEntryData {
   /** Anchor id the player should spawn at on entry. */
   entry?: 'inside-door' | 'bed';
+  /** When entering from a Town building, where to return on exit + title shown. */
+  shopId?: string;
 }
+
+const SHOP_TITLES: Record<string, string> = {
+  'market-bakery': 'Bakery',
+  'market-clinic': 'Clinic',
+  'market-library': 'Library',
+  'market-gear': 'Gear Shop',
+  'fishmonger': 'Fishmonger',
+  'community-hall': 'Community Hall',
+  'schoolhouse': 'Schoolhouse',
+  'blacksmith': 'Blacksmith',
+  'apartments': 'Apartments',
+};
 
 /**
  * The farmhouse interior (VS-A3). One-room graybox: floor, four walls + a
@@ -66,6 +80,8 @@ export class InteriorScene extends GameScene {
 
   private readonly insideDoorAnchor = new Vector3(0, 0.9, 4.5);
   private readonly bedAnchor = new Vector3(-3, 0.9, -2);
+  private returnTarget: 'Farm' | 'Town' = 'Farm';
+  private title = 'Farmhouse';
 
   build(): Scene {
     const scene = makeScene(this.ctx.engine, PALETTE.sky);
@@ -186,12 +202,19 @@ export class InteriorScene extends GameScene {
     this.refreshWorldState();
 
     // Spawn at the requested anchor (defaults to inside-door).
-    const entry: InteriorEntryData['entry'] =
-      typeof data === 'object' && data !== null && 'entry' in data
-        ? ((data as InteriorEntryData).entry ?? 'inside-door')
-        : 'inside-door';
+    const entryData: InteriorEntryData =
+      typeof data === 'object' && data !== null ? (data as InteriorEntryData) : {};
+    const entry = entryData.entry ?? 'inside-door';
     const spawn = entry === 'bed' ? this.bedAnchor : this.insideDoorAnchor;
     this.player.position.copyFrom(spawn);
+    // RF-15: pick the title + return target based on shopId.
+    if (entryData.shopId) {
+      this.title = SHOP_TITLES[entryData.shopId] ?? 'Shop';
+      this.returnTarget = 'Town';
+    } else {
+      this.title = 'Farmhouse';
+      this.returnTarget = 'Farm';
+    }
 
     this.targets = [
       { id: 'inside-door', kind: 'door', label: 'Step outside', x: 0, z: 5.6, radius: 1.6, priority: 5 },
@@ -290,7 +313,7 @@ export class InteriorScene extends GameScene {
     let line = `${status} · energy ${stamina}%`;
     if (this.actionTimer > 0) line += ` · ✔ ${this.actionLabel}`;
     else if (this.nearest) line += ` · [E] ${this.nearest.label}`;
-    this.ctx.overlay.showHud('Farmhouse', line, () => this.openMenu());
+    this.ctx.overlay.showHud(this.title, line, () => this.openMenu());
   }
 
   private openMenu(): void {
@@ -334,7 +357,11 @@ export class InteriorScene extends GameScene {
   }
 
   private exitToFarm(): void {
-    this.goTo('Farm', { entry: 'farmhouse-door' });
+    if (this.returnTarget === 'Town') {
+      this.goTo('Town', undefined);
+    } else {
+      this.goTo('Farm', { entry: 'farmhouse-door' });
+    }
   }
 
   private triggerSleep(collapsed: boolean): void {

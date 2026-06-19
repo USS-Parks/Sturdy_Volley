@@ -45,6 +45,7 @@ import {
 } from '../engine/friendship';
 import { recordRelationshipChange } from '../engine/gameState';
 import { removeItem } from '../engine/inventory';
+import { hoursFor, isShopOpen, type ShopHours } from '../engine/shops';
 
 interface TownBuilding {
   id: string;
@@ -397,6 +398,25 @@ export class TownScene extends GameScene {
         priority: 4,
       });
     }
+    // RF-15: building doors. Each shop door appears as an interaction target
+    // labeled with the building name and an open/closed badge based on
+    // `engine/shops.ts` hours.
+    const minutes = this.clock?.time?.minutes ?? this.save.calendar.timeMinutes;
+    for (const b of BUILDINGS) {
+      const [x, z] = b.position;
+      const doorZ = z + b.depth / 2 + 0.4;
+      const hours = hoursFor(b.id);
+      const open = hours ? isShopOpen(hours, minutes, false) : true;
+      base.push({
+        id: `door:${b.id}`,
+        kind: 'door',
+        label: open ? `Enter the ${b.label}` : `${b.label} — closed today`,
+        x,
+        z: doorZ,
+        radius: 1.2,
+        priority: 3,
+      });
+    }
     this.targets = base;
   }
 
@@ -453,6 +473,7 @@ export class TownScene extends GameScene {
     const interact = this.pressed.has('e') || this.pressed.has(' ');
     if (interact && !this.ePrev && this.nearest) {
       if (this.nearest.id.startsWith('npc:')) this.openNpcGreeting(this.nearest.id.slice('npc:'.length));
+      else if (this.nearest.id.startsWith('door:')) this.handleDoor(this.nearest.id.slice('door:'.length));
       else {
         this.actionLabel = this.nearest.label;
         this.actionTimer = 1.6;
@@ -574,6 +595,30 @@ export class TownScene extends GameScene {
         this.goTo('Title');
         break;
     }
+  }
+
+  private handleDoor(buildingId: string): void {
+    const minutes = this.clock.time.minutes;
+    const hours = hoursFor(buildingId);
+    const open = hours ? isShopOpen(hours, minutes, false) : true;
+    if (!open) {
+      const building = BUILDINGS.find((b) => b.id === buildingId);
+      this.actionLabel = `${building?.label ?? 'Shop'} is closed (${this.formatHours(hours)}).`;
+      this.actionTimer = 1.8;
+      return;
+    }
+    this.goTo('Interior', { entry: 'inside-door', shopId: buildingId });
+  }
+
+  private formatHours(hours: ShopHours | null): string {
+    if (!hours) return 'always open';
+    const fmt = (m: number): string => {
+      const h24 = Math.floor(m / 60) % 24;
+      const ampm = h24 < 12 ? 'AM' : 'PM';
+      const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+      return `${h12} ${ampm}`;
+    };
+    return `${fmt(hours.open)}–${fmt(hours.close)}`;
   }
 
   private openNpcGreeting(npcId: string): void {

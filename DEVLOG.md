@@ -248,6 +248,98 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## RF-15 — Town building doors + open/closed schedule + §8.1 phase complete (2026-06-19)
+
+Wired the long-uncommitted `engine/shops.ts` into the running game: every
+Ballast Bay building door is now interactable, labeled with the building name
+and an open/closed badge driven by `BALLAST_BAY_HOURS`. Open doors enter an
+InteriorScene parameterized by `shopId` (HUD title shifts + exit returns to
+Town). Closed doors flash a "Bakery is closed (6 AM–6 PM)." action label.
+
+- **`src/engine/shops.ts`** — promoted from uncommitted draft to a tracked
+  module. Adds `BALLAST_BAY_HOURS: Record<buildingId, ShopHours>` for the
+  9 storefronts (bakery 6 AM–6 PM, clinic 8 AM–7 PM, library 10 AM–8 PM,
+  gear-shop 9 AM–6 PM, fishmonger 5 AM–2 PM, community-hall 8 AM–10 PM,
+  schoolhouse 8 AM–4 PM, blacksmith 9 AM–5 PM, apartments 24/7) and
+  `hoursFor(buildingId)` lookup helper. The existing `isShopOpen(hours,
+  minutes, festivalActive)` is reused as-is.
+- **`tests/unit/shops.test.ts`** — promoted from untracked. 11 tests cover
+  `restockShop`, `buy`, `sellValue`, `isShopOpen`, plus 2 new RF-15 specs
+  for `BALLAST_BAY_HOURS` + `hoursFor` (returns hours for every shop;
+  apartments are open 24/7).
+- **`src/scenes/TownScene.ts`** — `rebuildTargets` now appends one
+  `door:<buildingId>` per BUILDING (at z = building.z + depth/2 + 0.4,
+  radius 1.2, priority 3). Label is `Enter the <Name>` when
+  `isShopOpen(hours, minutes, false)` is true, else `<Name> — closed today`.
+  Interaction routes through new `handleDoor(buildingId)` — if open, calls
+  `goTo('Interior', { entry: 'inside-door', shopId: buildingId })`; if
+  closed, flashes `<Name> is closed (open–close hours).` via the action
+  label. New `formatHours(hours)` helper renders "6 AM–6 PM".
+- **`src/scenes/InteriorScene.ts`** — `enter(data)` reads `data.shopId`:
+  when set, the HUD title becomes `SHOP_TITLES[shopId]` (Bakery / Clinic /
+  Library / ...) and `returnTarget = 'Town'` so the exit door routes back
+  to Town (not Farm). Without a `shopId`, the Interior stays the
+  Farmhouse (existing behavior preserved).
+- **`tests/e2e/town-doors.spec.ts`** — 4 specs across desktop + Pixel 5:
+  walking to the bakery door + pressing E enters an Interior with HUD
+  title "Bakery"; walking to the interior exit-door anchor returns to
+  Town. Second spec mutates `save.calendar.timeMinutes` to 15:00, reloads
+  + Continues into Town, and asserts `door:fishmonger`'s target label
+  contains "closed today" via the `window.sturdyVolleyTown.targets()`
+  debug surface.
+
+**Acceptance criteria (§0.9 / RF-15):**
+- [x] Every Ballast Bay building door is interactable (one target per
+  entry in `BUILDINGS`, priority 3, radius 1.2).
+- [x] Open/closed schedule reads from `engine/shops.ts`
+  (`hoursFor(buildingId)` + `isShopOpen(hours, minutes, false)` drive
+  both the target label and the handler branch).
+- [x] Open doors route to an InteriorScene parameterized by `shopId`
+  (HUD title flips; return target = Town).
+- [x] Closed doors show a closed-today message (handler flash + target
+  label both encode the state; e2e covers both).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`227/227` (29 files, +9 shops + 2 RF-15 specs) · build OK · Playwright
+`64/64` (60 prior + 4 new town-doors on desktop + Pixel 5).
+
+---
+
+## §8.1 Retrofit pass complete (2026-06-19)
+
+All six retrofit prompts (RF-10..RF-15) are integrated. Status of §8.1
+prompts at this commit:
+
+- **RF-10 Beach forage + tide-line shells** — shipped at [9487624](https://github.com/USS-Parks/Sturdy_Volley/commit/9487624)
+- **RF-11 Four NPCs walking + schedule overlay** — shipped at [2d1ffdc](https://github.com/USS-Parks/Sturdy_Volley/commit/2d1ffdc)
+- **RF-12 Full dialogue panel + branching graphs** — shipped at [5ac3402](https://github.com/USS-Parks/Sturdy_Volley/commit/5ac3402)
+- **RF-13 Gift handoff + rapport bar** — shipped at [da357e7](https://github.com/USS-Parks/Sturdy_Volley/commit/da357e7)
+- **RF-14 First-morning cutscene + Babylon runner** — shipped at [08cb2fc](https://github.com/USS-Parks/Sturdy_Volley/commit/08cb2fc)
+- **RF-15 Town doors + open/closed schedule** — this commit
+
+What a player can now do in the running build that they couldn't before
+§8.1:
+1. Forage tide-line shells at low tide on Driftwood Beach (RF-10).
+2. Meet Mara + Jun + Sol + Lio walking their schedules across the Town
+   map (RF-11).
+3. Choose branching dialogue with each (portrait + typewriter + choices)
+   (RF-12).
+4. Give them gifts from the hotbar and watch the rapport bar update with
+   loved/liked/neutral/disliked/hated flash (RF-13).
+5. Wake on Day 1 to a 3-camera-beat first-morning cutscene with a starter
+   seed packet + skip button (RF-14).
+6. Walk into the Bakery / Library / Gear Shop / etc. through their
+   doors during opening hours, and see a closed-today badge when out
+   of hours (RF-15).
+
+Up next per the revised P-SPR: §8.2 Continued roster — the original
+Prompts 016..050 executed under §0.9 (every prompt integrated).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`227/227` (29 files) · build OK · Playwright `64/64` (desktop + Pixel 5).
+
+---
+
 ## RF-14 — First-morning cutscene + Babylon camera/character mover (2026-06-19)
 
 Wired `engine/cutscene.ts`'s pure beat runner onto a live Babylon scene + the
