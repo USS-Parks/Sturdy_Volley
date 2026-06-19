@@ -5,6 +5,79 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 023 — Mining and cave exploration (2026-06-19)
+
+The Mine scene is promoted from a 20-line PlaceScene placeholder
+to a full walkable GameScene running on a 20-level catalog of
+**Ironroot Quarry** (L0–9) + **Rainhall Caverns** (L10–19). Pure
+engine ([src/engine/mine.ts](src/engine/mine.ts)) ships the
+catalog, an ore registry (8 ores from `gravel` to `sun-amber` with
+per-tier pickaxe hardness), `rollOreNodes` for per-level node
+spawn, `mineNode` (gates on pickaxe hardness + stamina, returns
+the drop), an HP model (`createMineHealth`, `hurtPlayer`,
+`healPlayer`), and a checkpoint-aware `MineProgress` with
+`descend` / `ascend` / `recordCheckpoint` / `jumpToCheckpoint`.
+
+- **Items**: 8 new minerals ([src/data/content/items.json](src/data/content/items.json))
+  matching the ore registry.
+- **Save model**: `mineProgress: { deepestLevel, currentLevel,
+  checkpoints }` ([src/engine/saveModel.ts](src/engine/saveModel.ts))
+  defaulting to `{0, 0, [0]}` so L0 is always a recorded checkpoint
+  on fresh saves.
+- **MineScene** ([src/scenes/MineScene.ts](src/scenes/MineScene.ts)):
+  rebuilt from scratch. Cave shell + four walls + ladder anchors at
+  the north and south edges + a Leave-quarry door target. On
+  level-load: ore-node polyhedra spawn from `rollOreNodes`, hazard
+  discs spawn per `level.hazardDensity` and drain 1 HP/sec on
+  overlap (player collapse routes back to the farm), light creature
+  capsules spawn per `level.creatureDensity` (combat lands in 026).
+  Pickaxe swing → `mineNode` → drop into inventory + foraging XP.
+  Checkpoint levels auto-record on enter.
+- **Debug API**: `window.sturdyVolleyMine` exposes `level()`,
+  `ores()`, `hp()`, `descend()`, `ascend()`, `jump(level)`,
+  `swing(nodeId)`, `checkpoints()`.
+- **Tests**:
+  - Unit: 13 new cases in [tests/unit/mine.test.ts](tests/unit/mine.test.ts)
+    cover catalog shape, checkpoint distribution, `rollOreNodes`
+    density, pickaxe + stamina gating on `mineNode`, descend/ascend
+    caps, checkpoint sort + dedupe, jump-to-checkpoint gating, HP
+    clamps, and `levelAt` bounds.
+  - E2E: 3 new cases in [tests/e2e/mine.spec.ts](tests/e2e/mine.spec.ts)
+    — fresh save starts at L0 with the L0 checkpoint recorded,
+    descend reshuffles the ores, swing removes the targeted node.
+
+**Acceptance criteria**
+
+- [x] At least 20 cave levels or room variants exist (`MINE_LEVELS`
+      ships exactly 20: 10 Ironroot Quarry levels + 10 Rainhall
+      Caverns levels, each with a distinct name, ore mix, and
+      hazard/creature density curve).
+- [x] Progress can be saved through elevator-style checkpoints
+      (every third level is a checkpoint, plus L0; checkpoints are
+      auto-recorded on enter via `recordCheckpoint`; the live save
+      tracks them in `mineProgress.checkpoints` and a future fast-
+      travel UI can call `jumpToCheckpoint` directly).
+- [x] Combat is light, readable, and optional-friendly where possible
+      (creature meshes spawn but do not attack — the player can avoid
+      them entirely; hazard discs only damage on overlap and the
+      collapse path is a clean exit to the Farm rather than a
+      game-over; full combat AI lands in Prompt 026).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` ·
+Vitest `298/298` (13 new mine cases) · validate:assets `exit 0` ·
+build `dist/` emitted · Playwright `104/104` across `desktop-chromium`
++ `mobile-chromium` (three new mine specs).
+
+**Note (scope):** the boss chamber + multi-segment elevator UI ship
+in Prompt 025; the creature AI ships in Prompt 026. Prompt 023's
+creatures are visible-but-passive graybox capsules; the hazard
+discs already give the level a "watch where you step" rhythm. The
+descend / ascend flow uses two ladder anchors at the north/south
+edges of every level — a future polish pass can swap in proper
+ladder geometry once the art pipeline lands.
+
+---
+
 ## Prompt 022 — Low-tide reef and snorkeling (2026-06-19)
 
 The Kelpglass Reef ships as a tide-gated panel off Driftwood Beach.

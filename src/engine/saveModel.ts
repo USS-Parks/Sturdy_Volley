@@ -115,6 +115,14 @@ export const saveSchema = z
       })
       .strict()
       .default({ health: 0, fragmentsDonated: 0, tier: 0 }),
+    mineProgress: z
+      .object({
+        deepestLevel: z.number().int().nonnegative(),
+        currentLevel: z.number().int().nonnegative(),
+        checkpoints: z.array(z.number().int().nonnegative()),
+      })
+      .strict()
+      .default({ deepestLevel: 0, currentLevel: 0, checkpoints: [] }),
     crabPots: z
       .record(
         z.string(),
@@ -257,6 +265,7 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
     fishingAssist: false,
     firstCatchSeen: {},
     reef: { health: 0, fragmentsDonated: 0, tier: 0 },
+    mineProgress: { deepestLevel: 0, currentLevel: 0, checkpoints: [0] },
     crabPots: {},
     pet: {
       kind: 'tide-cat',

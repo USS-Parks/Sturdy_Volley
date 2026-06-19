@@ -50,5 +50,13 @@
   { "id": "bait", "name": "Bait", "description": "Sticky tidepool grubs for the hook.", "category": "material", "sellPrice": 6, "stackable": true, "tags": ["bait"] },
   { "id": "sea-lettuce", "name": "Sea Lettuce", "description": "Pale-green reef greens, crisp from the cold tide.", "category": "forage", "sellPrice": 28, "stackable": true, "tags": ["reef", "forage"] },
   { "id": "coral-fragment", "name": "Coral Fragment", "description": "A pale shard of broken coral — the nursery can grow from these.", "category": "material", "sellPrice": 45, "stackable": true, "tags": ["reef"] },
-  { "id": "urchin", "name": "Urchin", "description": "A spiny urchin, brined fresh from the reef.", "category": "forage", "sellPrice": 55, "stackable": true, "tags": ["reef", "forage"] }
+  { "id": "urchin", "name": "Urchin", "description": "A spiny urchin, brined fresh from the reef.", "category": "forage", "sellPrice": 55, "stackable": true, "tags": ["reef", "forage"] },
+  { "id": "gravel", "name": "Gravel", "description": "Rough crushed stone.", "category": "mineral", "sellPrice": 4, "stackable": true, "tags": ["mine"] },
+  { "id": "tin-vein", "name": "Tin Vein", "description": "A streak of pale tin ore.", "category": "mineral", "sellPrice": 22, "stackable": true, "tags": ["mine"] },
+  { "id": "iron-ore", "name": "Iron Ore", "description": "A heavy, ruddy ore.", "category": "mineral", "sellPrice": 60, "stackable": true, "tags": ["mine"] },
+  { "id": "salt-crystal", "name": "Salt Crystal", "description": "Clear crystallized salt from a buried seam.", "category": "mineral", "sellPrice": 28, "stackable": true, "tags": ["mine"] },
+  { "id": "silver-vein", "name": "Silver Vein", "description": "Bright silver ore.", "category": "mineral", "sellPrice": 120, "stackable": true, "tags": ["mine"] },
+  { "id": "lampstone", "name": "Lampstone", "description": "A glowing stone from the deep galleries.", "category": "mineral", "sellPrice": 75, "stackable": true, "tags": ["mine"] },
+  { "id": "cold-iron", "name": "Cold Iron", "description": "An unusually cold iron, found near rainhall passages.", "category": "mineral", "sellPrice": 180, "stackable": true, "tags": ["mine"] },
+  { "id": "sun-amber", "name": "Sun Amber", "description": "A warm-glowing amber from the deepest atrium.", "category": "mineral", "sellPrice": 320, "stackable": true, "tags": ["mine"] }
 ]

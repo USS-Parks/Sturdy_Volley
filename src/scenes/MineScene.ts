@@ -1,20 +1,419 @@
-import { Scene, MeshBuilder, type Color3 } from '@babylonjs/core';
-import { PlaceScene, type PlaceNav } from './PlaceScene';
-import { flatMaterial, PALETTE } from '../render/scene-helpers';
+import {
+  Scene,
+  ArcRotateCamera,
+  MeshBuilder,
+  Vector3,
+  type AbstractMesh,
+} from '@babylonjs/core';
+import { GameScene } from './GameScene';
+import { makeScene, addFog, addLights, flatMaterial, PALETTE } from '../render/scene-helpers';
+import {
+  getActiveSave,
+  persistActiveSave,
+  clearActiveSave,
+  recordSkillXp,
+} from '../engine/gameState';
+import { writeSave } from '../engine/save';
+import { formatWorldStatus } from '../engine/format';
+import { computeMoveVector, type MoveInput } from '../engine/movement';
+import { createControllerState, stepController, type ControllerState } from '../engine/controller';
+import { resolveInteraction, type InteractTarget } from '../engine/interaction';
+import type { SaveData } from '../engine/saveModel';
+import { loadGameContent } from '../data/content';
+import { forecastFor } from '../engine/weather';
+import { tideStateAt, type TideState } from '../engine/tide';
+import { getGameTime } from '../engine/dayResolution';
+import { createTimeClock, pauseClock, tickClock, type TimeClockState } from '../engine/timeClock';
+import type { Weather } from '../data/schemas';
+import { addItem } from '../engine/inventory';
+import {
+  ascend,
+  createMineHealth,
+  descend,
+  hurtPlayer,
+  jumpToCheckpoint,
+  levelAt,
+  mineNode,
+  recordCheckpoint,
+  rollOreNodes,
+  TOTAL_MINE_LEVELS,
+  type MineHealthState,
+  type OreNode,
+} from '../engine/mine';
 
-export class MineScene extends PlaceScene {
-  protected readonly sceneKey = 'Mine';
-  protected readonly title = 'Ironroot Quarry';
-  protected readonly ground: Color3 = PALETTE.quarry;
-  protected readonly navs: PlaceNav[] = [
-    { id: 'farm', label: 'Leave the quarry', testId: 'nav-farm', target: 'Farm' },
-  ];
+interface MineDebugApi {
+  level: () => number;
+  ores: () => Array<{ id: string; ore: string; x: number; z: number }>;
+  hp: () => number;
+  descend: () => void;
+  ascend: () => void;
+  jump: (level: number) => void;
+  swing: (nodeId: string) => void;
+  checkpoints: () => number[];
+}
 
-  protected override decorate(scene: Scene): void {
-    ([[-6, -3], [4, 2], [7, -5], [-3, 6]] as const).forEach(([x, z], i) => {
-      const rock = MeshBuilder.CreatePolyhedron(`rock${i}`, { type: 1, size: 1.2 + (i % 2) * 0.4 }, scene);
-      rock.position.set(x, 0.8, z);
-      rock.material = flatMaterial(scene, `rock${i}`, PALETTE.cliff, 0.2);
+/**
+ * Mining and cave exploration (Prompt 023). A walkable 3D scene that
+ * loads one of 20 level configurations from `MINE_LEVELS`, spawns
+ * graybox rock + ore nodes, surfaces a ladder + descend / ascend
+ * interaction, and tracks per-room hp. Pickaxe hardness gates which
+ * ore nodes the player can break.
+ */
+export class MineScene extends GameScene {
+  private camera!: ArcRotateCamera;
+  private player!: AbstractMesh;
+  private save!: SaveData;
+  private controller: ControllerState = createControllerState();
+  private clock!: TimeClockState;
+  private weather: Weather | null = null;
+  private tide: TideState = 'low';
+  private targets: InteractTarget[] = [];
+  private nearest: InteractTarget | null = null;
+  private actionTimer = 0;
+  private actionLabel = '';
+  private hudTimer = 0;
+  private menuOpen = false;
+  private ePrev = false;
+  private mineHealth: MineHealthState = createMineHealth();
+  private oreNodes: OreNode[] = [];
+  private readonly oreMeshes = new Map<string, AbstractMesh>();
+  private readonly hazardMeshes: AbstractMesh[] = [];
+  private readonly creatureMeshes: AbstractMesh[] = [];
+  private readonly pressed = new Set<string>();
+  private readonly onKeyDown = (e: KeyboardEvent) => this.pressed.add(e.key.toLowerCase());
+  private readonly onKeyUp = (e: KeyboardEvent) => this.pressed.delete(e.key.toLowerCase());
+
+  build(): Scene {
+    const scene = makeScene(this.ctx.engine);
+    scene.collisionsEnabled = true;
+    addFog(scene, PALETTE.quarry, 0.05);
+    addLights(scene);
+
+    this.camera = new ArcRotateCamera('mine-cam', -Math.PI / 2 + 0.4, Math.PI / 3, 18, Vector3.Zero(), scene);
+    this.camera.fov = 0.8;
+
+    const ground = MeshBuilder.CreateGround('mine-ground', { width: 24, height: 24 }, scene);
+    ground.material = flatMaterial(scene, 'mine-ground', PALETTE.quarry, 0.22);
+    ground.checkCollisions = true;
+    const wall = (n: string, x: number, z: number, w: number, d: number) => {
+      const m = MeshBuilder.CreateBox(n, { width: w, depth: d, height: 4 }, scene);
+      m.position.set(x, 2, z);
+      m.material = flatMaterial(scene, n, PALETTE.cliff, 0.18);
+      m.checkCollisions = true;
+    };
+    wall('mw-n', 0, -12, 24, 1);
+    wall('mw-s', 0, 12, 24, 1);
+    wall('mw-w', -12, 0, 1, 24);
+    wall('mw-e', 12, 0, 1, 24);
+
+    const player = MeshBuilder.CreateCapsule('player', { height: 1.8, radius: 0.4 }, scene);
+    player.position.set(0, 0.9, 10);
+    player.material = flatMaterial(scene, 'player', PALETTE.player, 0.35);
+    player.checkCollisions = true;
+    player.ellipsoid = new Vector3(0.4, 0.9, 0.4);
+    this.player = player;
+    this.camera.lockedTarget = player;
+    this.scene = scene;
+    return scene;
+  }
+
+  override enter(): void {
+    const save = getActiveSave();
+    if (!save) {
+      this.goTo('Title', undefined, false);
+      return;
+    }
+    this.save = save;
+    save.location.sceneKey = 'Mine';
+    writeSave(save);
+    this.controller = createControllerState();
+    this.clock = createTimeClock(getGameTime(save));
+    this.refreshWorldState();
+    this.mineHealth = createMineHealth();
+    this.loadCurrentLevel();
+    window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('keyup', this.onKeyUp);
+    this.menuOpen = false;
+    this.refreshHud();
+
+    (window as unknown as { sturdyVolleyMine?: MineDebugApi }).sturdyVolleyMine = {
+      level: () => this.save.mineProgress?.currentLevel ?? 0,
+      ores: () => this.oreNodes.map((n) => ({ id: n.id, ore: n.ore, x: n.x, z: n.z })),
+      hp: () => this.mineHealth.hp,
+      descend: () => this.handleDescend(),
+      ascend: () => this.handleAscend(),
+      jump: (level: number) => {
+        this.save.mineProgress = jumpToCheckpoint(this.save.mineProgress!, level);
+        this.loadCurrentLevel();
+        persistActiveSave();
+      },
+      swing: (nodeId: string) => this.handleSwing(nodeId),
+      checkpoints: () => [...(this.save.mineProgress?.checkpoints ?? [])],
+    };
+  }
+
+  private loadCurrentLevel(): void {
+    const progress = this.save.mineProgress ?? { deepestLevel: 0, currentLevel: 0, checkpoints: [0] };
+    const def = levelAt(progress.currentLevel);
+    if (!def) return;
+    for (const m of this.oreMeshes.values()) m.dispose();
+    this.oreMeshes.clear();
+    for (const m of this.hazardMeshes) m.dispose();
+    this.hazardMeshes.length = 0;
+    for (const m of this.creatureMeshes) m.dispose();
+    this.creatureMeshes.length = 0;
+    const seed = def.index * 101 + 7;
+    this.oreNodes = rollOreNodes(def, seed);
+    for (const node of this.oreNodes) {
+      const mesh = MeshBuilder.CreatePolyhedron(`ore-${node.id}`, { type: 1, size: 0.8 }, this.scene!);
+      mesh.position.set(node.x, 0.6, node.z);
+      const color =
+        node.ore === 'lampstone' || node.ore === 'sun-amber'
+          ? PALETTE.warmLight
+          : node.ore === 'silver-vein' || node.ore === 'cold-iron'
+          ? PALETTE.stone
+          : PALETTE.cliff;
+      mesh.material = flatMaterial(
+        this.scene!,
+        `ore-${node.id}-mat`,
+        color,
+        node.ore === 'lampstone' || node.ore === 'sun-amber' ? 0.55 : 0.22,
+      );
+      mesh.checkCollisions = true;
+      this.oreMeshes.set(node.id, mesh);
+    }
+    const hazardCount = Math.floor(def.hazardDensity * 16);
+    for (let i = 0; i < hazardCount; i++) {
+      const x = ((i * 131) % 18) - 9;
+      const z = ((i * 73) % 18) - 9;
+      const haz = MeshBuilder.CreateDisc(`mine-hazard-${def.index}-${i}`, { radius: 0.6 }, this.scene!);
+      haz.rotation.x = Math.PI / 2;
+      haz.position.set(x, 0.05, z);
+      haz.material = flatMaterial(this.scene!, `mine-hazard-${def.index}-${i}-mat`, PALETTE.roof, 0.4);
+      this.hazardMeshes.push(haz);
+    }
+    const creatureCount = Math.floor(def.creatureDensity * 5);
+    for (let i = 0; i < creatureCount; i++) {
+      const x = ((i * 53) % 16) - 8;
+      const z = ((i * 89) % 16) - 8;
+      const c = MeshBuilder.CreateCapsule(`mine-creature-${def.index}-${i}`, { height: 0.5, radius: 0.2 }, this.scene!);
+      c.position.set(x, 0.3, z);
+      c.material = flatMaterial(this.scene!, `mine-creature-${def.index}-${i}-mat`, PALETTE.marsh, 0.25);
+      this.creatureMeshes.push(c);
+    }
+    if (def.checkpoint) {
+      this.save.mineProgress = recordCheckpoint(this.save.mineProgress!, def.index);
+    }
+    this.rebuildTargets();
+  }
+
+  private rebuildTargets(): void {
+    const base: InteractTarget[] = [
+      { id: 'ladder-up', kind: 'climb', label: 'Climb up the ladder', x: 0, z: 10, radius: 1.5, priority: 4 },
+      { id: 'ladder-down', kind: 'climb', label: 'Descend further', x: 0, z: -10, radius: 1.5, priority: 4 },
+      { id: 'leave', kind: 'door', label: 'Leave the quarry', x: -10, z: 10, radius: 1.4, priority: 3 },
+    ];
+    for (const node of this.oreNodes) {
+      const def = levelAt(this.save.mineProgress?.currentLevel ?? 0);
+      base.push({
+        id: `ore:${node.id}`,
+        kind: 'ore-node',
+        label: `Mine ${node.ore}`,
+        x: node.x,
+        z: node.z,
+        radius: 1.4,
+        priority: def?.swingStaminaCost ?? 2,
+      });
+    }
+    this.targets = base;
+  }
+
+  override update(dt: number): void {
+    if (!this.save) return;
+    if (this.menuOpen) {
+      this.clock = pauseClock(this.clock, true);
+      this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
+      return;
+    }
+    if (this.clock.paused) this.clock = pauseClock(this.clock, false);
+    const dir = this.cameraRelativeDir(computeMoveVector(this.readInput()));
+    const sprint = this.pressed.has('shift');
+    this.controller = stepController(this.controller, { dir, sprint }, dt);
+    if (this.controller.speed > 0.01 && (dir.x !== 0 || dir.z !== 0)) {
+      this.player.moveWithCollisions(new Vector3(dir.x, 0, dir.z).scale(this.controller.speed * dt));
+    }
+    this.nearest = resolveInteraction(this.targets, this.player.position.x, this.player.position.z);
+    const interact = this.pressed.has('e') || this.pressed.has(' ');
+    if (interact && !this.ePrev && this.nearest) {
+      if (this.nearest.id === 'ladder-up') this.handleAscend();
+      else if (this.nearest.id === 'ladder-down') this.handleDescend();
+      else if (this.nearest.id === 'leave') this.goTo('Farm', { entry: 'farmhouse-door' });
+      else if (this.nearest.id.startsWith('ore:')) this.handleSwing(this.nearest.id.slice('ore:'.length));
+    }
+    this.ePrev = interact;
+    if (this.actionTimer > 0) this.actionTimer -= dt;
+    const tick = tickClock(this.clock, dt);
+    this.clock = tick.state;
+    if (tick.advancedMinutes > 0) {
+      this.save.calendar.timeMinutes = this.clock.time.minutes;
+      this.refreshWorldState();
+      const overlap = this.hazardMeshes.some((h) => {
+        const dx = h.position.x - this.player.position.x;
+        const dz = h.position.z - this.player.position.z;
+        return Math.hypot(dx, dz) < 0.7;
+      });
+      if (overlap) {
+        this.mineHealth = hurtPlayer(this.mineHealth, 1);
+        if (this.mineHealth.hp === 0) {
+          this.actionLabel = 'You collapsed in the mine — back to the farm.';
+          this.actionTimer = 1.8;
+          this.goTo('Farm', { entry: 'farmhouse-door' });
+          return;
+        }
+      }
+    }
+    this.hudTimer -= dt;
+    if (this.hudTimer <= 0) {
+      this.hudTimer = 0.3;
+      this.refreshHud();
+    }
+  }
+
+  private cameraRelativeDir(vec: { x: number; y: number }): { x: number; z: number } {
+    if (vec.x === 0 && vec.y === 0) return { x: 0, z: 0 };
+    const forward = this.player.position.subtract(this.camera.position);
+    forward.y = 0;
+    if (forward.lengthSquared() < 1e-4) return { x: 0, z: 0 };
+    forward.normalize();
+    const right = new Vector3(forward.z, 0, -forward.x);
+    const move = right.scale(vec.x).add(forward.scale(-vec.y));
+    return { x: move.x, z: move.z };
+  }
+
+  private readInput(): MoveInput {
+    const p = this.pressed;
+    return {
+      up: p.has('w') || p.has('arrowup'),
+      down: p.has('s') || p.has('arrowdown'),
+      left: p.has('a') || p.has('arrowleft'),
+      right: p.has('d') || p.has('arrowright'),
+    };
+  }
+
+  private refreshWorldState(): void {
+    const content = loadGameContent();
+    this.weather = forecastFor(this.clock.time, content.weather);
+    this.tide = tideStateAt(this.clock.time);
+  }
+
+  private refreshHud(): void {
+    const stamina = Math.round(this.controller.stamina);
+    const status = formatWorldStatus(this.save, {
+      weather: this.weather,
+      tide: this.tide,
+      gold: this.save.wallet.gold,
     });
+    const def = levelAt(this.save.mineProgress?.currentLevel ?? 0);
+    let line = `${status} · L${def?.index}: ${def?.name} · HP ${this.mineHealth.hp} · energy ${stamina}%`;
+    if (this.actionTimer > 0) line += ` · ✔ ${this.actionLabel}`;
+    else if (this.nearest) line += ` · [E] ${this.nearest.label}`;
+    this.ctx.overlay.showHud('Mine', line, () => this.openMenu());
+  }
+
+  private openMenu(): void {
+    this.menuOpen = true;
+    this.ctx.overlay.showMenu(
+      'Paused',
+      [
+        { id: 'resume', label: 'Resume', enabled: true, testId: 'pause-resume' },
+        { id: 'leave', label: 'Leave the quarry', enabled: true, testId: 'nav-farm' },
+        { id: 'save-quit', label: 'Save & quit to title', enabled: true, testId: 'nav-save-quit' },
+      ],
+      (id) => {
+        if (id === 'resume') {
+          this.menuOpen = false;
+          this.refreshHud();
+        } else if (id === 'leave') {
+          this.goTo('Farm', { entry: 'farmhouse-door' });
+        } else if (id === 'save-quit') {
+          persistActiveSave();
+          clearActiveSave();
+          this.goTo('Title');
+        }
+      },
+      formatWorldStatus(this.save, { weather: this.weather, tide: this.tide, gold: this.save.wallet.gold }),
+    );
+  }
+
+  private handleSwing(nodeId: string): void {
+    const node = this.oreNodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    const def = levelAt(this.save.mineProgress?.currentLevel ?? 0);
+    if (!def) return;
+    const pickaxeLevel = (this.save.toolLevels?.pick ?? 0) as 0 | 1 | 2 | 3;
+    const result = mineNode({
+      node,
+      pickaxeLevel,
+      staminaCost: def.swingStaminaCost,
+      currentStamina: this.controller.stamina,
+    });
+    if (!result.broke) {
+      this.actionLabel = result.reason === 'too-soft' ? 'Need a stronger pickaxe' : 'Too tired to swing';
+      this.actionTimer = 1.6;
+      return;
+    }
+    this.controller = { ...this.controller, stamina: result.stamina };
+    if (result.drop) {
+      const added = addItem(this.save.inventory, result.drop.itemId, result.drop.qty, result.drop.quality);
+      this.save.inventory = added.container;
+      this.actionLabel = `Mined ${result.drop.itemId}`;
+      this.actionTimer = 1.6;
+      recordSkillXp('exploring', 5);
+    }
+    const mesh = this.oreMeshes.get(nodeId);
+    if (mesh) {
+      mesh.dispose();
+      this.oreMeshes.delete(nodeId);
+    }
+    this.oreNodes = this.oreNodes.filter((n) => n.id !== nodeId);
+    this.rebuildTargets();
+    persistActiveSave();
+  }
+
+  private handleDescend(): void {
+    const progress = this.save.mineProgress;
+    if (!progress) return;
+    if (progress.currentLevel + 1 >= TOTAL_MINE_LEVELS) {
+      this.actionLabel = 'Heartrock — deepest point reached.';
+      this.actionTimer = 1.8;
+      return;
+    }
+    this.save.mineProgress = descend(progress);
+    persistActiveSave();
+    this.loadCurrentLevel();
+    this.player.position.set(0, 0.9, 10);
+    this.actionLabel = `Descend to L${this.save.mineProgress!.currentLevel}`;
+    this.actionTimer = 1.4;
+  }
+
+  private handleAscend(): void {
+    const progress = this.save.mineProgress;
+    if (!progress) return;
+    if (progress.currentLevel === 0) {
+      this.goTo('Farm', { entry: 'farmhouse-door' });
+      return;
+    }
+    this.save.mineProgress = ascend(progress);
+    persistActiveSave();
+    this.loadCurrentLevel();
+    this.player.position.set(0, 0.9, -10);
+    this.actionLabel = `Ascend to L${this.save.mineProgress!.currentLevel}`;
+    this.actionTimer = 1.4;
+  }
+
+  override dispose(): void {
+    window.removeEventListener('keydown', this.onKeyDown);
+    window.removeEventListener('keyup', this.onKeyUp);
+    super.dispose();
   }
 }
