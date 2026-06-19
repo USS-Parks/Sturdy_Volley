@@ -16,6 +16,7 @@ import { absoluteDay } from './timeSystem';
 import { evaluateRecipeUnlocks, unlockRecipes } from './crafting';
 import { resolveAnimalsDay } from './animals';
 import { tickPetDay } from './pets';
+import { aggregatePerks } from './professions';
 
 /** Sync from the save's flat `calendar` into the timeSystem's `GameTime`. */
 export function getGameTime(save: SaveData): GameTime {
@@ -96,7 +97,17 @@ export interface ResolveDayResult {
 export function resolveDay(input: ResolveDayInput): ResolveDayResult {
   const { save, ledger, collapsed, festivals, npcs, items, crops } = input;
   const catalog = buildItemCatalog(items, npcs);
-  const shipmentEarnings = containerSellValue(save.shippingBin, catalog);
+  // Prompt 027: profession perks multiply category prices in the shipment.
+  const perks = aggregatePerks(save.professions ?? {});
+  const priceMultiplier = (category: string): number => {
+    if (category === 'crop') return perks.cropPriceMult;
+    if (category === 'animal') return perks.animalPriceMult;
+    if (category === 'artisan') return perks.artisanPriceMult;
+    if (category === 'forage') return perks.foragePriceMult;
+    if (category === 'gear') return perks.gearPriceMult;
+    return 1;
+  };
+  const shipmentEarnings = containerSellValue(save.shippingBin, catalog, priceMultiplier);
   save.shippingBin = { slots: new Array(save.shippingBin.capacity).fill(null), capacity: save.shippingBin.capacity };
 
   const totalIncome = ledger.income + shipmentEarnings;

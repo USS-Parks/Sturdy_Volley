@@ -36,13 +36,18 @@ export function lovedByNpcs(catalog: ItemCatalog, id: string): readonly Npc[] {
 }
 
 /** Quality-adjusted total sell value of every stack in a container. */
-export function containerSellValue(container: Container, catalog: ItemCatalog): number {
+export function containerSellValue(
+  container: Container,
+  catalog: ItemCatalog,
+  priceMultiplier?: (itemCategory: string) => number,
+): number {
   let total = 0;
   for (const slot of container.slots) {
     if (!slot) continue;
     const item = catalog.byId.get(slot.itemId);
     if (!item) continue;
-    total += sellValueOf(slot, item.sellPrice);
+    const mult = priceMultiplier?.(item.category) ?? 1;
+    total += Math.round(sellValueOf(slot, item.sellPrice) * mult);
   }
   return total;
 }

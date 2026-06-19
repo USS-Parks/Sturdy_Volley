@@ -72,6 +72,12 @@ import {
   unlockedPetPerk,
 } from '../engine/pets';
 import {
+  SKILL_IDS,
+  levelFromXp,
+  professionOptionsFor,
+  xpToNextLevel,
+} from '../engine/professions';
+import {
   ANIMAL_DEFS,
   feedAnimal,
   heartsOf,
@@ -183,6 +189,7 @@ export class FarmScene extends GameScene {
   private petMesh: PetMesh | null = null;
   private petPanelOpen = false;
   private petSeed = 1;
+  private professionsPanelOpen = false;
   private readonly homePosition = new Vector3(-8, 0.9, -5.4);
   private readonly plotOrigin = new Vector3(-6, 0, -4);
   private static readonly SCENE_KEY = 'Farm';
@@ -538,7 +545,7 @@ export class FarmScene extends GameScene {
         return;
       }
     }
-    if (this.menuOpen || this.inventoryOpen || this.dayResolving || this.machinePanelOpen || this.animalsPanelOpen || this.petPanelOpen) {
+    if (this.menuOpen || this.inventoryOpen || this.dayResolving || this.machinePanelOpen || this.animalsPanelOpen || this.petPanelOpen || this.professionsPanelOpen) {
       this.clock = pauseClock(this.clock, true);
       this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
       return;
@@ -737,6 +744,7 @@ export class FarmScene extends GameScene {
         { id: 'inventory', label: 'Open inventory', enabled: true, testId: 'pause-inventory' },
         { id: 'animals', label: 'Animals', enabled: true, testId: 'pause-animals' },
         { id: 'pet', label: 'Pet', enabled: Boolean(this.save.pet), testId: 'pause-pet' },
+        { id: 'skills', label: 'Skills & Professions', enabled: true, testId: 'pause-skills' },
         { id: 'sleep', label: 'Sleep until tomorrow', enabled: true, testId: 'pause-sleep' },
         { id: 'town', label: 'Walk to Ballast Bay', enabled: true, testId: 'nav-town' },
         { id: 'beach', label: 'Driftwood Beach', enabled: true, testId: 'nav-beach' },
@@ -769,6 +777,10 @@ export class FarmScene extends GameScene {
       case 'pet':
         this.menuOpen = false;
         this.openPetPanel();
+        break;
+      case 'skills':
+        this.menuOpen = false;
+        this.openProfessionPanel();
         break;
       case 'sleep':
         this.menuOpen = false;
@@ -1187,6 +1199,60 @@ export class FarmScene extends GameScene {
     const toolId = FARM_TOOL_IDS[this.selectedTool];
     if (!toolId) return 1;
     return hardnessReach(toolId, this.save.toolLevels[toolId] ?? 0);
+  }
+
+  private openProfessionPanel(): void {
+    this.professionsPanelOpen = true;
+    this.renderProfessionPanel();
+  }
+
+  private renderProfessionPanel(): void {
+    const skillNames: Record<string, string> = {
+      cultivation: 'Cultivation',
+      husbandry: 'Husbandry',
+      foraging: 'Foraging',
+      angling: 'Angling',
+      crafting: 'Crafting',
+      exploring: 'Exploring',
+      combat: 'Combat',
+      rapport: 'Rapport',
+    };
+    const rows: import('../ui/overlay').ProfessionPanelSkillRow[] = SKILL_IDS.map((sid) => {
+      const xp = this.save.skills?.[sid] ?? 0;
+      const level = levelFromXp(xp);
+      const xpToNext = xpToNextLevel(xp);
+      const professionId = this.save.professions?.[sid] ?? null;
+      const choices = !professionId
+        ? professionOptionsFor(sid, level).map((p) => ({
+            id: p.id,
+            label: p.name,
+            description: p.description,
+          }))
+        : undefined;
+      return {
+        skillId: sid,
+        name: skillNames[sid] ?? sid,
+        xp,
+        level,
+        xpToNext,
+        professionId,
+        pendingChoices: choices && choices.length > 0 ? choices : undefined,
+      };
+    });
+    this.ctx.overlay.showProfessionPanel({
+      rows,
+      masteryXp: this.save.mastery?.totalMasteryXp ?? 0,
+      onChoose: (skillId, professionId) => {
+        if (!this.save.professions) this.save.professions = {};
+        this.save.professions[skillId] = professionId;
+        persistActiveSave();
+        this.renderProfessionPanel();
+      },
+      onClose: () => {
+        this.professionsPanelOpen = false;
+        this.refreshHud();
+      },
+    });
   }
 
   private refreshPetMesh(): void {

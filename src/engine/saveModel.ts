@@ -87,6 +87,14 @@ export const saveSchema = z
     giftsThisWeek: z.record(z.string(), z.number().int().nonnegative()),
     knownRecipeIds: z.array(z.string()),
     skills: z.record(z.string(), z.number()),
+    professions: z.record(z.string(), z.string()).default({}),
+    mastery: z
+      .object({
+        totalMasteryXp: z.number().nonnegative(),
+        ranks: z.record(z.string(), z.number().int().min(0).max(5)),
+      })
+      .strict()
+      .default({ totalMasteryXp: 0, ranks: {} }),
     flags: z.record(z.string(), z.union([z.boolean(), z.number(), z.string()])),
     mapState: z.record(z.string(), z.unknown()),
     machines: z
@@ -264,6 +272,8 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
       'shell-charm',
     ],
     skills: {},
+    professions: {},
+    mastery: { totalMasteryXp: 0, ranks: {} },
     flags: {},
     mapState: {},
     machines: defaultFarmMachines(),

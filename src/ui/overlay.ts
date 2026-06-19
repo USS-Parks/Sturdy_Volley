@@ -85,6 +85,24 @@ export interface AnimalPanelOptions {
   onClose: () => void;
 }
 
+export interface ProfessionPanelSkillRow {
+  skillId: string;
+  name: string;
+  xp: number;
+  level: number;
+  xpToNext: number;
+  /** Profession id selected, if any. */
+  professionId: string | null;
+  /** Available choices when level threshold met but no pick yet. */
+  pendingChoices?: Array<{ id: string; label: string; description: string }>;
+}
+export interface ProfessionPanelOptions {
+  rows: ProfessionPanelSkillRow[];
+  masteryXp: number;
+  onChoose: (skillId: string, professionId: string) => void;
+  onClose: () => void;
+}
+
 export interface ElevatorPanelOption {
   level: number;
   name: string;
@@ -803,6 +821,61 @@ export class UIOverlay {
     close.type = 'button';
     close.textContent = 'Close';
     close.dataset.testid = 'crafting-close';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /**
+   * Professions panel (Prompt 027). Lists every skill with XP +
+   * level + xpToNext + the selected profession (or pending-choice
+   * buttons). Mastery XP total surfaces at the bottom.
+   */
+  showProfessionPanel(opts: ProfessionPanelOptions): void {
+    this.clear();
+    const panel = this.createPanel('Skills & Professions', `Mastery XP: ${opts.masteryXp}`);
+    panel.classList.add('profession-panel');
+    panel.dataset.testid = 'profession-panel';
+
+    const list = document.createElement('ul');
+    list.className = 'profession-list';
+    for (const r of opts.rows) {
+      const li = document.createElement('li');
+      li.className = 'profession-row';
+      li.dataset.testid = `profession-row-${r.skillId}`;
+      const title = document.createElement('div');
+      title.className = 'profession-title';
+      title.textContent = `${r.name} — Lv ${r.level}`;
+      const meta = document.createElement('div');
+      meta.className = 'profession-meta';
+      meta.textContent = `XP ${r.xp}${r.xpToNext > 0 ? ` · ${r.xpToNext} to next` : ' · MAX'}` +
+        (r.professionId ? ` · ${r.professionId}` : '');
+      li.append(title, meta);
+      if (r.pendingChoices && r.pendingChoices.length > 0) {
+        const choices = document.createElement('div');
+        choices.className = 'profession-choices';
+        for (const choice of r.pendingChoices) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'menu-button menu-button-secondary';
+          btn.textContent = `${choice.label}: ${choice.description}`;
+          btn.dataset.testid = `profession-pick-${r.skillId}-${choice.id}`;
+          btn.addEventListener('click', () => opts.onChoose(r.skillId, choice.id));
+          choices.appendChild(btn);
+        }
+        li.appendChild(choices);
+      }
+      list.appendChild(li);
+    }
+    panel.appendChild(list);
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'menu-button';
+    close.textContent = 'Close';
+    close.dataset.testid = 'profession-close';
     close.addEventListener('click', opts.onClose);
     panel.appendChild(close);
 

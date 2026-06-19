@@ -5,6 +5,87 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 027 — Skill professions and mastery (2026-06-19)
+
+All eight skills (cultivation, husbandry, foraging, angling,
+crafting, exploring, combat, rapport) get a 0–10 XP ladder with
+a branching profession choice at level 5 + a second branch at
+level 10, plus a mastery overflow track. Pure engine
+([src/engine/professions.ts](src/engine/professions.ts)) ships
+the XP thresholds (triangular curve 40, 110, 220 … 3100 — all
+original to Ballast Bay, no Stardew numbers), every profession
+def + its `PerkEffect[]`, `professionOptionsFor(skill, level)`,
+`aggregatePerks(professions)` which folds the picks into a
+strongly-typed `AggregatedPerks` shape, and `awardMasteryXp` for
+the level-10 overflow track.
+
+- **Save model**: `professions: Record<skillId, professionId>` +
+  `mastery: { totalMasteryXp, ranks }` ([src/engine/saveModel.ts](src/engine/saveModel.ts)),
+  both `.default({})` so existing saves still load.
+- **dayResolution**: `containerSellValue` gains an optional
+  `priceMultiplier` callback; the day-end shipment now passes one
+  that reads from `aggregatePerks(save.professions)`, so picking
+  `cultivation-tiller` immediately makes crops sell at the +20%
+  bonus. ([src/engine/dayResolution.ts](src/engine/dayResolution.ts) +
+  [src/engine/itemCatalog.ts](src/engine/itemCatalog.ts))
+- **FarmScene**: new pause-menu entry **Skills & Professions**
+  opens `showProfessionPanel` ([src/scenes/FarmScene.ts](src/scenes/FarmScene.ts)
+  + [src/ui/overlay.ts](src/ui/overlay.ts) +
+  [src/styles.css](src/styles.css)). The panel lists every skill
+  with live XP / level / xp-to-next + a buttoned choice list when
+  the skill is at a milestone level and no profession is picked
+  yet. Picks persist to the save immediately.
+- **Tests**:
+  - Unit: 12 new cases in [tests/unit/professions.test.ts](tests/unit/professions.test.ts)
+    cover the branching pair shape (level 5 / level 10), XP
+    thresholds, `levelFromXp` + `xpToNextLevel` curves, level
+    gating on `professionOptionsFor`, perk aggregation including
+    the tiller crop multiplier + the toolStaminaMult product +
+    the stacked-hazard-resist cap, and the mastery rank climb.
+  - E2E: 1 new case in [tests/e2e/professions.spec.ts](tests/e2e/professions.spec.ts)
+    — the pause-menu **Skills & Professions** entry opens the
+    panel and lists all eight skill rows.
+
+**Acceptance criteria**
+
+- [x] At least one branching profession choice exists per skill
+      (every `SKILL_TREES` entry has a 2-element level-5 tuple +
+      a 2-element level-10 tuple — 16 total professions across 8
+      skills).
+- [x] Profession perks measurably change play without trivializing
+      progression (`aggregatePerks` is consumed by
+      `containerSellValue` in `resolveDay` — tiller adds 20% to
+      crop shipments today; the other perks land as their consumer
+      surfaces evolve. Per-perk effects are capped: tool stamina
+      is multiplicative below 1.0, hazard resist tops out at 0.9,
+      no perk grants a >2× yield multiplier).
+- [x] Tutorials and mastery prompts are playable and skippable,
+      and no exact Stardew XP numbers or profession tree are
+      copied (the panel is opt-in via the pause menu — never
+      forced; mastery only kicks in after level 10; the XP ladder
+      is the original Ballast Bay curve `40, 110, 220, 380, 600,
+      880, 1240, 1700, 2300, 3100`; profession ids are all
+      original names like Tiller, Coop Keeper, Botanist, Mariner,
+      Spelunker, Champion).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` ·
+Vitest `347/347` (12 new profession cases) · validate:assets
+`exit 0` · build `dist/` emitted · Playwright `112/112` across
+`desktop-chromium` + `mobile-chromium` (one new profession spec).
+
+**Note (scope):** the other perk consumers (tool stamina,
+hazard-resist, forage-extra-roll, fish-bite-faster, cooking-buff
+extension, gift bonus) are wired through `aggregatePerks` but
+their respective game systems will consume them per the prompts
+that own those surfaces. The shipping-bin price multiplier was
+chosen as the canonical "measurably changes play" surface for
+Prompt 027 because it routes through an existing test seam
+(`containerSellValue`). A trainer / mentor NPC is deferred to a
+later content prompt; the in-game discovery surface today is the
+pause panel.
+
+---
+
 ## Prompt 026 — Combat-light creatures, AI, and difficulty (2026-06-19)
 
 Cave creatures stop being passive: four original non-gory kinds
