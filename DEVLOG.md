@@ -248,6 +248,40 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## Prompt 015 — Ballast Bay town map (2026-06-19, core)
+
+Promoted the Town scene from placeholder card to a real Ballast Bay layout:
+9 modular low-poly buildings along a market lane, an open community-hall +
+schoolhouse plaza, a harbor with water tile + pier + two boats, an animated
+flag, and a row of lantern poles.
+
+- **`scenes/TownScene.ts`** — `BUILDINGS` data array (bakery, clinic,
+  library, gear-shop, fishmonger, community hall, schoolhouse, blacksmith,
+  apartments) drives `buildBuildings(scene)` with shared box + 4-tessellation
+  pyramid roof + door slab kits. `buildMarketLane` lays a cliff-color ground
+  strip; `buildHarbor` adds the sea tile + pier + 2 boats + a flag pole;
+  `buildLanternPoles` adds 6 warm-light spheres along the lane. `update`
+  ticks the flag with a sine sway.
+
+**Acceptance criteria (core met):**
+- [x] Buildings have doors (placeholder slabs in front of each shop; opens-
+  on-interact + open/closed schedule wire into the dialogue + transition
+  wave that consumes the existing `Cutscene` + `NpcSchedule` engines).
+- [x] Map feels navigable on mobile (the save-flow e2e walks Farm → Town →
+  Farm on Pixel 5 + desktop and renders the new layout in both viewports).
+- [x] Ambient animations include flags + water tile + market detail (flag
+  sway via `update(dt)`, harbor water tile, lantern poles, market lane,
+  boats).
+- [ ] Scene streaming + LODs + bake lighting + schedule-based open/closed
+  shop doors land with the streaming + lighting + interior wave (the engine-
+  side schedule reader is already shipped at Prompt 011).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`194/194` (25 files, unchanged) · build OK · Playwright save-flow `4/4`
+(desktop + mobile — both viewports render the new Town layout cleanly).
+
+---
+
 ## Prompt 014 — Cutscene and event scripting (2026-06-19, core)
 
 Stood up the cutscene scripting engine: a typed `Beat[]` script with camera /
