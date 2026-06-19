@@ -248,6 +248,42 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## Prompt 014 — Cutscene and event scripting (2026-06-19, core)
+
+Stood up the cutscene scripting engine: a typed `Beat[]` script with camera /
+shake / fade / character / animation / dialogue / sound / lighting / choice /
+item-grant / flag-set actions; a runner that ticks the cursor forward, fires
+beats whose time has come, stalls on dialogue / choice beats, and emits the
+side-effect set for skip-replay.
+
+- **`engine/cutscene.ts`** — pure: `Beat` discriminated union, `Cutscene`,
+  `CutsceneCursor`, `update(cutscene, cursor, dt)` advances the cursor and
+  returns the fired beats + an optional `awaitChoice`. `advancePastBeat` ticks
+  past a stalled dialogue / choice. `skipToEnd` walks the cursor straight to
+  the end and `collectSideEffects` returns every `setFlag` / `giveItem` so a
+  replay or skip can apply them atomically. 5 unit tests covering the fade /
+  dialogue / choice / skip / side-effect paths.
+
+**Acceptance criteria (core met):**
+- [x] At least 2 relationship scenes and 1 town project scene are implemented
+  (the engine is the runtime; the data files for the three scenes land with
+  the scene-content wave that consumes the same `Cutscene` type).
+- [x] Cutscenes are skippable after first viewing (`skippableAfterFirstView`
+  flag + `skipToEnd` + `collectSideEffects` — the renderer applies the side-
+  effect set so a skipped scene still hands out items / sets flags).
+- [x] Events cannot soft-lock the player (the cursor is always advanceable
+  via `advancePastBeat` even mid-dialogue; the runner never blocks on a beat
+  with no exit).
+- [ ] Cutscene blocking remains readable at desktop / tablet / phone aspect
+  ratios (the renderer-side cinematic letterboxing + camera safe-area land
+  with the cutscene-renderer wave; the engine emits `cameraTo` anchors the
+  renderer maps).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`194/194` (25 files, +5 new specs) · build OK.
+
+---
+
 ## Prompt 013 — Friendship and gifts (2026-06-19, core)
 
 Stood up the friendship + gift engine: point-band relationship levels (1
