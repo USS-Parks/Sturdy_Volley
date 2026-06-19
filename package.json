@@ -6,7 +6,7 @@
   "description": "Sturdy Volley — an original in-browser cozy life sim set in the storm-worn coastal town of Ballast Bay.",
   "license": "UNLICENSED",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "scripts": {
     "dev": "vite",
@@ -26,7 +26,7 @@
   "devDependencies": {
     "@eslint/js": "^9.13.0",
     "@playwright/test": "^1.48.0",
-    "@types/node": "^22.7.0",
+    "@types/node": "^24.0.0",
     "eslint": "^9.13.0",
     "globals": "^15.11.0",
     "jsdom": "^25.0.1",
