@@ -589,6 +589,77 @@ body {
   text-align: center;
 }
 
+/* Crafting panel (Prompt 017). */
+.crafting-panel {
+  width: min(560px, 96vw);
+}
+
+.crafting-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: min(56vh, 480px);
+  overflow-y: auto;
+}
+
+.crafting-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 8px 10px;
+  color: var(--sv-ink);
+  background: var(--sv-parchment);
+  border: 1px solid var(--sv-wood);
+  border-radius: 8px;
+  align-items: center;
+}
+
+.crafting-head {
+  grid-column: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.crafting-title {
+  font-weight: 700;
+}
+
+.crafting-type {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.12);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.crafting-ingredients {
+  grid-column: 1;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.crafting-btn {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-height: 44px;
+}
+
+.shop-section-heading {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--sv-ink);
+  opacity: 0.75;
+}
+
 /* Shop panel (Prompt 016). */
 .shop-panel {
   width: min(480px, 94vw);

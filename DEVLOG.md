@@ -5,6 +5,82 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 017 — Crafting and recipes (2026-06-19)
+
+Crafting subsystem ships end-to-end: a pure engine, a known-recipes UI on a
+new workbench prop in the Farmhouse Interior, four unlock-source kinds
+(skills / NPCs / shops / quests), and persistent placed decor on the map.
+
+- **Engine** ([src/engine/crafting.ts](src/engine/crafting.ts)): `craft` /
+  `canCraft` / `ingredientShortage`, the `STARTER_RECIPE_IDS` Day-1 list,
+  the `RECIPE_UNLOCK_SOURCES` table (per-recipe `skill` / `npc` / `shop` /
+  `quest` trigger), `evaluateRecipeUnlocks` (fires at day end inside
+  `resolveDay`), `unlockRecipes` (de-dup append), `buildCraftingPanelRecipes`
+  (renderer projection with resolved names + `canCraft` per row), and
+  `placeCrafted` / `listPlacements` / `isPlaceable` for the `decor`-tagged
+  placement pipeline.
+- **Content** ([src/data/content/items.json](src/data/content/items.json) +
+  [src/data/content/recipes.json](src/data/content/recipes.json)): 15 new
+  items (salt, jams, pickles, planks, shelf, charms, tarts, stews) and 20
+  recipes covering both `cooking` and `crafting` types.
+- **Save model** ([src/engine/saveModel.ts:88](src/engine/saveModel.ts:88)):
+  `knownRecipeIds: string[]` added; `createNewSave` seeds the seven starter
+  ids. The existing `mapState: Record<string, unknown>` slot now holds the
+  per-scene `{ placements: Placement[] }` shape; saves round-trip cleanly.
+- **Day end** ([src/engine/dayResolution.ts](src/engine/dayResolution.ts)):
+  flushes `ledger.skillXp` into `save.skills` so skill-source unlocks
+  advance from real play, then runs `evaluateRecipeUnlocks` and appends a
+  "N new recipes unlocked." notice to the day summary when fresh ids land.
+- **Interior wiring** ([src/scenes/InteriorScene.ts](src/scenes/InteriorScene.ts)):
+  graybox workbench (top + mallet) + interaction target, `openCrafting` /
+  `renderCrafting` / `handleCraft` panel flow, placeable handling that
+  consumes ingredients but routes the output to `placeCrafted` instead of
+  inventory, `refreshPlacedDecor` + per-scene `buildPlacementMesh` so the
+  driftwood-shelf graybox re-spawns on re-enter and after reload. The
+  shop panel grows an optional `recipeOffers` shelf — buying a recipe at
+  the bakery (e.g. `preserved-radish`, `radish-pickle`, `sunmelon-juice`)
+  spends gold and unlocks the recipe in place.
+- **Overlay** ([src/ui/overlay.ts](src/ui/overlay.ts) +
+  [src/styles.css](src/styles.css)): new `showCraftingPanel` (rows show
+  `output × qty`, a `crafting / cooking` badge, ingredient progress
+  `have/need name · …`, and a Craft button disabled when short). Shop
+  panel gains the "Recipes" section heading + `shop-buy-recipe-*` rows.
+- **Tests**:
+  - Unit: [tests/unit/crafting.test.ts](tests/unit/crafting.test.ts) — 13
+    cases covering shortage / craft / overflow / starter set / unlock
+    evaluator across all four source kinds / panel projection / placement
+    round-trip via `parseSave` + `serializeSave`.
+  - E2E: [tests/e2e/crafting.spec.ts](tests/e2e/crafting.spec.ts) —
+    workbench opens panel with seven starter rows; placing a
+    driftwood-shelf persists across reload + `title-continue`.
+
+**Acceptance criteria**
+
+- [x] At least 20 recipes exist (20 in `recipes.json`, validated by the
+      Zod schema + cross-references in [src/data/content.ts](src/data/content.ts)).
+- [x] Recipes unlock through skills, NPCs, shops, and quests
+      (`RECIPE_UNLOCK_SOURCES` + `evaluateRecipeUnlocks` cover all four;
+      shop path wired through the bakery panel, day-end auto-unlock fires
+      for the other three).
+- [x] Placed crafted objects persist on maps (driftwood-shelf round-trips
+      through `save.mapState.Interior.placements`; e2e reloads the page
+      and re-enters Interior to confirm the mesh respawns).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`233/233` (unit suite includes 13 new crafting cases) · validate:assets
+`exit 0` · build `dist/` emitted (`5,251 kB / 1,168 kB gzip`) · Playwright
+`70/70` across `desktop-chromium` + `mobile-chromium` (two new crafting
+specs).
+
+**Note (placement scope):** Prompt 017 wires placement for the
+driftwood-shelf decor; future Prompts (018 machines, 019 husbandry, 037
+décor unlocks) can grow the `decor`-tag set and add per-item graybox
+variants in `buildPlacementMesh`. Placement uses a fixed anchor on the
+north wall (`placementRoot` plus a 1.2 m fan-out); a follow-up could let
+the player aim placement at their current facing.
+
+---
+
 ## Prompt 001 — Project scaffold and quality bar (2026-06-18)
 
 Stood up the browser game project: **TypeScript + Vite + Phaser 3 + Vitest +

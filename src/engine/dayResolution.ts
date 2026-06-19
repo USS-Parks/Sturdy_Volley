@@ -13,6 +13,7 @@ import { buildItemCatalog, containerSellValue } from './itemCatalog';
 import { advanceCrops, buildCropIndex } from './soil';
 import { advanceWorld, type RegionForageTable } from './forage';
 import { absoluteDay } from './timeSystem';
+import { evaluateRecipeUnlocks, unlockRecipes } from './crafting';
 
 /** Sync from the save's flat `calendar` into the timeSystem's `GameTime`. */
 export function getGameTime(save: SaveData): GameTime {
@@ -97,6 +98,12 @@ export function resolveDay(input: ResolveDayInput): ResolveDayResult {
   const totalIncome = ledger.income + shipmentEarnings;
   save.wallet.gold += totalIncome;
 
+  // Prompt 017: flush today's skill XP into the persistent skill totals so
+  // unlock thresholds can advance from real play.
+  for (const [skillId, xp] of Object.entries(ledger.skillXp)) {
+    save.skills[skillId] = (save.skills[skillId] ?? 0) + xp;
+  }
+
   const collapse = collapsed ? applyCollapsePenalty(save, input.penalty) : null;
 
   const endingTime = getGameTime(save);
@@ -154,6 +161,23 @@ export function resolveDay(input: ResolveDayInput): ResolveDayResult {
   if (worldResult.spawned > 0) {
     summary.notices.push(
       `${worldResult.spawned} forage item${worldResult.spawned === 1 ? '' : 's'} appeared in the wild.`,
+    );
+  }
+
+  // Prompt 017: re-check recipe unlock conditions at day end. Skills /
+  // friendship may have advanced today; surface any newly known recipes.
+  const newRecipes = evaluateRecipeUnlocks({
+    knownRecipeIds: save.knownRecipeIds,
+    skills: save.skills,
+    relationships: save.relationships,
+    flags: Object.fromEntries(
+      Object.entries(save.flags).filter(([, v]) => typeof v !== 'object'),
+    ) as Record<string, boolean | number | string>,
+  });
+  if (newRecipes.length > 0) {
+    save.knownRecipeIds = unlockRecipes(save.knownRecipeIds, newRecipes);
+    summary.notices.push(
+      `${newRecipes.length} new recipe${newRecipes.length === 1 ? '' : 's'} unlocked.`,
     );
   }
 

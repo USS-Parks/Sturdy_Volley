@@ -23,6 +23,23 @@ export interface InventoryPanelOptions {
   onClose: () => void;
 }
 
+export interface CraftingPanelRecipe {
+  id: string;
+  name: string;
+  type: 'cooking' | 'crafting';
+  outputName: string;
+  outputQty: number;
+  ingredients: Array<{ itemId: string; itemName: string; need: number; have: number }>;
+  canCraft: boolean;
+}
+
+export interface CraftingPanelOptions {
+  title: string;
+  recipes: CraftingPanelRecipe[];
+  onCraft: (recipeId: string) => void;
+  onClose: () => void;
+}
+
 export interface ShopPanelEntry {
   itemId: string;
   itemName: string;
@@ -30,11 +47,21 @@ export interface ShopPanelEntry {
   remaining: number; // -1 = unlimited
 }
 
+export interface ShopPanelRecipeOffer {
+  recipeId: string;
+  recipeName: string;
+  price: number;
+  knownAlready: boolean;
+}
+
 export interface ShopPanelOptions {
   shopName: string;
   walletGold: number;
   entries: ShopPanelEntry[];
+  /** Prompt 017: optional recipe offers sold by this shop. */
+  recipeOffers?: ShopPanelRecipeOffer[];
   onBuy: (itemId: string) => void;
+  onBuyRecipe?: (recipeId: string) => void;
   onClose: () => void;
 }
 
@@ -616,6 +643,66 @@ export class UIOverlay {
   }
 
   /**
+   * Crafting panel (Prompt 017). Lists known recipes filtered by type; each
+   * row shows the output, ingredients ("3/2 bell-peas"), and a Craft button
+   * disabled when ingredients are short.
+   */
+  showCraftingPanel(opts: CraftingPanelOptions): void {
+    this.clear();
+    const panel = this.createPanel(opts.title);
+    panel.classList.add('crafting-panel');
+    panel.dataset.testid = 'crafting-panel';
+
+    const list = document.createElement('ul');
+    list.className = 'crafting-list';
+    list.dataset.testid = 'crafting-list';
+    for (const r of opts.recipes) {
+      const li = document.createElement('li');
+      li.className = 'crafting-row';
+      li.dataset.testid = `crafting-row-${r.id}`;
+
+      const head = document.createElement('div');
+      head.className = 'crafting-head';
+      const title = document.createElement('span');
+      title.className = 'crafting-title';
+      title.textContent = `${r.name} → ${r.outputName} ×${r.outputQty}`;
+      const badge = document.createElement('span');
+      badge.className = 'crafting-type';
+      badge.textContent = r.type;
+      head.append(title, badge);
+
+      const ing = document.createElement('div');
+      ing.className = 'crafting-ingredients';
+      ing.textContent = r.ingredients
+        .map((i) => `${i.have}/${i.need} ${i.itemName}`)
+        .join(' · ');
+
+      const craftBtn = document.createElement('button');
+      craftBtn.className = 'menu-button crafting-btn';
+      craftBtn.type = 'button';
+      craftBtn.textContent = 'Craft';
+      craftBtn.dataset.testid = `crafting-craft-${r.id}`;
+      craftBtn.disabled = !r.canCraft;
+      craftBtn.addEventListener('click', () => opts.onCraft(r.id));
+
+      li.append(head, ing, craftBtn);
+      list.appendChild(li);
+    }
+    panel.appendChild(list);
+
+    const close = document.createElement('button');
+    close.className = 'menu-button';
+    close.type = 'button';
+    close.textContent = 'Close';
+    close.dataset.testid = 'crafting-close';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /**
    * Shop panel (Prompt 016). Shows the shop name + wallet + stock list with
    * per-row Buy button. Idempotent — re-mounts replace prior panel cleanly.
    */
@@ -655,6 +742,44 @@ export class UIOverlay {
       list.appendChild(li);
     }
     panel.appendChild(list);
+
+    // Prompt 017: optional recipe shelf — buying a recipe unlocks it on the
+    // save instead of dropping an item in inventory.
+    if (opts.recipeOffers && opts.recipeOffers.length > 0) {
+      const heading = document.createElement('div');
+      heading.className = 'shop-section-heading';
+      heading.textContent = 'Recipes';
+      panel.appendChild(heading);
+
+      const rList = document.createElement('ul');
+      rList.className = 'shop-list';
+      rList.dataset.testid = 'shop-recipes';
+      for (const offer of opts.recipeOffers) {
+        const li = document.createElement('li');
+        li.className = 'shop-row';
+        li.dataset.testid = `shop-recipe-${offer.recipeId}`;
+
+        const name = document.createElement('span');
+        name.className = 'shop-item-name';
+        name.textContent = offer.recipeName;
+
+        const price = document.createElement('span');
+        price.className = 'shop-item-price';
+        price.textContent = `${offer.price} g`;
+
+        const buyBtn = document.createElement('button');
+        buyBtn.type = 'button';
+        buyBtn.className = 'menu-button shop-buy';
+        buyBtn.dataset.testid = `shop-buy-recipe-${offer.recipeId}`;
+        buyBtn.textContent = offer.knownAlready ? 'Known' : 'Learn';
+        buyBtn.disabled = offer.knownAlready || opts.walletGold < offer.price;
+        buyBtn.addEventListener('click', () => opts.onBuyRecipe?.(offer.recipeId));
+
+        li.append(name, price, buyBtn);
+        rList.appendChild(li);
+      }
+      panel.appendChild(rList);
+    }
 
     const close = document.createElement('button');
     close.className = 'menu-button';

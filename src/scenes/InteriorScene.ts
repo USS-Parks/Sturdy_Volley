@@ -15,8 +15,18 @@ import {
   resetDayLedger,
 } from '../engine/gameState';
 import { buy, hoursFor, isShopOpen, restockShop } from '../engine/shops';
-import { addItem } from '../engine/inventory';
+import { addItem, removeItem, countItem } from '../engine/inventory';
 import type { Item } from '../data/schemas';
+import {
+  RECIPE_UNLOCK_SOURCES,
+  buildCraftingPanelRecipes,
+  craft,
+  isPlaceable,
+  listPlacements,
+  loadRecipesFromContent,
+  placeCrafted,
+  unlockRecipes,
+} from '../engine/crafting';
 import { writeSave } from '../engine/save';
 import { formatWorldStatus } from '../engine/format';
 import { computeMoveVector, type MoveInput } from '../engine/movement';
@@ -36,11 +46,42 @@ import {
 } from '../engine/timeClock';
 import type { Weather } from '../data/schemas';
 
+interface InteriorDebugApi {
+  openCrafting: () => void;
+  placedDecor: () => Array<{ id: string; itemId: string; x: number; z: number }>;
+  grantStarterIngredients: () => void;
+  grantItem: (itemId: string, qty: number) => void;
+  grantRecipe: (recipeId: string) => void;
+  knownRecipes: () => readonly string[];
+}
+
 interface InteriorEntryData {
   /** Anchor id the player should spawn at on entry. */
   entry?: 'inside-door' | 'bed';
   /** When entering from a Town building, where to return on exit + title shown. */
   shopId?: string;
+}
+
+/**
+ * Per-item graybox geometry for placed crafted decor (Prompt 017). Each
+ * entry returns the constructed mesh; the InteriorScene tracks them so a
+ * scene re-enter or dispose can clear them cleanly.
+ */
+function buildPlacementMesh(
+  scene: Scene,
+  p: { id: string; itemId: string; x: number; z: number },
+): AbstractMesh {
+  if (p.itemId === 'driftwood-shelf') {
+    const top = MeshBuilder.CreateBox(p.id, { width: 1.2, depth: 0.45, height: 0.18 }, scene);
+    top.position.set(p.x, 1.1, p.z);
+    top.material = flatMaterial(scene, `${p.id}-top`, PALETTE.wood, 0.22);
+    return top;
+  }
+  // Fallback: a small cube for unrecognised decor (kept readable in graybox).
+  const box = MeshBuilder.CreateBox(p.id, { size: 0.6 }, scene);
+  box.position.set(p.x, 0.3, p.z);
+  box.material = flatMaterial(scene, p.id, PALETTE.accent, 0.3);
+  return box;
 }
 
 const SHOP_TITLES: Record<string, string> = {
@@ -87,6 +128,10 @@ export class InteriorScene extends GameScene {
   private title = 'Farmhouse';
   private shopId: string | null = null;
   private shopOpen = false;
+  private craftingOpen = false;
+  private readonly workbenchAnchor = new Vector3(2.4, 0, -3.6);
+  private readonly placementRoot = new Vector3(-2.5, 0, -4.8);
+  private placementMeshes: AbstractMesh[] = [];
 
   build(): Scene {
     const scene = makeScene(this.ctx.engine, PALETTE.sky);
@@ -190,6 +235,17 @@ export class InteriorScene extends GameScene {
     chest.position.set(-5.2, 0.38, 3);
     chest.material = flatMaterial(scene, 'interior-chest', PALETTE.wood, 0.22);
     chest.checkCollisions = true;
+
+    // Crafting workbench (Prompt 017) — between hearth and chest along the north wall.
+    const benchTop = MeshBuilder.CreateBox('workbench-top', { width: 1.8, depth: 0.9, height: 0.9 }, scene);
+    benchTop.position.copyFrom(this.workbenchAnchor);
+    benchTop.position.y = 0.45;
+    benchTop.material = flatMaterial(scene, 'workbench-top', PALETTE.wood, 0.24);
+    benchTop.checkCollisions = true;
+    // A small mallet on the bench so it reads as a work surface, not a table.
+    const mallet = MeshBuilder.CreateBox('workbench-mallet', { width: 0.25, depth: 0.55, height: 0.18 }, scene);
+    mallet.position.set(this.workbenchAnchor.x + 0.3, 1.0, this.workbenchAnchor.z);
+    mallet.material = flatMaterial(scene, 'workbench-mallet', PALETTE.accent, 0.3);
   }
 
   override enter(data?: unknown): void {
@@ -232,6 +288,15 @@ export class InteriorScene extends GameScene {
       { id: 'kitchen', kind: 'prop', label: 'Tidy the kitchen', x: 4.8, z: -1, radius: 1.6, priority: 2 },
       { id: 'hearth', kind: 'prop', label: 'Tend the hearth', x: 4.5, z: -5, radius: 1.6, priority: 2 },
       { id: 'interior-chest', kind: 'prop', label: 'Open the chest', x: -5.2, z: 3, radius: 1.6, priority: 3 },
+      {
+        id: 'workbench',
+        kind: 'machine',
+        label: 'Craft at the workbench',
+        x: this.workbenchAnchor.x,
+        z: this.workbenchAnchor.z,
+        radius: 1.8,
+        priority: 3,
+      },
     ];
     if (this.shopId) {
       // Place a shop counter target at the kitchen counter spot.
@@ -251,12 +316,35 @@ export class InteriorScene extends GameScene {
     window.addEventListener('keyup', this.onKeyUp);
     this.menuOpen = false;
     this.dayResolving = false;
+    this.craftingOpen = false;
+    this.refreshPlacedDecor();
     this.refreshHud();
+
+    // Prompt 017: per-scene debug hook for the crafting playwright spec.
+    (window as unknown as { sturdyVolleyInterior?: InteriorDebugApi }).sturdyVolleyInterior = {
+      openCrafting: () => this.openCrafting(),
+      placedDecor: () => listPlacements(this.save, 'Interior').map((p) => ({ ...p })),
+      grantStarterIngredients: () => {
+        const r = addItem(this.save.inventory, 'driftwood', 2);
+        this.save.inventory = r.container;
+        persistActiveSave();
+      },
+      grantItem: (itemId, qty) => {
+        const r = addItem(this.save.inventory, itemId, qty);
+        this.save.inventory = r.container;
+        persistActiveSave();
+      },
+      grantRecipe: (recipeId) => {
+        this.save.knownRecipeIds = unlockRecipes(this.save.knownRecipeIds, [recipeId]);
+        persistActiveSave();
+      },
+      knownRecipes: () => [...this.save.knownRecipeIds],
+    };
   }
 
   override update(dt: number): void {
     if (!this.player || !this.save) return;
-    if (this.menuOpen || this.dayResolving || this.shopOpen) {
+    if (this.menuOpen || this.dayResolving || this.shopOpen || this.craftingOpen) {
       this.clock = pauseClock(this.clock, true);
       this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
       return;
@@ -277,6 +365,7 @@ export class InteriorScene extends GameScene {
       if (this.nearest.id === 'inside-door') this.exitToFarm();
       else if (this.nearest.id === 'bed') this.triggerSleep(false);
       else if (this.nearest.id === 'shop-counter') this.openShop();
+      else if (this.nearest.id === 'workbench') this.openCrafting();
       else {
         this.actionLabel = this.nearest.label;
         this.actionTimer = 1.6;
@@ -409,6 +498,7 @@ export class InteriorScene extends GameScene {
 
   private renderShop(entries: ReturnType<typeof restockShop>['entries'], items: readonly Item[]): void {
     const itemsById = new Map(items.map((i) => [i.id, i]));
+    const recipeOffers = this.buildRecipeOffersForCurrentShop();
     this.ctx.overlay.showShopPanel({
       shopName: this.title,
       walletGold: this.save.wallet.gold,
@@ -418,12 +508,48 @@ export class InteriorScene extends GameScene {
         price: e.price,
         remaining: e.remaining,
       })),
+      recipeOffers,
       onBuy: (itemId) => this.handleBuy(itemId, entries, items),
+      onBuyRecipe: (recipeId) => this.handleBuyRecipe(recipeId, entries, items),
       onClose: () => {
         this.shopOpen = false;
         this.refreshHud();
       },
     });
+  }
+
+  private buildRecipeOffersForCurrentShop(): import('../ui/overlay').ShopPanelRecipeOffer[] {
+    if (!this.shopId) return [];
+    const offers: import('../ui/overlay').ShopPanelRecipeOffer[] = [];
+    const content = loadGameContent();
+    for (const [recipeId, src] of Object.entries(RECIPE_UNLOCK_SOURCES)) {
+      if (src.source !== 'shop') continue;
+      if (src.shopId !== this.shopId) continue;
+      const recipe = content.recipes.find((r) => r.id === recipeId);
+      if (!recipe) continue;
+      offers.push({
+        recipeId,
+        recipeName: recipe.name,
+        price: src.price,
+        knownAlready: this.save.knownRecipeIds.includes(recipeId),
+      });
+    }
+    return offers;
+  }
+
+  private handleBuyRecipe(
+    recipeId: string,
+    entries: ReturnType<typeof restockShop>['entries'],
+    items: readonly Item[],
+  ): void {
+    const src = RECIPE_UNLOCK_SOURCES[recipeId];
+    if (!src || src.source !== 'shop') return;
+    if (this.save.knownRecipeIds.includes(recipeId)) return;
+    if (this.save.wallet.gold < src.price) return;
+    this.save.wallet.gold -= src.price;
+    this.save.knownRecipeIds = unlockRecipes(this.save.knownRecipeIds, [recipeId]);
+    persistActiveSave();
+    this.renderShop(entries, items);
   }
 
   private handleBuy(
@@ -442,6 +568,94 @@ export class InteriorScene extends GameScene {
     this.save.inventory = added.container;
     persistActiveSave();
     this.renderShop(entries, items);
+  }
+
+  private openCrafting(): void {
+    const content = loadGameContent();
+    const recipes = loadRecipesFromContent(content);
+    const itemsById = new Map<string, Item>();
+    for (const item of content.items) itemsById.set(item.id, item);
+    this.craftingOpen = true;
+    this.renderCrafting(recipes, itemsById);
+  }
+
+  private renderCrafting(
+    recipes: readonly import('../data/schemas').Recipe[],
+    itemsById: ReadonlyMap<string, Item>,
+  ): void {
+    const rows = buildCraftingPanelRecipes({
+      knownRecipeIds: this.save.knownRecipeIds,
+      recipes,
+      itemsById,
+      container: this.save.inventory,
+    });
+    this.ctx.overlay.showCraftingPanel({
+      title: 'Workbench',
+      recipes: rows,
+      onCraft: (recipeId) => this.handleCraft(recipeId, recipes, itemsById),
+      onClose: () => {
+        this.craftingOpen = false;
+        this.refreshHud();
+      },
+    });
+  }
+
+  private handleCraft(
+    recipeId: string,
+    recipes: readonly import('../data/schemas').Recipe[],
+    itemsById: ReadonlyMap<string, Item>,
+  ): void {
+    const recipe = recipes.find((r) => r.id === recipeId);
+    if (!recipe) return;
+    if (isPlaceable(recipe.outputItemId, itemsById)) {
+      // Placeable craft: consume ingredients and skip the inventory — the
+      // output is placed on the map instead.
+      for (const ing of recipe.ingredients) {
+        if (countItem(this.save.inventory, ing.itemId) < ing.qty) return;
+      }
+      let next = this.save.inventory;
+      for (const ing of recipe.ingredients) {
+        next = removeItem(next, ing.itemId, ing.qty).container;
+      }
+      this.save.inventory = next;
+      const slot = this.placementRoot;
+      const slotsTaken = listPlacements(this.save, 'Interior').length;
+      const placed = placeCrafted(
+        this.save,
+        'Interior',
+        recipe.outputItemId,
+        slot.x + slotsTaken * 1.2,
+        slot.z,
+      );
+      this.spawnPlacementMesh(placed);
+      persistActiveSave();
+      this.actionLabel = `Placed ${itemsById.get(recipe.outputItemId)?.name ?? recipe.outputItemId}`;
+      this.actionTimer = 1.6;
+    } else {
+      const result = craft({ recipe, container: this.save.inventory });
+      if (!result.accepted) return;
+      this.save.inventory = result.container;
+      persistActiveSave();
+      this.actionLabel = `Crafted ${recipe.name}`;
+      this.actionTimer = 1.6;
+    }
+    this.renderCrafting(recipes, itemsById);
+  }
+
+  private refreshPlacedDecor(): void {
+    if (!this.scene) return;
+    // Clear any meshes from a prior enter().
+    for (const m of this.placementMeshes) m.dispose();
+    this.placementMeshes = [];
+    for (const p of listPlacements(this.save, 'Interior')) {
+      this.spawnPlacementMesh(p);
+    }
+  }
+
+  private spawnPlacementMesh(p: { id: string; itemId: string; x: number; z: number }): void {
+    if (!this.scene) return;
+    const mesh = buildPlacementMesh(this.scene, p);
+    this.placementMeshes.push(mesh);
   }
 
   private exitToFarm(): void {

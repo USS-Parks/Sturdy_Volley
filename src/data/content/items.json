@@ -12,5 +12,20 @@
   { "id": "goat-cheese", "name": "Goat Cheese", "description": "Tangy cheese pressed in a cheese drum.", "category": "artisan", "sellPrice": 95, "stackable": true, "tags": ["artisan"] },
   { "id": "garden-omelet", "name": "Garden Omelet", "description": "A fluffy omelet folded with garden veg.", "category": "cooking", "sellPrice": 120, "stackable": true, "tags": ["cooked", "buff"] },
   { "id": "driftwood", "name": "Driftwood", "description": "Storm-smoothed wood washed up on the bay.", "category": "material", "sellPrice": 5, "stackable": true, "tags": ["material"] },
-  { "id": "tide-shell", "name": "Tide Shell", "description": "An iridescent shell from the low-tide line.", "category": "forage", "sellPrice": 12, "stackable": true, "tags": ["beach", "forage"] }
+  { "id": "tide-shell", "name": "Tide Shell", "description": "An iridescent shell from the low-tide line.", "category": "forage", "sellPrice": 12, "stackable": true, "tags": ["beach", "forage"] },
+  { "id": "harborlime", "name": "Harborlime", "description": "A tart citrus that thrives in salt air.", "category": "forage", "sellPrice": 22, "stackable": true, "tags": ["summer", "forage"] },
+  { "id": "salt", "name": "Sea Salt", "description": "Coarse salt evaporated from tide pans.", "category": "material", "sellPrice": 8, "stackable": true, "tags": ["material"] },
+  { "id": "pea-jam", "name": "Pea Jam", "description": "Sweet-savory preserve from ripe Bell Peas.", "category": "artisan", "sellPrice": 90, "stackable": true, "tags": ["artisan"] },
+  { "id": "sun-jam", "name": "Sun Jam", "description": "Thick rind-and-flesh preserve.", "category": "artisan", "sellPrice": 180, "stackable": true, "tags": ["artisan"] },
+  { "id": "preserved-radish", "name": "Preserved Radish", "description": "Sliced radish in brine.", "category": "artisan", "sellPrice": 70, "stackable": true, "tags": ["artisan"] },
+  { "id": "driftwood-plank", "name": "Driftwood Plank", "description": "A planed, ready-to-build plank.", "category": "material", "sellPrice": 18, "stackable": true, "tags": ["material"] },
+  { "id": "driftwood-shelf", "name": "Driftwood Shelf", "description": "A sturdy little shelf.", "category": "artisan", "sellPrice": 140, "stackable": true, "tags": ["artisan", "decor"] },
+  { "id": "shell-charm", "name": "Shell Charm", "description": "A polished, drilled tide-shell on a cord.", "category": "artisan", "sellPrice": 95, "stackable": true, "tags": ["artisan", "gift"] },
+  { "id": "shell-bracelet", "name": "Shell Bracelet", "description": "Three tide-shells wired together.", "category": "artisan", "sellPrice": 130, "stackable": true, "tags": ["artisan", "gift"] },
+  { "id": "harborlime-tart", "name": "Harborlime Tart", "description": "A tangy citrus tart.", "category": "cooking", "sellPrice": 165, "stackable": true, "tags": ["cooked", "buff"] },
+  { "id": "bell-pea-stew", "name": "Bell Pea Stew", "description": "A green stew with chiming pods.", "category": "cooking", "sellPrice": 110, "stackable": true, "tags": ["cooked", "buff"] },
+  { "id": "turnip-soup", "name": "Turnip Soup", "description": "A briny, warming soup.", "category": "cooking", "sellPrice": 100, "stackable": true, "tags": ["cooked", "buff"] },
+  { "id": "sunmelon-juice", "name": "Sunmelon Juice", "description": "A glass of summer.", "category": "cooking", "sellPrice": 85, "stackable": true, "tags": ["cooked"] },
+  { "id": "root-stew", "name": "Root Stew", "description": "Slow-cooked roots in goat milk.", "category": "cooking", "sellPrice": 150, "stackable": true, "tags": ["cooked", "buff"] },
+  { "id": "radish-pickle", "name": "Radish Pickle", "description": "Salty-tart pickled radish.", "category": "artisan", "sellPrice": 80, "stackable": true, "tags": ["artisan"] }
 ]

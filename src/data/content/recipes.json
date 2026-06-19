@@ -17,5 +17,180 @@
       { "itemId": "mooncalf-egg", "qty": 1 },
       { "itemId": "blush-radish", "qty": 1 }
     ]
+  },
+  {
+    "id": "salt-from-shells",
+    "name": "Sea Salt",
+    "type": "crafting",
+    "outputItemId": "salt",
+    "outputQty": 2,
+    "ingredients": [{ "itemId": "tide-shell", "qty": 1 }]
+  },
+  {
+    "id": "pea-jam",
+    "name": "Pea Jam",
+    "type": "crafting",
+    "outputItemId": "pea-jam",
+    "outputQty": 1,
+    "ingredients": [
+      { "itemId": "bell-peas", "qty": 3 },
+      { "itemId": "salt", "qty": 1 }
+    ]
+  },
+  {
+    "id": "sun-jam",
+    "name": "Sun Jam",
+    "type": "crafting",
+    "outputItemId": "sun-jam",
+    "outputQty": 1,
+    "ingredients": [{ "itemId": "sunmelon", "qty": 1 }]
+  },
+  {
+    "id": "preserved-radish",
+    "name": "Preserved Radish",
+    "type": "crafting",
+    "outputItemId": "preserved-radish",
+    "outputQty": 1,
+    "ingredients": [
+      { "itemId": "blush-radish", "qty": 2 },
+      { "itemId": "salt", "qty": 1 }
+    ]
+  },
+  {
+    "id": "radish-pickle",
+    "name": "Radish Pickle",
+    "type": "crafting",
+    "outputItemId": "radish-pickle",
+    "outputQty": 1,
+    "ingredients": [
+      { "itemId": "blush-radish", "qty": 1 },
+      { "itemId": "harborlime", "qty": 1 }
+    ]
+  },
+  {
+    "id": "driftwood-plank",
+    "name": "Driftwood Plank",
+    "type": "crafting",
+    "outputItemId": "driftwood-plank",
+    "outputQty": 1,
+    "ingredients": [{ "itemId": "driftwood", "qty": 2 }]
+  },
+  {
+    "id": "driftwood-shelf",
+    "name": "Driftwood Shelf",
+    "type": "crafting",
+    "outputItemId": "driftwood-shelf",
+    "outputQty": 1,
+    "ingredients": [{ "itemId": "driftwood-plank", "qty": 3 }]
+  },
+  {
+    "id": "shell-charm",
+    "name": "Shell Charm",
+    "type": "crafting",
+    "outputItemId": "shell-charm",
+    "outputQty": 1,
+    "ingredients": [{ "itemId": "tide-shell", "qty": 2 }]
+  },
+  {
+    "id": "shell-bracelet",
+    "name": "Shell Bracelet",
+    "type": "crafting",
+    "outputItemId": "shell-bracelet",
+    "outputQty": 1,
+    "ingredients": [{ "itemId": "tide-shell", "qty": 3 }]
+  },
+  {
+    "id": "harborlime-tart",
+    "name": "Harborlime Tart",
+    "type": "cooking",
+    "outputItemId": "harborlime-tart",
+    "outputQty": 1,
+    "ingredients": [
+      { "itemId": "harborlime", "qty": 2 },
+      { "itemId": "mooncalf-egg", "qty": 1 }
+    ]
+  },
+  {
+    "id": "bell-pea-stew",
+    "name": "Bell Pea Stew",
+    "type": "cooking",
+    "outputItemId": "bell-pea-stew",
+    "outputQty": 1,
+    "ingredients": [
+      { "itemId": "bell-peas", "qty": 2 },
+      { "itemId": "salt", "qty": 1 }
+    ]
+  },
+  {
+    "id": "turnip-soup",
+    "name": "Turnip Soup",
+    "type": "cooking",
+    "outputItemId": "turnip-soup",
+    "outputQty": 1,
+    "ingredients": [
+      { "itemId": "tide-turnip", "qty": 2 },
+      { "itemId": "bluff-goat-milk", "qty": 1 }
+    ]
+  },
+  {
+    "id": "sunmelon-juice",
+    "name": "Sunmelon Juice",
+    "type": "cooking",
+    "outputItemId": "sunmelon-juice",
+    "outputQty": 2,
+    "ingredients": [{ "itemId": "sunmelon", "qty": 1 }]
+  },
+  {
+    "id": "root-stew",
+    "name": "Root Stew",
+    "type": "cooking",
+    "outputItemId": "root-stew",
+    "outputQty": 1,
+    "ingredients": [
+      { "itemId": "tide-turnip", "qty": 1 },
+      { "itemId": "blush-radish", "qty": 1 },
+      { "itemId": "bluff-goat-milk", "qty": 1 }
+    ]
+  },
+  {
+    "id": "salted-driftwood",
+    "name": "Salted Driftwood",
+    "type": "crafting",
+    "outputItemId": "driftwood-plank",
+    "outputQty": 2,
+    "ingredients": [
+      { "itemId": "driftwood", "qty": 3 },
+      { "itemId": "salt", "qty": 1 }
+    ]
+  },
+  {
+    "id": "cheese-omelet",
+    "name": "Cheese Omelet",
+    "type": "cooking",
+    "outputItemId": "garden-omelet",
+    "outputQty": 1,
+    "ingredients": [
+      { "itemId": "mooncalf-egg", "qty": 1 },
+      { "itemId": "goat-cheese", "qty": 1 }
+    ]
+  },
+  {
+    "id": "pea-cheese-stew",
+    "name": "Pea & Cheese Stew",
+    "type": "cooking",
+    "outputItemId": "bell-pea-stew",
+    "outputQty": 2,
+    "ingredients": [
+      { "itemId": "bell-peas", "qty": 3 },
+      { "itemId": "goat-cheese", "qty": 1 }
+    ]
+  },
+  {
+    "id": "sea-salt-bulk",
+    "name": "Sea Salt (bulk)",
+    "type": "crafting",
+    "outputItemId": "salt",
+    "outputQty": 5,
+    "ingredients": [{ "itemId": "tide-shell", "qty": 3 }]
   }
 ]
