@@ -248,6 +248,39 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## Prompt 011 — NPC schedule engine (2026-06-19, core)
+
+Stood up the schedule + abstract-pathing engine plus four NPC schedules
+spanning Farm / Town / Beach / Interior.
+
+- **`engine/npcSchedule.ts`** — pure: `Waypoint`, `ScheduleSegment`,
+  `NpcSchedule { default, bySeason, byWeather, byFestival, byRelationship,
+  byEvent }`, `ResolveContext`, `pickLayer` (precedence: event flag →
+  festival → weather → relationship-tier → season → default), `activeWaypoint`,
+  `abstractStep` (offscreen NPCs jump-to-anchor, no navmesh cost), `liveStep`
+  (linear walk with arrival snap), `isConversationAvailable`. 13 unit tests.
+- **`src/data/content/schedules.json`** — 4 NPC schedules (mara-vale, jun-park,
+  sol-aranda, lio-marin) routed across Farm / Town / Beach / Interior with at
+  least one weather override (mara's rain-day stays indoors).
+
+**Acceptance criteria (core met):**
+- [x] At least 4 NPCs follow schedules across farm, town, interiors, and
+  beach (data file ships with all 4; schedule resolution is pure-tested).
+- [x] Offscreen NPCs advance through abstract schedules without consuming
+  full navigation or animation cost (`abstractStep` returns the active
+  waypoint directly; no live walk-physics needed off-screen).
+- [ ] NPCs avoid obstacles and recover if blocked *(navmesh + local
+  avoidance arrive with the scene-renderer wave; the engine emits arrival
+  events the renderer can intercept with reroute logic).*
+- [ ] Debug overlay can show current schedule target *(reserved for the
+  debug-tools wave; the resolver already returns the waypoint id renderers
+  can echo into the existing `sturdyVolleyDebug` shim).*
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`173/173` (22 files, +9 new specs) · build OK.
+
+---
+
 ## Prompt 010 — Foraging, debris, trees, and regrowth (2026-06-19, core)
 
 Stood up the forage / debris / tree-regrowth layer: a `WorldEntity` map
