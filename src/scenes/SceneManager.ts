@@ -11,6 +11,7 @@ export type SceneFactory = (ctx: SceneContext) => GameScene;
  */
 export class SceneManager {
   private current: GameScene | null = null;
+  private currentKey: string | null = null;
   private transitioning = false;
 
   constructor(
@@ -19,6 +20,14 @@ export class SceneManager {
     private readonly overlay: UIOverlay,
     private readonly fade: FadeLayer,
   ) {}
+
+  currentScene(): import('@babylonjs/core').Scene | null {
+    return this.current?.getScene() ?? null;
+  }
+
+  currentSceneKey(): string | null {
+    return this.currentKey;
+  }
 
   start(): void {
     this.engine.runRenderLoop(() => {
@@ -42,6 +51,7 @@ export class SceneManager {
     const next = factory({ engine: this.engine, manager: this, overlay: this.overlay });
     next.build();
     this.current = next;
+    this.currentKey = key;
     next.enter(data);
 
     // Release the guard as soon as the next scene is interactive — the fade-in

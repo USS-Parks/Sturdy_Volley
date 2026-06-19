@@ -11,6 +11,8 @@ Revision status: Revised 2026-06-18 to remove volleyball (an erroneous editing-p
 
 Revision status: Revised 2026-06-19 to add §0 Execution Rules — the per-prompt verify gate, DEVLOG entry, commit discipline, push policy, and originality + Theme 3 rules are now strict and load-bearing, not inherited convention. Section 8's "committed or checkpointed" language is superseded by §0.4.
 
+Revision status: Revised 2026-06-19 (VS-A1) to retire the "(core)" deferral pattern. The Theme 3 Production Track (A01–A10) is no longer a mandatory upstream dependency — rendering and representative graybox geometry now sit fully with Claude. §0 gains §0.9 (every prompt is integrated), §0.10 (representative graybox is Claude's responsibility), §0.11 (production art follows feature demand). §8 is restructured: §8.0 Vertical Slice phase (VS-A1..VS-A5) executes first, then §8.1 Retrofit pass over Prompts 010–015, then §8.2 Continued roster (Prompts 016–050). The DEVLOG entries for Prompts 010–014 carry an appended "Status: pending RF integration" note pointing at the matching RF prompt.
+
 ---
 
 ## 0. Execution Rules
@@ -77,8 +79,38 @@ For any change that spans multiple prompts, multiple subsystems, or introduces a
 
 ### 0.8 Mandatory tracks
 
-- Execute the Theme 3 Production Track (Theme 3 Prompts A01–A10) after Prompt 003 and before Prompt 004, as stated in §8.
-- The A-track and the numbered P-track each follow §0.2 – §0.5 independently. An A-track prompt is shipped under its own commit with its own DEVLOG entry.
+- Execute the §8.0 Vertical Slice phase (VS-A1..VS-A5) before any §8.1 retrofit prompt or §8.2 numbered prompt. The slice establishes player movement, camera, collision, interaction, scale, scene transitions, mobile performance budgets, and a complete gather → plant/water → harvest → inventory/save loop with one visible NPC.
+- After §8.0 ships, execute §8.1 (RF-10..RF-15) before resuming §8.2 (Prompts 016+).
+- The Theme 3 Production Track (Theme 3 Prompts A01–A10, sketched as the third major track in earlier revisions) is **no longer mandatory** and does not gate any P-prompt. See §0.10 + §0.11. Existing Theme 3 imagery in `art-production/` remains a reference library, not a sunk-cost obligation.
+
+### 0.9 Every prompt is integrated
+
+A prompt is not complete until its new behavior is **visible in the running game** and verified by Playwright (or, when Playwright can't observe it, by an explicit in-game manual check the DEVLOG entry names).
+
+- "(core) — renderer wave pending" is not an acceptable acceptance-criterion state. A pure module is acceptable only when paired in the same commit with the scene wiring + interaction surface that exercises it.
+- A prompt that introduces a new entity (NPC, animal, prop, machine, festival decor, shop, building) ships the entity's representative graybox mesh and an interaction surface in the same commit (per §0.10).
+- A prompt that ships a new system (weather, dialogue, friendship, schedules) ships at least one visible in-game consumer of that system in the same commit. If the system has multiple consumers across the roster, the same prompt picks the first one and wires it; later prompts add the others under the same rule.
+- The DEVLOG entry's "Acceptance criteria" section is gated on integration. Items that remain unintegrated stay unchecked.
+
+### 0.10 Representative graybox geometry is Claude's responsibility
+
+Claude owns the representative graybox geometry for every entity introduced under §8.
+
+- Use Babylon primitives (`MeshBuilder.Create*`) and the existing `flatMaterial` helper. No imported assets at this stage.
+- Match the world-scale conventions documented in `docs/SCALE_AND_PERFORMANCE.md` (1 world unit = 1 meter; player capsule 1.8 m; farm cell 1 m × 1 m; building walls 3–4 m; doorways ≥ 1 m × 1.8 m).
+- One material per simple prop. Reuse palette colors from `PALETTE` in `src/render/scene-helpers.ts`.
+- Keep the primitive-construction code grouped in a single scene helper per entity class so a future `.glb` swap is a one-line edit.
+
+When real `.glb` assets land, they swap in via the existing factory pattern. Until then, the graybox is the asset.
+
+### 0.11 Production art follows feature demand
+
+Production art (real low-poly `.glb` models, hand-painted textures, finished animation clips) is created **only when a working feature needs it**.
+
+- The existing `art-production/style-themes/theme-03-n64-low-poly-adventure/` boards are a **reference library**, not a backlog of work to justify. They may inform palette + silhouette choices but do not gate any prompt.
+- A working feature is a graybox-integrated, Playwright-verifiable surface that the slice exercises. Once such a feature is shipped and the loop around it is stable, the relevant prompt or a follow-up may commission a real asset.
+- A real asset commission must (a) name the specific graybox mesh it replaces, (b) list the constraints from `docs/SCALE_AND_PERFORMANCE.md` it must respect, and (c) be reversible — the graybox stays in the tree as a fallback until the new asset ships.
+- Engaging external art collaborators (Codex or otherwise) does not transfer scope ownership back. Claude remains responsible for representative geometry until a delivered `.glb` is integrated by a Claude-shipped prompt.
 
 ---
 
@@ -607,7 +639,108 @@ Accessibility:
 
 ## 8. Sequential Prompt Roster
 
-Use the following prompts in order with a coding agent. Each prompt assumes the previous prompt has been completed, passed §0.2's verify gate, received a §0.3 DEVLOG entry, and been committed per §0.4. For every prompt: keep assets original (§0.7), use placeholder art only when needed, keep data-driven systems extensible, and follow the approved Theme 3 low-poly 3D art bible. Execute the mandatory Theme 3 Production Track after Prompt 003 and before Prompt 004 (§0.8).
+Use the following prompts in order with a coding agent. Each prompt assumes the previous prompt has been completed, passed §0.2's verify gate, received a §0.3 DEVLOG entry, and been committed per §0.4. For every prompt: keep assets original (§0.7), use representative graybox geometry under Claude's ownership (§0.10), let production art follow feature demand (§0.11), and ship every prompt fully integrated in the running game (§0.9).
+
+**Execution order (§0.8):**
+
+1. **§8.0 Vertical Slice phase (VS-A1..VS-A5)** — establishes the playable graybox foundation. Executes first; no prompt outside §8.0 may land while §8.0 is incomplete.
+2. **§8.1 Retrofit pass (RF-10..RF-15)** — integrates the unwired engine modules from the original Prompts 010–015 into the slice under §0.9.
+3. **§8.2 Continued roster (Prompts 016..050)** — the original numbered prompts, each executed under §0.9.
+
+The original Prompts 001..015 below remain the historical record and the source for the retrofit punch list. They do not re-execute.
+
+---
+
+### §8.0 Vertical Slice phase
+
+The Vertical Slice phase delivers a playable graybox: player movement, camera, collision, interaction, scale, an exterior + interior scene, one complete gather → plant/water → harvest → inventory/save loop, one live NPC, and measurable mobile performance budgets.
+
+#### VS-A1 — Governance update, scale + mobile performance budgets
+
+Bundle the §0.9/§0.10/§0.11 governance additions, the `docs/SCALE_AND_PERFORMANCE.md` scale + budget document, and a `?debug=perf` overlay that surfaces FPS / draw calls / active meshes / triangles per scene with per-scene budget paint, into a single commit.
+
+Acceptance criteria:
+
+- §0.9, §0.10, §0.11 land in the P-SPR.
+- §8 restructured into §8.0 + §8.1 + §8.2.
+- DEVLOG entries for Prompts 010–014 carry a "Status: pending RF integration" note.
+- `docs/SCALE_AND_PERFORMANCE.md` defines the world-unit convention and the per-scene mobile budgets.
+- `?debug=perf` mounts an overlay reading FPS / draw calls / active meshes / triangles; over-budget cells paint red.
+- Playwright `tests/e2e/perf-budget.spec.ts` asserts Farm + Town fit the Pixel 5 budget after New Game.
+
+#### VS-A2 — Gather: visible forage + chop on the Farm
+
+Retrofit `engine/forage.ts` into the Farm: spawn graybox forage meshes (shells, driftwood sticks, mushrooms) along farm edges; add chop-able trees and break-able debris on the Farm; interact + tool-hardness gate; foraging skill XP via the existing ledger.
+
+Acceptance criteria:
+
+- A fresh save shows at least 4 forage meshes on the Farm.
+- Interact picks up a forage item into the hotbar; spawn count drops; save persists the world-entities map.
+- Axe (Prompt 009) at hardness ≥ 2 turns a tree into a stump + 3 driftwood; stump regrows after 5 days.
+- Playwright walks to a known spawn, collects, asserts the inventory entry.
+- Farm scene remains within the §0.10 mobile budget after the new meshes spawn.
+
+#### VS-A3 — Real farmhouse Interior + door handoff
+
+Replace the `InteriorScene` placeholder with `FarmhouseInteriorScene`: walls, floor, bed, kitchen counter, table, hearth, chest, exit door. Add door interactions Farm ↔ Interior with player-position handoff at the inside-door / outside-door anchor points. Move the sleep flow to the bed interaction. Reframe the camera indoors.
+
+Acceptance criteria:
+
+- The farmhouse door on the Farm enters the Interior at the inside-door anchor.
+- The Interior exit door returns the player to the Farm at the outside-door anchor.
+- The bed inside the farmhouse triggers the sleep + day-resolution flow (replacing the "sleep at the door" handler).
+- Camera reframes indoors (closer + lower).
+- Interior scene remains within its §0.10 budget.
+- Playwright walks Farm → Interior → bed → Day 2 → Interior exit → Farm.
+
+#### VS-A4 — One live NPC walking the schedule + a greet bubble
+
+Retrofit `engine/npcSchedule.ts` and a tiny slice of `engine/dialogue.ts` into the Town scene: render one graybox NPC (Mara Vale) as a capsule + head + arms + legs, walk her between the waypoints from `schedules.json`, and add an interact-to-greet that opens a dialogue bubble using the `dialogue` runner with one node.
+
+Acceptance criteria:
+
+- Mara renders as a representative humanoid graybox on the Town map.
+- Her position interpolates between her current waypoints; she snaps to the abstract waypoint when offscreen.
+- Standing near her shows an `[E] Talk to Mara` prompt.
+- Pressing interact opens a dialogue bubble with her line, advances on tap, closes.
+- Town scene remains within the §0.10 budget after the NPC.
+- Playwright opens the bubble, advances it, asserts the talk happened.
+
+#### VS-A5 — Complete-loop slice gate
+
+A single Playwright spec that walks the full gather → plant → water → harvest → bank → sleep → bank loop end-to-end on both desktop and Pixel 5. Asserts the day-summary income picks up the shipment and the foraging XP. Also re-asserts the §0.10 budget at every visited scene.
+
+Acceptance criteria:
+
+- The spec opens a fresh New Game, forages one item on the Farm, plants the starter Bell Pea Seeds, waters them, sleeps to Day 2, waters again, sleeps to maturity, harvests, drops the produce in the shipping bin, sleeps once more, and asserts the day-summary surfaces "Yesterday's shipment earned N g." with N > 0.
+- The same spec walks through Mara's greet bubble and asserts the talk.
+- Every scene visited remains within its §0.10 budget.
+- Passes on both `desktop-chromium` and `mobile-chromium` (Pixel 5).
+
+---
+
+### §8.1 Retrofit pass
+
+The retrofit pass integrates the unwired engine modules from the original Prompts 010–015 into the slice. Each RF prompt revisits one historical "(core)" entry, applies §0.9, ships scene wiring + interaction surface, and re-checks the DEVLOG "Acceptance criteria" line items.
+
+- **RF-10 Forage** — already integrated by VS-A2; RF-10 verifies the integration is complete on Beach + Marsh too (forage spawn anchors on each visited scene; tide-line shell collection).
+- **RF-11 NPC schedules** — extends VS-A4 to the remaining three NPCs (Jun Park, Sol Aranda, Lio Marin) and ships a debug overlay (`?debug=schedules`) that draws the current waypoint above each NPC.
+- **RF-12 Dialogue** — extends VS-A4's greet bubble into the full dialogue panel: portrait placeholder, typewriter pacing, branching choices, line-seen-today tracking, the `startQuest` / `startCutscene` effect routing.
+- **RF-13 Friendship** — wires the gift-give interaction (drop a held stack onto an NPC bubble) through `engine/friendship.ts`, adds a relationship bar to the dialogue panel, and a birthday HUD notice.
+- **RF-14 Cutscene** — wires the Babylon camera + character mover for `engine/cutscene.ts`, adds a skip button, and ships one playable scene (the Day 1 first-morning intro at the farmhouse bed).
+- **RF-15 Town doors** — every Ballast Bay building door opens an interior placeholder or shows a "Closed today" tooltip from a `ShopHours` data file; door + hours schedule reads from `engine/shops.ts` when it lands under §8.2.
+
+---
+
+### §8.2 Continued roster
+
+The original Prompts 016..050 below execute next, in the same numerical order, each under §0.9. Their acceptance criteria stay as written. Where a prompt would otherwise ship a pure module without scene wiring, the same prompt must add the scene wiring + interaction surface in the same commit; "(core)" deferrals are no longer permitted.
+
+---
+
+### Original Prompts 001..015 (historical record)
+
+The original §8 prompt roster below remains the historical record of work shipped under the pre-VS-A1 governance. Prompts 001..009 are fully integrated. Prompts 010..014 are pure modules pending RF integration per §8.1. Prompt 015 (Town map) is integrated but its building doors await RF-15. These prompts do not re-execute.
 
 ### Prompt 001 - Project scaffold and quality bar
 

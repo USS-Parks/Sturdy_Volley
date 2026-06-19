@@ -248,7 +248,70 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## VS-A1 — Governance update, scale + mobile performance budgets (2026-06-19)
+
+Bundle commit that re-orients the P-SPR around a playable graybox vertical
+slice. Retires the "(core)" deferral pattern; consolidates rendering +
+representative graybox ownership in Claude; sets measurable mobile
+performance budgets and ships the observability surface that enforces them.
+
+- **`STURDY_VOLLEY_PSPR.md`** — adds §0.9 (Every prompt is integrated),
+  §0.10 (Representative graybox geometry is Claude's responsibility),
+  §0.11 (Production art follows feature demand). §0.8 mandatory-tracks
+  language replaced: Theme 3 Production Track A01–A10 is no longer
+  gating. §8 restructured into §8.0 Vertical Slice (VS-A1..VS-A5), §8.1
+  Retrofit pass (RF-10..RF-15), §8.2 Continued roster (Prompts
+  016..050). The original Prompts 001..015 stay below as the historical
+  record.
+- **`docs/SCALE_AND_PERFORMANCE.md`** — world-unit convention (1u = 1m),
+  reference scales for player / cell / building / doorway, and the
+  per-scene Pixel-5 mobile budgets (Farm/Town: 220 dc / 180–200 meshes /
+  220k tris; Interior: 140 / 120 / 100k; Beach/Mine: 180 / 140 / 160k).
+  Plus the breach protocol and the initial-download budget.
+- **`src/render/perf-overlay.ts`** — pure DOM perf overlay gated by
+  `?debug=perf`. `sampleScene(engine, scene)` reads FPS + draw calls +
+  active meshes + triangles each frame; `mountPerfOverlay()` mounts an
+  idempotent strip with per-cell over-budget paint. `MOBILE_BUDGETS` +
+  `budgetFor(sceneKey)` + `passesBudget(sample, budget)` for tests.
+- **`src/main.ts`** — when `?debug=perf` is set, mounts the overlay and
+  drives it from a side render loop reading `manager.currentScene()` +
+  `manager.currentSceneKey()`. Off otherwise — zero cost in production.
+- **`src/scenes/SceneManager.ts`** — exposes `currentScene()` +
+  `currentSceneKey()` (used by the perf loop; could be used by the
+  retrofit waves too).
+- **`src/styles.css`** — `#perf-overlay` + `.perf-grid` + over-budget
+  red paint via `[data-over="1"]`.
+- **`tests/unit/perfOverlay.test.ts`** — 7 tests for the overlay
+  module: URL parsing, budget lookup, pass/fail, mount + destroy +
+  re-mount idempotency, over-budget paint.
+- **`tests/e2e/perf-budget.spec.ts`** — Playwright spec that asserts
+  Farm + Town stay within the Pixel 5 budget after New Game. FPS is read
+  for diagnostics only (SwiftShader software WebGL is unreliable).
+- **DEVLOG entries** for Prompts 010–014 receive an appended "Status:
+  pending RF integration" note pointing at the matching RF prompt
+  (§0.3 append-only honored).
+
+**Acceptance criteria**
+
+- [x] §0.9 / §0.10 / §0.11 land in the P-SPR
+- [x] §8 restructured into §8.0 / §8.1 / §8.2
+- [x] DEVLOG entries for Prompts 010–014 carry the status note
+- [x] `docs/SCALE_AND_PERFORMANCE.md` defines world units + per-scene
+  budgets
+- [x] `?debug=perf` mounts the overlay with red over-budget paint
+- [x] Playwright asserts Farm + Town within the Pixel 5 budget
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` ·
+Vitest +7 new specs · build OK · Playwright perf-budget spec passes on
+desktop + Pixel 5.
+
+---
+
 ## Prompt 015 — Ballast Bay town map (2026-06-19, core)
+
+**Status (VS-A1, 2026-06-19):** integrated (visible 3D buildings + harbor +
+flag + lanterns), but the building doors await RF-15 (door interactions +
+open/closed schedule via `engine/shops.ts`).
 
 Promoted the Town scene from placeholder card to a real Ballast Bay layout:
 9 modular low-poly buildings along a market lane, an open community-hall +
@@ -283,6 +346,11 @@ flag, and a row of lantern poles.
 ---
 
 ## Prompt 014 — Cutscene and event scripting (2026-06-19, core)
+
+**Status (VS-A1, 2026-06-19):** pending RF integration. The pure `engine/cutscene.ts`
+runner is shipped and unit-tested but has no Babylon camera + character mover
+bound to it and no in-game cutscene plays. Retrofit lands at RF-14 (Day 1
+first-morning intro at the farmhouse bed, skip button).
 
 Stood up the cutscene scripting engine: a typed `Beat[]` script with camera /
 shake / fade / character / animation / dialogue / sound / lighting / choice /
@@ -320,6 +388,12 @@ side-effect set for skip-replay.
 
 ## Prompt 013 — Friendship and gifts (2026-06-19, core)
 
+**Status (VS-A1, 2026-06-19):** pending RF integration. The pure
+`engine/friendship.ts` engine is shipped and unit-tested but no gift-give
+interaction exists in-game and the relationship value never updates from
+play. Retrofit lands at RF-13 (gift-handoff via inventory drag, relationship
+bar on the dialogue panel, birthday HUD notice).
+
 Stood up the friendship + gift engine: point-band relationship levels (1
 level per 100 points, 10 levels for everyone, 14 for confirmed spouses),
 loved / liked / neutral / disliked / hated tasting tables, weekly gift
@@ -354,6 +428,14 @@ bonus, decay floor.
 ---
 
 ## Prompt 012 — Dialogue engine (2026-06-19, core)
+
+**Status (VS-A1, 2026-06-19):** pending RF integration. The pure
+`engine/dialogue.ts` runner is shipped and unit-tested but no dialogue panel
+exists in-game, no NPC has a graybox mesh to talk to, and the `startQuest` /
+`startCutscene` effects have no routing. First partial integration lands at
+VS-A4 (one-node greet bubble for Mara). Full retrofit at RF-12 (portrait
+placeholder, typewriter pacing, branching choices, line-seen-today tracking,
+effect routing).
 
 Stood up the dialogue graph engine: typed nodes with optional conditions,
 effects, and branching choices; a deterministic runner that walks the graph
@@ -392,6 +474,13 @@ flag, item-check, weather, season conditions; rapport / flag / item-consume
 
 ## Prompt 011 — NPC schedule engine (2026-06-19, core)
 
+**Status (VS-A1, 2026-06-19):** pending RF integration. The pure
+`engine/npcSchedule.ts` engine and 4 schedules ship and are unit-tested but
+no live NPC renders in any scene and no waypoint is consumed at runtime.
+First partial integration lands at VS-A4 (Mara walks her schedule on the
+Town map). Full retrofit at RF-11 (remaining three NPCs + `?debug=schedules`
+overlay).
+
 Stood up the schedule + abstract-pathing engine plus four NPC schedules
 spanning Farm / Town / Beach / Interior.
 
@@ -424,6 +513,13 @@ spanning Farm / Town / Beach / Interior.
 ---
 
 ## Prompt 010 — Foraging, debris, trees, and regrowth (2026-06-19, core)
+
+**Status (VS-A1, 2026-06-19):** pending RF integration. The pure
+`engine/forage.ts` advanceWorld + collect + quality roll ship and are
+unit-tested but no forage mesh spawns in any scene and no in-game collection
+exists. First partial integration lands at VS-A2 (Farm-side forage spawn +
+collect + tree-chop). Full retrofit at RF-10 (Beach + Marsh forage anchors
++ tide-line shell collection).
 
 Stood up the forage / debris / tree-regrowth layer: a `WorldEntity` map
 shared by every scene, deterministic per-day spawning + regrowth via
