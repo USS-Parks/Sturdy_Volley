@@ -8,10 +8,27 @@ import {
   flatMaterial,
   PALETTE,
 } from '../render/scene-helpers';
-import { getActiveSave, persistActiveSave, clearActiveSave } from '../engine/gameState';
+import {
+  getActiveSave,
+  persistActiveSave,
+  clearActiveSave,
+  getDayLedger,
+  resetDayLedger,
+} from '../engine/gameState';
 import { writeSave } from '../engine/save';
-import { formatSaveStatus } from '../engine/format';
+import { formatWorldStatus } from '../engine/format';
+import { loadGameContent } from '../data/content';
+import { forecastFor } from '../engine/weather';
+import { tideStateAt, type TideState } from '../engine/tide';
+import { applyGameTime, getGameTime, resolveDay } from '../engine/dayResolution';
+import {
+  createTimeClock,
+  pauseClock,
+  tickClock,
+  type TimeClockState,
+} from '../engine/timeClock';
 import type { SaveData } from '../engine/saveModel';
+import type { Weather } from '../data/schemas';
 
 export interface PlaceNav {
   id: string;
@@ -24,13 +41,22 @@ export interface PlaceNav {
 /**
  * Placeholder gameplay scene: a colored ground + a player capsule + Theme-3
  * fog/lighting, with the HUD bar + pause menu preserving navigation and saving.
- * Real terrain/props/movement arrive once the art track delivers (Prompt 004+).
+ * Time keeps flowing while the player is here (Prompt 006), pauses with the
+ * menu, and collapses to a day-summary at 2 AM the same way the Farm does.
  */
 export abstract class PlaceScene extends GameScene {
   protected abstract readonly sceneKey: string;
   protected abstract readonly title: string;
   protected abstract readonly ground: Color3;
   protected abstract readonly navs: PlaceNav[];
+
+  protected save!: SaveData;
+  protected clock!: TimeClockState;
+  protected weather: Weather | null = null;
+  protected tide: TideState = 'low';
+  protected menuOpen = false;
+  protected dayResolving = false;
+  private hudTimer = 0;
 
   build(): Scene {
     const scene = makeScene(this.ctx.engine, PALETTE.sky);
@@ -58,30 +84,76 @@ export abstract class PlaceScene extends GameScene {
       this.goTo('Title', undefined, false);
       return;
     }
+    this.save = save;
     save.location.sceneKey = this.sceneKey;
     writeSave(save);
-    this.showHud(save);
+    this.clock = createTimeClock(getGameTime(save));
+    this.refreshWorldState();
+    this.menuOpen = false;
+    this.dayResolving = false;
+    this.refreshHud();
   }
 
-  private showHud(save: SaveData): void {
-    this.ctx.overlay.showHud(this.title, formatSaveStatus(save), () => this.openMenu(save));
+  override update(dt: number): void {
+    if (!this.save) return;
+    if (this.menuOpen || this.dayResolving) {
+      this.clock = pauseClock(this.clock, true);
+      return;
+    }
+    if (this.clock.paused) this.clock = pauseClock(this.clock, false);
+
+    const tick = tickClock(this.clock, dt);
+    this.clock = tick.state;
+    if (tick.advancedMinutes > 0) {
+      applyGameTime(this.save, this.clock.time);
+      this.refreshWorldState();
+    }
+    if (tick.collapsed) {
+      this.triggerCollapse();
+      return;
+    }
+    this.hudTimer -= dt;
+    if (this.hudTimer <= 0) {
+      this.hudTimer = 0.4;
+      this.refreshHud();
+    }
   }
 
-  private openMenu(save: SaveData): void {
+  private refreshWorldState(): void {
+    const content = loadGameContent();
+    this.weather = forecastFor(this.clock.time, content.weather);
+    this.tide = tideStateAt(this.clock.time);
+  }
+
+  private statusLine(): string {
+    return formatWorldStatus(this.save, {
+      weather: this.weather,
+      tide: this.tide,
+      gold: this.save.wallet.gold,
+    });
+  }
+
+  private refreshHud(): void {
+    this.ctx.overlay.showHud(this.title, this.statusLine(), () => this.openMenu());
+  }
+
+  private openMenu(): void {
+    this.menuOpen = true;
     this.ctx.overlay.showMenu(
       'Paused',
       [
         { id: 'resume', label: 'Resume', enabled: true, testId: 'pause-resume' },
         ...this.navs.map((n) => ({ id: n.id, label: n.label, enabled: true, testId: n.testId })),
       ],
-      (id) => this.onMenu(id, save),
-      formatSaveStatus(save),
+      (id) => this.onMenu(id),
+      this.statusLine(),
     );
   }
 
-  private onMenu(id: string, save: SaveData): void {
+  private onMenu(id: string): void {
     if (id === 'resume') {
-      this.showHud(save);
+      this.menuOpen = false;
+      this.refreshHud();
       return;
     }
     const nav = this.navs.find((n) => n.id === id);
@@ -93,5 +165,31 @@ export abstract class PlaceScene extends GameScene {
       return;
     }
     if (nav.target) this.goTo(nav.target);
+  }
+
+  private triggerCollapse(): void {
+    if (this.dayResolving) return;
+    this.dayResolving = true;
+    this.clock = pauseClock(this.clock, true);
+
+    const content = loadGameContent();
+    const ledger = getDayLedger();
+    const result = resolveDay({
+      save: this.save,
+      ledger,
+      collapsed: true,
+      festivals: content.festivals,
+      npcs: content.npcs,
+    });
+    resetDayLedger();
+    applyGameTime(this.save, result.nextTime);
+    persistActiveSave();
+
+    // Off-farm collapse: the day summary plays here, then the player is
+    // shuttled home to the Farm so the next day starts in the right place.
+    this.ctx.overlay.showDaySummary(result.summary, () => {
+      this.dayResolving = false;
+      this.goTo('Farm');
+    });
   }
 }

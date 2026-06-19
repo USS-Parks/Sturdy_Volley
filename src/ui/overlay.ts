@@ -1,4 +1,5 @@
 import type { MenuItem } from './menuModel';
+import type { DaySummary } from '../engine/timeSystem';
 
 /**
  * Manages the HTML overlay layer (#ui-root) rendered above the Phaser canvas.
@@ -207,6 +208,67 @@ export class UIOverlay {
     back.dataset.testid = 'panel-back';
     back.addEventListener('click', onBack);
     panel.appendChild(back);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /** Bedtime / collapse summary panel — income, skill XP, relationship deltas, notices. */
+  showDaySummary(summary: DaySummary, onContinue: () => void): void {
+    this.clear();
+    const panel = this.createPanel('Day Summary', summary.dayLabel);
+    panel.classList.add('day-summary-panel');
+    panel.dataset.testid = 'day-summary';
+
+    const stats = document.createElement('ul');
+    stats.className = 'day-summary-stats';
+
+    const rows: Array<[string, string]> = [
+      ['Income', `${summary.income} g`],
+      ['Relationship changes', `${summary.relationshipChanges}`],
+    ];
+    const xpEntries = Object.entries(summary.skillXp);
+    if (xpEntries.length === 0) {
+      rows.push(['Skill XP', 'none today']);
+    } else {
+      for (const [skill, xp] of xpEntries) {
+        rows.push([`${skill} XP`, `+${xp}`]);
+      }
+    }
+    for (const [label, value] of rows) {
+      const li = document.createElement('li');
+      li.className = 'day-summary-row';
+      const k = document.createElement('span');
+      k.className = 'day-summary-label';
+      k.textContent = label;
+      const v = document.createElement('span');
+      v.className = 'day-summary-value';
+      v.textContent = value;
+      li.append(k, v);
+      stats.appendChild(li);
+    }
+    panel.appendChild(stats);
+
+    if (summary.notices.length > 0) {
+      const notices = document.createElement('ul');
+      notices.className = 'day-summary-notices';
+      notices.dataset.testid = 'day-summary-notices';
+      for (const note of summary.notices) {
+        const li = document.createElement('li');
+        li.className = 'day-summary-notice';
+        li.textContent = note;
+        notices.appendChild(li);
+      }
+      panel.appendChild(notices);
+    }
+
+    const cont = document.createElement('button');
+    cont.className = 'menu-button';
+    cont.type = 'button';
+    cont.textContent = 'Continue to next day';
+    cont.dataset.testid = 'day-summary-continue';
+    cont.addEventListener('click', onContinue);
+    panel.appendChild(cont);
 
     this.root.appendChild(panel);
     this.focusFirstEnabled(panel);

@@ -34,10 +34,12 @@ export const saveSchema = z
         year: z.number().int().positive(),
         season: seasonSchema,
         day: z.number().int().min(1).max(28),
-        timeMinutes: z.number().int().min(0).max(24 * 60),
+        // Past-midnight hours up to 2:00 AM (26 * 60) are valid; the day collapses there.
+        timeMinutes: z.number().int().min(0).max(26 * 60),
       })
       .strict(),
     location: z.object({ sceneKey: z.string().min(1) }).strict(),
+    wallet: z.object({ gold: z.number().int().nonnegative() }).strict(),
     inventory: z.array(inventoryStackSchema),
     relationships: z.record(z.string(), z.number()),
     skills: z.record(z.string(), z.number()),
@@ -65,6 +67,7 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
     },
     calendar: { year: 1, season: 'spring', day: 1, timeMinutes: 6 * 60 },
     location: { sceneKey: 'Farm' },
+    wallet: { gold: 500 },
     inventory: [],
     relationships: {},
     skills: {},

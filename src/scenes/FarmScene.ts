@@ -7,14 +7,34 @@ import {
 } from '@babylonjs/core';
 import { GameScene } from './GameScene';
 import { makeScene, addFog, addLights, flatMaterial, PALETTE } from '../render/scene-helpers';
-import { getActiveSave, persistActiveSave, clearActiveSave } from '../engine/gameState';
+import {
+  getActiveSave,
+  persistActiveSave,
+  clearActiveSave,
+  getDayLedger,
+  resetDayLedger,
+} from '../engine/gameState';
 import { writeSave } from '../engine/save';
-import { formatSaveStatus } from '../engine/format';
+import { formatWorldStatus } from '../engine/format';
 import { computeMoveVector, type MoveInput } from '../engine/movement';
 import { FarmGrid, FARM_CELL_SIZE } from '../engine/farmGrid';
 import { createControllerState, stepController, type ControllerState } from '../engine/controller';
 import { resolveInteraction, type InteractTarget } from '../engine/interaction';
 import type { SaveData } from '../engine/saveModel';
+import { loadGameContent } from '../data/content';
+import { forecastFor } from '../engine/weather';
+import { tideStateAt, type TideState } from '../engine/tide';
+import { applyGameTime, getGameTime, resolveDay } from '../engine/dayResolution';
+import {
+  createTimeClock,
+  pauseClock,
+  setClockScale,
+  setClockTime,
+  tickClock,
+  type TimeClockState,
+} from '../engine/timeClock';
+import { formatClock as formatGameClock } from '../engine/timeSystem';
+import type { Weather } from '../data/schemas';
 
 const FARM_HALF = 20;
 const TOOLS = ['Hoe', 'Watering Can', 'Axe', 'Pick', 'Sickle'] as const;
@@ -22,14 +42,17 @@ const TOOLS = ['Hoe', 'Watering Can', 'Axe', 'Pick', 'Sickle'] as const;
 interface DebugApi {
   player: () => { x: number; z: number };
   controller: () => { stamina: number; gait: string; target: string | null; tool: string };
+  time: () => { minutes: number; paused: boolean; scale: number; clock: string };
+  setTimeScale: (scale: number) => void;
+  sleep: () => void;
 }
 
 /**
- * Breakpoint Farm — playable 3D scene (Prompts 004–005). Placeholder low-poly
+ * Breakpoint Farm — playable 3D scene (Prompts 004–006). Placeholder low-poly
  * terrain/props + a grid-aware tilled plot; a third-person player driven by the
- * renderer-agnostic controller (jog/sprint, acceleration, stamina) and an
- * interaction resolver (one button → nearest, highest-priority target). Tool
- * slots cycle with the number keys. Real rigs/animations bind at the art pass.
+ * renderer-agnostic controller + interaction resolver. Prompt 006 adds the live
+ * time clock (paused with menus, debug-only acceleration), bedtime/collapse,
+ * and a Sleep prompt at the farmhouse door that resolves the day.
  */
 export class FarmScene extends GameScene {
   private camera!: ArcRotateCamera;
@@ -45,6 +68,11 @@ export class FarmScene extends GameScene {
   private hudTimer = 0;
   private ePrev = false;
   private menuOpen = false;
+  private clock!: TimeClockState;
+  private weather: Weather | null = null;
+  private tide: TideState = 'low';
+  private dayResolving = false;
+  private readonly homePosition = new Vector3(-8, 0.9, -5.4);
 
   private readonly pressed = new Set<string>();
   private touch = { active: false, dx: 0, dy: 0, ox: 0, oy: 0 };
@@ -153,8 +181,10 @@ export class FarmScene extends GameScene {
     writeSave(save);
 
     this.controller = createControllerState();
+    this.clock = createTimeClock(getGameTime(save));
+    this.refreshWorldState();
     this.targets = [
-      { id: 'farmhouse-door', kind: 'door', label: 'Enter the farmhouse', x: -10, z: -5.6, radius: 2.6, priority: 5 },
+      { id: 'farmhouse-door', kind: 'door', label: 'Sleep at the farmhouse', x: -10, z: -5.6, radius: 2.6, priority: 5 },
       { id: 'tilled-plot', kind: 'farm-cell', label: 'Tend the soil', x: -6, z: -4, radius: 4, priority: 3 },
       { id: 'tide-pond', kind: 'water-entry', label: 'Check the tide pond', x: 10, z: -2, radius: 4.4, priority: 2 },
       { id: 'tree-1', kind: 'prop', label: 'Inspect the tree', x: 8, z: -6, radius: 2, priority: 1 },
@@ -165,6 +195,7 @@ export class FarmScene extends GameScene {
     window.addEventListener('keyup', this.onKeyUp);
     this.attachTouch();
     this.menuOpen = false;
+    this.dayResolving = false;
     this.refreshHud();
 
     (window as unknown as { sturdyVolleyDebug?: DebugApi }).sturdyVolleyDebug = {
@@ -175,15 +206,27 @@ export class FarmScene extends GameScene {
         target: this.nearest?.id ?? null,
         tool: TOOLS[this.selectedTool],
       }),
+      time: () => ({
+        minutes: this.clock.time.minutes,
+        paused: this.clock.paused,
+        scale: this.clock.scale,
+        clock: formatGameClock(this.clock.time.minutes),
+      }),
+      setTimeScale: (scale: number) => {
+        this.clock = setClockScale(this.clock, scale);
+      },
+      sleep: () => this.triggerSleep(false),
     };
   }
 
   override update(dt: number): void {
     if (!this.player) return;
-    if (this.menuOpen) {
+    if (this.menuOpen || this.dayResolving) {
+      this.clock = pauseClock(this.clock, true);
       this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
       return;
     }
+    if (this.clock.paused) this.clock = pauseClock(this.clock, false);
 
     this.updateToolSelection();
 
@@ -198,11 +241,26 @@ export class FarmScene extends GameScene {
 
     const interact = this.pressed.has('e') || this.pressed.has(' ');
     if (interact && !this.ePrev && this.nearest) {
-      this.actionLabel = this.nearest.label;
-      this.actionTimer = 1.6;
+      if (this.nearest.id === 'farmhouse-door') {
+        this.triggerSleep(false);
+      } else {
+        this.actionLabel = this.nearest.label;
+        this.actionTimer = 1.6;
+      }
     }
     this.ePrev = interact;
     if (this.actionTimer > 0) this.actionTimer -= dt;
+
+    const tick = tickClock(this.clock, dt);
+    this.clock = tick.state;
+    if (tick.advancedMinutes > 0) {
+      applyGameTime(this.save, this.clock.time);
+      this.refreshWorldState();
+    }
+    if (tick.collapsed) {
+      this.triggerSleep(true);
+      return;
+    }
 
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) {
@@ -260,9 +318,20 @@ export class FarmScene extends GameScene {
     this.touch = { active: false, dx: 0, dy: 0, ox: 0, oy: 0 };
   };
 
+  private refreshWorldState(): void {
+    const content = loadGameContent();
+    this.weather = forecastFor(this.clock.time, content.weather);
+    this.tide = tideStateAt(this.clock.time);
+  }
+
   private refreshHud(): void {
     const stamina = Math.round(this.controller.stamina);
-    let line = `${formatSaveStatus(this.save)} · energy ${stamina}% · tool: ${TOOLS[this.selectedTool]}`;
+    const status = formatWorldStatus(this.save, {
+      weather: this.weather,
+      tide: this.tide,
+      gold: this.save.wallet.gold,
+    });
+    let line = `${status} · energy ${stamina}% · tool: ${TOOLS[this.selectedTool]}`;
     if (this.actionTimer > 0) line += ` · ✔ ${this.actionLabel}`;
     else if (this.nearest) line += ` · [E] ${this.nearest.label}`;
     this.ctx.overlay.showHud('Breakpoint Farm', line, () => this.openMenu());
@@ -274,13 +343,18 @@ export class FarmScene extends GameScene {
       'Paused',
       [
         { id: 'resume', label: 'Resume', enabled: true, testId: 'pause-resume' },
+        { id: 'sleep', label: 'Sleep until tomorrow', enabled: true, testId: 'pause-sleep' },
         { id: 'town', label: 'Walk to Ballast Bay', enabled: true, testId: 'nav-town' },
         { id: 'beach', label: 'Driftwood Beach', enabled: true, testId: 'nav-beach' },
         { id: 'mine', label: 'Ironroot Quarry', enabled: true, testId: 'nav-mine' },
         { id: 'save-quit', label: 'Save & quit to title', enabled: true, testId: 'nav-save-quit' },
       ],
       (id) => this.onMenu(id),
-      formatSaveStatus(this.save),
+      formatWorldStatus(this.save, {
+        weather: this.weather,
+        tide: this.tide,
+        gold: this.save.wallet.gold,
+      }),
     );
   }
 
@@ -289,6 +363,10 @@ export class FarmScene extends GameScene {
       case 'resume':
         this.menuOpen = false;
         this.refreshHud();
+        break;
+      case 'sleep':
+        this.menuOpen = false;
+        this.triggerSleep(false);
         break;
       case 'town':
         this.goTo('Town');
@@ -305,6 +383,41 @@ export class FarmScene extends GameScene {
         this.goTo('Title');
         break;
     }
+  }
+
+  private triggerSleep(collapsed: boolean): void {
+    if (this.dayResolving) return;
+    this.dayResolving = true;
+    this.clock = pauseClock(this.clock, true);
+
+    const content = loadGameContent();
+    const ledger = getDayLedger();
+    const result = resolveDay({
+      save: this.save,
+      ledger,
+      collapsed,
+      festivals: content.festivals,
+      npcs: content.npcs,
+    });
+
+    resetDayLedger();
+    applyGameTime(this.save, result.nextTime);
+    if (result.collapse) {
+      this.controller = { ...this.controller, stamina: result.collapse.wakeStamina };
+    } else {
+      this.controller = { ...this.controller, stamina: 100 };
+    }
+    persistActiveSave();
+    this.clock = setClockTime(this.clock, result.nextTime);
+    this.player.position.copyFrom(this.homePosition);
+    this.refreshWorldState();
+
+    this.ctx.overlay.showDaySummary(result.summary, () => {
+      this.dayResolving = false;
+      this.menuOpen = false;
+      this.clock = pauseClock(this.clock, false);
+      this.refreshHud();
+    });
   }
 
   override dispose(): void {

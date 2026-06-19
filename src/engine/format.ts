@@ -1,4 +1,7 @@
 import type { SaveData } from './saveModel';
+import { weekdayOf } from './timeSystem';
+import type { Weather } from '../data/schemas';
+import type { TideState } from './tide';
 
 /** Render in-game minutes-since-midnight as a 12-hour clock string. */
 export function formatClock(totalMinutes: number): string {
@@ -19,4 +22,29 @@ export function capitalize(text: string): string {
 export function formatSaveStatus(save: SaveData): string {
   const c = save.calendar;
   return `${save.player.name} · Year ${c.year}, ${capitalize(c.season)} ${c.day} · ${formatClock(c.timeMinutes)}`;
+}
+
+const TIDE_LABEL: Record<TideState, string> = {
+  low: 'low tide',
+  rising: 'rising tide',
+  high: 'high tide',
+  falling: 'falling tide',
+};
+
+/** Extended HUD line that adds weekday, weather, and tide context. */
+export function formatWorldStatus(
+  save: SaveData,
+  ctx: { weather?: Weather | null; tide?: TideState | null; gold?: number } = {},
+): string {
+  const c = save.calendar;
+  const weekday = weekdayOf({ year: c.year, season: c.season, day: c.day });
+  const parts = [
+    save.player.name,
+    `Year ${c.year}, ${capitalize(c.season)} ${c.day} (${weekday})`,
+    formatClock(c.timeMinutes),
+  ];
+  if (typeof ctx.gold === 'number') parts.push(`${ctx.gold} g`);
+  if (ctx.weather) parts.push(ctx.weather.name);
+  if (ctx.tide) parts.push(TIDE_LABEL[ctx.tide]);
+  return parts.join(' · ');
 }

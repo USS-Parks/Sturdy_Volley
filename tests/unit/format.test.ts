@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatClock, capitalize, formatSaveStatus } from '../../src/engine/format';
+import { formatClock, capitalize, formatSaveStatus, formatWorldStatus } from '../../src/engine/format';
 import { createNewSave } from '../../src/engine/saveModel';
 
 describe('formatClock', () => {
@@ -27,5 +27,24 @@ describe('formatSaveStatus', () => {
   it('renders player, calendar, and clock', () => {
     const save = createNewSave({ name: 'Wren', farmName: 'Saltbreak' }, 1000);
     expect(formatSaveStatus(save)).toBe('Wren · Year 1, Spring 1 · 6:00 AM');
+  });
+});
+
+describe('formatWorldStatus', () => {
+  it('renders weekday, gold, weather, and tide chips', () => {
+    const save = createNewSave({ name: 'Wren', farmName: 'Saltbreak' }, 1000);
+    const status = formatWorldStatus(save, {
+      gold: 500,
+      weather: { id: 'sunny', name: 'Sunny', description: 'a', affectsTravel: false },
+      tide: 'low',
+    });
+    expect(status).toBe(
+      'Wren · Year 1, Spring 1 (Mon) · 6:00 AM · 500 g · Sunny · low tide',
+    );
+  });
+
+  it('omits optional fields when missing', () => {
+    const save = createNewSave({ name: 'Wren', farmName: 'Saltbreak' }, 1000);
+    expect(formatWorldStatus(save)).toBe('Wren · Year 1, Spring 1 (Mon) · 6:00 AM');
   });
 });

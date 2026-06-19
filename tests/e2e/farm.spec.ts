@@ -5,6 +5,9 @@ declare global {
     sturdyVolleyDebug?: {
       player: () => { x: number; z: number };
       controller: () => { stamina: number; gait: string; target: string | null; tool: string };
+      time: () => { minutes: number; paused: boolean; scale: number; clock: string };
+      setTimeScale: (scale: number) => void;
+      sleep: () => void;
     };
   }
 }

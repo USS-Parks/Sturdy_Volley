@@ -248,6 +248,73 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## Prompt 006 — Time, calendar, and day resolution (2026-06-19)
+
+Stood up the live clock + day-resolution loop on top of the renderer-agnostic
+foundation, with deterministic weather + tide schedules.
+
+- **`engine/timeSystem.ts`** (pure, already drafted) — `GameTime`, four 28-day
+  seasons, weekdays, `advanceTime` with 2 AM collapse, `startNextDay` (wraps
+  season + year), `festivalOn`, `birthdaysOn`, `buildDaySummary`. 11 unit tests.
+- **`engine/timeClock.ts`** — real-seconds → game-minutes ticker
+  (`REAL_SECONDS_PER_GAME_MINUTE = 0.7`, the Stardew-adjacent comfort cadence),
+  with `pauseClock`, debug-only `setClockScale` (clamped `[0, 120]`), carry of
+  fractional minutes between integer-minute advances, and a `collapsed` signal
+  when time touches the 2 AM cap. 5 unit tests.
+- **`engine/weather.ts`** — `forecastFor(time, pool)`: deterministic per-day
+  forecast seeded by absolute day. Season-weighted tables so summer leans drier
+  than fall; spring/fall lean wet. 4 unit tests including a per-season variety
+  + summer-vs-fall lean check.
+- **`engine/tide.ts`** — `tidesFor` / `nextTide` / `tideStateAt` / `isLowTide`:
+  semidiurnal ~12h25m cycle anchored on day 0 and drifting ~25 min/day so reef
+  access can't be memorized to a single wall-clock time. 5 unit tests.
+- **`engine/dayResolution.ts`** — `getGameTime` / `applyGameTime` save bridge,
+  `DEFAULT_COLLAPSE_PENALTY` (10% gold + 50% wake stamina), `applyCollapsePenalty`,
+  and `resolveDay(input)` — applies income, optionally docks the collapse
+  penalty, rolls the calendar, and assembles the bedtime summary with tomorrow's
+  festival + birthdays. 7 unit tests.
+- **`engine/gameState.ts`** gains a transient `DayLedger` so income / skill XP /
+  relationship deltas accumulate during the day and drain into the summary at
+  bedtime. Cleared on `clearActiveSave` and explicit `resetDayLedger`. 4 unit
+  tests.
+- **`engine/saveModel.ts`** — `calendar.timeMinutes` now accepts past-midnight
+  hours up to 2 AM (`max(26 * 60)`); new `wallet: { gold }` for the income
+  ledger (default 500 g on new save).
+- **`engine/format.ts`** — added `formatWorldStatus` so the HUD line carries
+  weekday, gold, weather, and tide chips. 2 new tests.
+- **`ui/overlay.ts`** — `showDaySummary(summary, onContinue)` renders income +
+  per-skill XP + relationship deltas as a parchment list, tomorrow notices as a
+  dashed band, and a Continue button. 2 jsdom tests + matching parchment-card
+  styling in `styles.css`.
+- **FarmScene + PlaceScene** — both now tick `tickClock` each frame, pause
+  whenever a menu / day-summary panel is open, refresh weather + tide each
+  advance, and trigger the day-resolution flow on 2 AM collapse. Farm adds a
+  Sleep affordance on the farmhouse door + a "Sleep until tomorrow" pause-menu
+  option. Place scenes that collapse off-farm shuttle the player home to the
+  Farm after the summary closes. Persists the save after every roll.
+- **Debug API** on `window.sturdyVolleyDebug` extended with `time()`,
+  `setTimeScale(scale)`, and `sleep()` so the time-of-day flow can be exercised
+  deterministically in e2e.
+
+**Acceptance criteria**
+
+- [x] Time advances, can pause in menus, and accelerates only in debug
+  (`pauseClock` driven by `menuOpen` + `dayResolving`; `setTimeScale` is
+  debug-only on `sturdyVolleyDebug`, clamped at 120×)
+- [x] Passing out after 2:00 AM returns the player home with a configurable
+  penalty (`applyCollapsePenalty` + the `DEFAULT_COLLAPSE_PENALTY` knobs,
+  FarmScene teleports to `homePosition`; PlaceScene navigates to Farm)
+- [x] Day summary shows income, skill XP, relationship changes, and next-day
+  notices (`showDaySummary` + `buildDaySummary` with festival + birthday
+  notices; e2e verifies it appears + advances to the next day)
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`102/102` (16 files) · build `dist/` (Babylon bundle ~5.16 MB / 1.14 MB gzip) ·
+Playwright `time.spec.ts` smoke covers clock-advances/pause + sleep → summary
+→ next day + collapse → summary.
+
+---
+
 ## Prompt 005 — Player controller + interaction model (core) (2026-06-18)
 
 Added the controller depth + interaction model as renderer-agnostic logic,

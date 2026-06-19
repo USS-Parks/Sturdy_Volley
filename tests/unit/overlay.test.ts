@@ -82,6 +82,46 @@ describe('UIOverlay', () => {
     expect(cancelled).toBe(true);
   });
 
+  it('showDaySummary renders rows, notices, and a Continue button', () => {
+    const overlay = new UIOverlay();
+    let advanced = false;
+    overlay.showDaySummary(
+      {
+        dayLabel: 'Year 1, spring 1 (Mon)',
+        income: 250,
+        skillXp: { cultivation: 12 },
+        relationshipChanges: 2,
+        notices: ['You collapsed and were carried home.', 'Tomorrow: Seed Blessing.'],
+      },
+      () => {
+        advanced = true;
+      },
+    );
+    expect(document.querySelector('[data-testid="day-summary"]')).toBeTruthy();
+    expect(document.querySelector('.menu-subtitle')?.textContent).toBe('Year 1, spring 1 (Mon)');
+    expect(document.querySelectorAll('[data-testid="day-summary-notices"] li')).toHaveLength(2);
+    document.querySelector<HTMLButtonElement>('[data-testid="day-summary-continue"]')?.click();
+    expect(advanced).toBe(true);
+  });
+
+  it('showDaySummary shows "none today" when no skill XP rolled', () => {
+    const overlay = new UIOverlay();
+    overlay.showDaySummary(
+      {
+        dayLabel: 'Y1 S1 (Mon)',
+        income: 0,
+        skillXp: {},
+        relationshipChanges: 0,
+        notices: [],
+      },
+      () => {},
+    );
+    const values = Array.from(document.querySelectorAll('.day-summary-value')).map(
+      (n) => n.textContent,
+    );
+    expect(values).toContain('none today');
+  });
+
   it('showReport renders pass/fail rows and a Back button', () => {
     const overlay = new UIOverlay();
     let backed = false;
