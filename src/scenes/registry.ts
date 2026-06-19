@@ -6,7 +6,7 @@ import { NewGameScene } from './NewGameScene';
 import { FarmScene } from './FarmScene';
 import { TownScene } from './TownScene';
 import { InteriorScene } from './InteriorScene';
-import { CourtScene } from './CourtScene';
+import { BeachScene } from './BeachScene';
 import { MineScene } from './MineScene';
 
 /** All game scenes, keyed by the names used in save.location.sceneKey + transitions. */
@@ -18,6 +18,6 @@ export const SCENE_FACTORIES: Record<string, SceneFactory> = {
   Farm: (ctx) => new FarmScene(ctx),
   Town: (ctx) => new TownScene(ctx),
   Interior: (ctx) => new InteriorScene(ctx),
-  Court: (ctx) => new CourtScene(ctx),
+  Beach: (ctx) => new BeachScene(ctx),
   Mine: (ctx) => new MineScene(ctx),
 };

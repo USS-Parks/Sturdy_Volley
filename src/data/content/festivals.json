@@ -1,6 +1,6 @@
 [
-  { "id": "spring-netraising", "name": "Spring Netraising", "season": "spring", "day": 13, "description": "The town raises a new court net to open the season." },
-  { "id": "summer-glowball-night", "name": "Summer Glowball Night", "season": "summer", "day": 18, "description": "Lantern-lit beach volleyball under the stars." },
-  { "id": "fall-harvest-rally", "name": "Fall Harvest Rally", "season": "fall", "day": 16, "description": "A harvest market wrapped around a doubles bracket." },
-  { "id": "winter-icecourt-classic", "name": "Winter Icecourt Classic", "season": "winter", "day": 8, "description": "Slick footing and warm cider at the indoor classic." }
+  { "id": "seed-blessing", "name": "Seed Blessing", "season": "spring", "day": 13, "description": "The town blesses the season's first seeds and shares planting tips." },
+  { "id": "glowtide-night", "name": "Glowtide Night", "season": "summer", "day": 18, "description": "A lantern-lit night market along the shore as the tide glows." },
+  { "id": "harvest-fair", "name": "Harvest Fair", "season": "fall", "day": 16, "description": "A harvest market with stalls, contests, and shared meals." },
+  { "id": "frostlight-festival", "name": "Frostlight Festival", "season": "winter", "day": 8, "description": "Warm cider and lanterns against the longest nights of the year." }
 ]

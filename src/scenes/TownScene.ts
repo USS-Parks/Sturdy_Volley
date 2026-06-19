@@ -9,7 +9,7 @@ export class TownScene extends PlaceScene {
   protected readonly navs: PlaceNav[] = [
     { id: 'farm', label: 'Back to the farm', testId: 'nav-farm', target: 'Farm' },
     { id: 'interior', label: 'Enter the bakery', testId: 'nav-interior', target: 'Interior' },
-    { id: 'court', label: 'Beach court', testId: 'nav-court', target: 'Court' },
+    { id: 'beach', label: 'Driftwood Beach', testId: 'nav-beach', target: 'Beach' },
   ];
 
   protected override decorate(scene: Scene): void {

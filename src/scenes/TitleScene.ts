@@ -7,7 +7,7 @@ import { setActiveSave, clearActiveSave } from '../engine/gameState';
 import { downloadSave, pickAndImportSave } from '../engine/saveTransfer';
 import { getContentReport } from '../data/content';
 
-const RESUMABLE_SCENES = new Set(['Farm', 'Town', 'Interior', 'Court', 'Mine']);
+const RESUMABLE_SCENES = new Set(['Farm', 'Town', 'Interior', 'Beach', 'Mine']);
 
 /**
  * Title screen: a slowly-orbiting low-poly Ballast Bay diorama (all placeholder
@@ -62,13 +62,13 @@ export class TitleScene extends GameScene {
       roof.material = flatMaterial(scene, `roof${i}`, PALETTE.roof, 0.25);
     });
 
-    // Beach court
-    const court = MeshBuilder.CreateBox('court', { width: 6, depth: 4, height: 0.3 }, scene);
-    court.position.set(2, 4.15, -3);
-    court.material = flatMaterial(scene, 'court', PALETTE.sand, 0.32);
-    const net = MeshBuilder.CreateBox('net', { width: 0.12, depth: 4, height: 1 }, scene);
-    net.position.set(2, 4.8, -3);
-    net.material = flatMaterial(scene, 'net', PALETTE.stone, 0.45);
+    // Harbor market stall
+    const stall = MeshBuilder.CreateBox('stall', { width: 3, depth: 2, height: 1.4 }, scene);
+    stall.position.set(2, 4.7, -3);
+    stall.material = flatMaterial(scene, 'stall', PALETTE.wood, 0.28);
+    const canopy = MeshBuilder.CreateBox('canopy', { width: 3.4, depth: 2.4, height: 0.3 }, scene);
+    canopy.position.set(2, 5.55, -3);
+    canopy.material = flatMaterial(scene, 'canopy', PALETTE.accent, 0.4);
 
     // Sea stacks
     ([[-22, 16, 5], [24, 11, 6], [-17, -20, 7]] as const).forEach(([x, z, h], i) => {

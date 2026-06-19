@@ -1,6 +1,6 @@
 [
-  { "id": "sunny", "name": "Sunny", "description": "Clear skies and steady play.", "affectsCourt": false },
-  { "id": "rain", "name": "Rain", "description": "Waters outdoor crops; reduces court traction.", "affectsCourt": true },
-  { "id": "sea-fog", "name": "Sea Fog", "description": "Narrows visibility and shot preview.", "affectsCourt": true },
-  { "id": "windstorm", "name": "Windstorm", "description": "Bends ball arcs and scatters debris.", "affectsCourt": true }
+  { "id": "sunny", "name": "Sunny", "description": "Clear skies and bright fields.", "affectsTravel": false },
+  { "id": "rain", "name": "Rain", "description": "Waters outdoor crops; turns paths to mud.", "affectsTravel": true },
+  { "id": "sea-fog", "name": "Sea Fog", "description": "Narrows visibility on the water and the trails.", "affectsTravel": true },
+  { "id": "windstorm", "name": "Windstorm", "description": "Scatters debris and rattles the shutters.", "affectsTravel": true }
 ]

@@ -61,7 +61,7 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
     player: {
       name: opts.name.trim() || 'Coast Keeper',
       farmName: opts.farmName.trim() || 'Breakpoint Farm',
-      farmType: opts.farmType ?? 'open-court',
+      farmType: opts.farmType ?? 'open-meadow',
     },
     calendar: { year: 1, season: 'spring', day: 1, timeMinutes: 6 * 60 },
     location: { sceneKey: 'Farm' },

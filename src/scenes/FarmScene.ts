@@ -8,7 +8,7 @@ export class FarmScene extends PlaceScene {
   protected readonly ground: Color3 = PALETTE.grass;
   protected readonly navs: PlaceNav[] = [
     { id: 'town', label: 'Walk to Ballast Bay', testId: 'nav-town', target: 'Town' },
-    { id: 'court', label: 'Practice court', testId: 'nav-court', target: 'Court' },
+    { id: 'beach', label: 'Walk to Driftwood Beach', testId: 'nav-beach', target: 'Beach' },
     { id: 'mine', label: 'Ironroot Quarry', testId: 'nav-mine', target: 'Mine' },
     { id: 'save-quit', label: 'Save & quit to title', testId: 'nav-save-quit', action: 'save-quit' },
   ];

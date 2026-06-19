@@ -2,8 +2,8 @@
   {
     "id": "mara-vale",
     "name": "Mara Vale",
-    "role": "Harbor mechanic and former league setter",
-    "description": "Direct, funny, and precise. Rebuilding trust after a match-fixing accusation she did not earn.",
+    "role": "Harbor mechanic and shipwright's apprentice",
+    "description": "Direct, funny, and precise. Rebuilding trust after she was wrongly blamed for a harbor repair that failed in the storm.",
     "birthday": { "season": "summer", "day": 14 },
     "lovedGiftItemIds": ["goat-cheese", "driftwood"],
     "romanceable": true

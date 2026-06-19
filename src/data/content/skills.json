@@ -3,8 +3,8 @@
   { "id": "husbandry", "name": "Husbandry", "description": "Animal friendship, products, training, and habitats." },
   { "id": "foraging", "name": "Foraging", "description": "Flora, mushrooms, shelling, and wild seeds." },
   { "id": "angling", "name": "Angling", "description": "Fishing, crab pots, snorkeling, and bait crafting." },
-  { "id": "crafting", "name": "Crafting", "description": "Machines, buildings, court equipment, and artisan goods." },
+  { "id": "crafting", "name": "Crafting", "description": "Machines, buildings, tools, and artisan goods." },
   { "id": "exploring", "name": "Exploring", "description": "Mines, reefs, caves, ruins, and map shortcuts." },
-  { "id": "volleycraft", "name": "Volleycraft", "description": "Serving, receiving, setting, spiking, blocking, and court strategy." },
+  { "id": "combat", "name": "Combat", "description": "Defensive tools, cavern creatures, and safe descent into the mines." },
   { "id": "rapport", "name": "Rapport", "description": "Dialogue, gift insight, team chemistry, and diplomacy." }
 ]

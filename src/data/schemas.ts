@@ -108,7 +108,7 @@ export const weatherSchema = z
     id: idSchema,
     name: z.string().min(1),
     description: z.string().min(1),
-    affectsCourt: z.boolean().default(false),
+    affectsTravel: z.boolean().default(false),
   })
   .strict();
 export type Weather = z.infer<typeof weatherSchema>;
@@ -136,7 +136,7 @@ export const questSchema = z
       'crafting',
       'exploration',
       'social',
-      'volleyball',
+      'combat',
     ]),
   })
   .strict();
