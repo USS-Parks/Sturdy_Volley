@@ -248,6 +248,73 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## VS-A4 — One live NPC walking the schedule + a greet bubble (2026-06-19)
+
+Promoted `TownScene` from a placeholder `PlaceScene` (135 lines, static
+buildings, no player movement) into a full walkable `GameScene` (~390 lines)
+with player movement + camera + interaction, and rendered Mara Vale as the
+first live graybox humanoid walking her schedule across the Town map. First
+partial retrofit of Prompts 011 (schedules) and 012 (dialogue).
+
+- **`src/render/npc-graybox.ts`** — representative humanoid factory:
+  capsule torso (~1.2 m) + sphere head + thin arm + leg boxes, all parented
+  to the torso for single-position writes. `faceTo` rotates the rig toward
+  a target; `disposeNpcGraybox` cleans up sub-meshes. Per §0.10 — primitives
+  only, one material per limb, ~1.8 m total height matches the player.
+- **`src/engine/schedules.ts`** — pure loader exposing the bundled
+  `data/content/schedules.json`. `loadSchedule(npcId)` returns the typed
+  `NpcSchedule`; `knownNpcIds()` enumerates the four. Formal validation
+  lands at RF-11.
+- **`src/ui/overlay.ts`** — `showDialogue(speaker, body, onDismiss)` mounts
+  a minimal parchment bubble (one body line + Continue button) inside a
+  `menu-panel`. Idempotent via `clear()`. The portrait + typewriter +
+  branching choices arrive at RF-12.
+- **`src/styles.css`** — `.dialogue-bubble` width clamp + `.dialogue-body`
+  parchment styling.
+- **`src/scenes/TownScene.ts`** — promoted to extend `GameScene` directly
+  (was `PlaceScene`). Adds: player capsule + ArcRotateCamera lockedTarget,
+  keyboard movement (WASD + arrows + Shift to sprint, same controller as
+  Farm + Interior), Mara's NpcGrayboxHandles built at `loadSchedule('mara-vale')`'s
+  active waypoint, `liveStep(NPC_WALK_SPEED = 1.6 m/s)` to interpolate her
+  toward each waypoint, `faceTo` to rotate her toward the target, the
+  interaction resolver (1 target — Mara, radius 1.8 m, priority 4), and
+  `openMaraGreeting` which calls `showDialogue(...)` with the
+  morning-greet line. The other 3 NPCs (Jun, Sol, Lio) land at RF-11.
+  Time tick + a 2-AM Town collapse shuttle the player to the Farm. The
+  pause-menu placeholder navs (Farm / Bakery / Beach / Save+Quit) carry
+  through.
+- **`tests/e2e/npc.spec.ts`** — 2 specs across desktop + Pixel 5:
+  Mara's torso mesh exists in the Town scene, and pressing E next to her
+  opens the greet bubble + Continue dismisses.
+
+**Acceptance criteria**
+
+- [x] Mara renders as a representative humanoid graybox on the Town map
+  (`buildNpcGraybox({ scene, npcId: 'mara-vale', ... })`; e2e asserts the
+  `npc-mara-vale-torso` mesh exists).
+- [x] Her position interpolates between her current waypoints
+  (`liveStep` at 1.6 m/s with arrival snap); she's parked under the ground
+  when her current waypoint's scene isn't Town (the "snap to abstract
+  waypoint when offscreen" rule).
+- [x] Standing near her shows an `[E] Talk to Mara Vale` prompt
+  (Interaction target radius 1.8 m, priority 4; HUD line shows the prompt
+  exactly when the resolver picks her).
+- [x] Pressing interact opens a dialogue bubble with her line, advances
+  on tap, closes (`showDialogue` + Continue button; e2e covers the round-
+  trip).
+- [x] Town scene remains within the §0.10 budget after the NPC mesh is
+  added (perf-budget e2e still green; Town stays under 220 dc / 200
+  meshes / 220k tris on Pixel 5).
+- [x] Playwright opens the bubble, advances it, asserts the talk
+  happened (`tests/e2e/npc.spec.ts:40`).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`212/212` (unchanged — VS-A4 is integration code; renderer-bound tests
+move to e2e) · build OK · Playwright `42/42` (38 prior + 4 new
+npc/perf-budget on desktop + Pixel 5).
+
+---
+
 ## VS-A3 — Real farmhouse Interior + door handoff (2026-06-19)
 
 Replaced the `InteriorScene` placeholder (12 lines: a colored ground + capsule

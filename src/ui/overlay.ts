@@ -243,6 +243,35 @@ export class UIOverlay {
   }
 
   /**
+   * Minimal dialogue bubble (VS-A4). One line + dismiss button. The full panel
+   * with portrait + typewriter + branching choices arrives at RF-12. Idempotent
+   * via `clear()` — opens replace any prior bubble cleanly.
+   */
+  showDialogue(speaker: string, body: string, onDismiss: () => void): void {
+    this.clear();
+    const panel = this.createPanel(speaker);
+    panel.classList.add('dialogue-bubble');
+    panel.dataset.testid = 'dialogue-bubble';
+
+    const text = document.createElement('p');
+    text.className = 'dialogue-body';
+    text.dataset.testid = 'dialogue-body';
+    text.textContent = body;
+    panel.appendChild(text);
+
+    const dismiss = document.createElement('button');
+    dismiss.className = 'menu-button';
+    dismiss.type = 'button';
+    dismiss.textContent = 'Continue';
+    dismiss.dataset.testid = 'dialogue-dismiss';
+    dismiss.addEventListener('click', onDismiss);
+    panel.appendChild(dismiss);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /**
    * Persistent hotbar strip at the bottom of the screen. Rendered as its own
    * element so it can coexist with the HUD bar and pause menu. Idempotent —
    * subsequent calls replace the strip in place without disturbing other UI.

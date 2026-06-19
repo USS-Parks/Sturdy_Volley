@@ -518,6 +518,23 @@ body {
   font-style: italic;
 }
 
+/* Dialogue bubble (VS-A4) — minimal one-line panel. RF-12 brings the full
+ * portrait + typewriter + branching choices panel. */
+.dialogue-bubble {
+  width: min(440px, 92vw);
+}
+
+.dialogue-body {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--sv-ink);
+  background: var(--sv-parchment);
+  border: 2px solid var(--sv-wood);
+  border-radius: 10px;
+}
+
 /* Performance overlay — only mounted when ?debug=perf is set. */
 #perf-overlay {
   position: absolute;
