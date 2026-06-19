@@ -12,6 +12,9 @@ declare global {
       shippingBinSlots: () => Array<{ itemId: string; qty: number; quality: number } | null>;
       hotbarSlots: () => Array<{ itemId: string; qty: number; quality: number } | null>;
       shipPrototypeSeeds: () => void;
+      worldEntities: () => Record<string, { kind: string; itemId: string | null; age: number }>;
+      warpToEntity: (suffix: string) => boolean;
+      entityAnchors: () => Record<string, { x: number; z: number }>;
     };
   }
 }

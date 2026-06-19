@@ -46,9 +46,17 @@ import {
   plantingKey,
 } from '../engine/soil';
 import { recordIncome as _recordIncome, recordSkillXp } from '../engine/gameState';
-import { aoeAt, aoeOffsets, staminaCost, type ToolId } from '../engine/tools';
+import { aoeAt, aoeOffsets, hardnessReach, staminaCost, type ToolId } from '../engine/tools';
 import type { Crop } from '../data/schemas';
 import type { AbstractMesh as BabylonMesh } from '@babylonjs/core';
+import { collect, type WorldEntity } from '../engine/forage';
+import {
+  anchorFor,
+  buildEntityMesh,
+  entityLabel,
+  farmEntitySuffix,
+  FARM_ENTITY_ANCHORS,
+} from '../render/farm-entities';
 
 const FARM_HALF = 20;
 const TOOLS = ['Hoe', 'Watering Can', 'Axe', 'Pick', 'Sickle'] as const;
@@ -65,6 +73,9 @@ interface DebugApi {
   shippingBinSlots: () => readonly (import('../engine/saveModel').InventoryStack | null)[];
   hotbarSlots: () => readonly (import('../engine/saveModel').InventoryStack | null)[];
   shipPrototypeSeeds: () => void;
+  worldEntities: () => Record<string, { kind: string; itemId: string | null; age: number }>;
+  warpToEntity: (suffix: string) => boolean;
+  entityAnchors: () => Record<string, { x: number; z: number }>;
 }
 
 type PartnerKind = 'chest' | 'shipping-bin' | null;
@@ -106,6 +117,8 @@ export class FarmScene extends GameScene {
   private seedToCropId: Map<string, string> = new Map();
   private readonly cellMeshes = new Map<string, BabylonMesh>();
   private readonly cropMeshes = new Map<string, BabylonMesh>();
+  /** Live meshes for `Farm:*` worldEntities keyed by the bare suffix. */
+  private readonly entityMeshes = new Map<string, BabylonMesh>();
   private readonly homePosition = new Vector3(-8, 0.9, -5.4);
   private readonly plotOrigin = new Vector3(-6, 0, -4);
   private static readonly SCENE_KEY = 'Farm';
@@ -171,7 +184,8 @@ export class FarmScene extends GameScene {
     roof.rotation.y = Math.PI / 4;
     roof.material = flatMaterial(scene, 'farmroof', PALETTE.roof, 0.25);
 
-    ([[8, -6], [11, 4], [-2, 9], [6, 10]] as const).forEach(([x, z], i) => {
+    // Static decorative trees — entity trees (tree-a, tree-b) own (11,4) + (-2,9).
+    ([[8, -6], [6, 10]] as const).forEach(([x, z], i) => {
       const trunk = MeshBuilder.CreateCylinder(`trunk${i}`, { height: 2, diameter: 0.6 }, scene);
       trunk.position.set(x, 1, z);
       trunk.material = flatMaterial(scene, `trunk${i}`, PALETTE.wood, 0.18);
@@ -240,19 +254,12 @@ export class FarmScene extends GameScene {
     this.cropIndex = buildCropIndex(content.crops);
     this.seedToCropId = new Map(content.crops.map((c) => [c.seedItemId, c.id] as const));
     this.refreshCropMeshes();
+    this.refreshEntityMeshes();
 
     this.controller = createControllerState();
     this.clock = createTimeClock(getGameTime(save));
     this.refreshWorldState();
-    this.targets = [
-      { id: 'farmhouse-door', kind: 'door', label: 'Sleep at the farmhouse', x: -10, z: -5.6, radius: 2.6, priority: 5 },
-      { id: 'shipping-bin', kind: 'prop', label: 'Open the shipping bin', x: -6.2, z: -7.6, radius: 2.2, priority: 4 },
-      { id: 'porch-chest', kind: 'prop', label: 'Open the porch chest', x: -12, z: -6, radius: 2.2, priority: 4 },
-      { id: 'tilled-plot', kind: 'farm-cell', label: 'Tend the soil', x: -6, z: -4, radius: 4, priority: 3 },
-      { id: 'tide-pond', kind: 'water-entry', label: 'Check the tide pond', x: 10, z: -2, radius: 4.4, priority: 2 },
-      { id: 'tree-1', kind: 'prop', label: 'Inspect the tree', x: 8, z: -6, radius: 2, priority: 1 },
-      { id: 'tree-2', kind: 'prop', label: 'Inspect the tree', x: -2, z: 9, radius: 2, priority: 1 },
-    ];
+    this.rebuildInteractionTargets();
 
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
@@ -296,6 +303,21 @@ export class FarmScene extends GameScene {
         persistActiveSave();
         this.refreshHotbar();
       },
+      worldEntities: () => {
+        const out: Record<string, { kind: string; itemId: string | null; age: number }> = {};
+        for (const [k, v] of Object.entries(this.save.worldEntities)) {
+          out[k] = { kind: v.kind, itemId: v.itemId, age: v.age };
+        }
+        return out;
+      },
+      warpToEntity: (suffix: string): boolean => {
+        const anchor = anchorFor(suffix);
+        if (!anchor) return false;
+        // Stand just inside the interaction radius.
+        this.player.position.set(anchor.x - 0.5, 0.9, anchor.z - 0.5);
+        return true;
+      },
+      entityAnchors: () => ({ ...FARM_ENTITY_ANCHORS }),
     };
   }
 
@@ -330,6 +352,8 @@ export class FarmScene extends GameScene {
         this.openInventory({ kind: 'chest', id: 'farm-porch-chest' });
       } else if (this.nearest.id === 'tilled-plot') {
         this.handlePlotInteract();
+      } else if (this.nearest.id.startsWith('entity:')) {
+        this.handleEntityInteract(this.nearest.id.slice('entity:'.length));
       } else {
         this.actionLabel = this.nearest.label;
         this.actionTimer = 1.6;
@@ -761,6 +785,122 @@ export class FarmScene extends GameScene {
     }
   }
 
+  private rebuildInteractionTargets(): void {
+    const base: InteractTarget[] = [
+      { id: 'farmhouse-door', kind: 'door', label: 'Sleep at the farmhouse', x: -10, z: -5.6, radius: 2.6, priority: 5 },
+      { id: 'shipping-bin', kind: 'prop', label: 'Open the shipping bin', x: -6.2, z: -7.6, radius: 2.2, priority: 4 },
+      { id: 'porch-chest', kind: 'prop', label: 'Open the porch chest', x: -12, z: -6, radius: 2.2, priority: 4 },
+      { id: 'tilled-plot', kind: 'farm-cell', label: 'Tend the soil', x: -6, z: -4, radius: 4, priority: 3 },
+      { id: 'tide-pond', kind: 'water-entry', label: 'Check the tide pond', x: 10, z: -2, radius: 4.4, priority: 2 },
+    ];
+    // World entities (forage / tree / stump / debris / grass).
+    for (const [key, entity] of Object.entries(this.save.worldEntities)) {
+      const suffix = farmEntitySuffix(key);
+      if (!suffix) continue;
+      const anchor = anchorFor(suffix);
+      if (!anchor) continue;
+      base.push({
+        id: `entity:${suffix}`,
+        kind: entity.kind === 'forage' ? 'pickup' : 'prop',
+        label: entityLabel(entity),
+        x: anchor.x,
+        z: anchor.z,
+        radius: anchor.radius ?? 1.4,
+        priority: entity.kind === 'forage' ? 3 : 2,
+      });
+    }
+    this.targets = base;
+  }
+
+  private refreshEntityMeshes(): void {
+    if (!this.scene) return;
+    const seen = new Set<string>();
+    for (const [key, entity] of Object.entries(this.save.worldEntities)) {
+      const suffix = farmEntitySuffix(key);
+      if (!suffix) continue;
+      const anchor = anchorFor(suffix);
+      if (!anchor) continue;
+      seen.add(suffix);
+      const existing = this.entityMeshes.get(suffix);
+      const expectedName = `${entity.kind}-${suffix}`;
+      // Reuse the mesh when its kind hasn't changed; otherwise rebuild.
+      if (existing && existing.name.startsWith(`${entity.kind}-${suffix}`)) {
+        continue;
+      }
+      existing?.dispose();
+      const mesh = buildEntityMesh(this.scene, suffix, entity, anchor);
+      void expectedName;
+      this.entityMeshes.set(suffix, mesh);
+    }
+    for (const [suffix, mesh] of this.entityMeshes) {
+      if (seen.has(suffix)) continue;
+      mesh.dispose();
+      this.entityMeshes.delete(suffix);
+    }
+  }
+
+  private currentEntityToolHardness(): number {
+    const stack = this.save.inventory.slots[this.selectedHotbar];
+    if (stack) return 1; // forage items pop with any pickup intent
+    const toolId = FARM_TOOL_IDS[this.selectedTool];
+    if (!toolId) return 1;
+    return hardnessReach(toolId, this.save.toolLevels[toolId] ?? 0);
+  }
+
+  private handleEntityInteract(suffix: string): void {
+    const key = `Farm:${suffix}`;
+    const entity: WorldEntity | undefined = this.save.worldEntities[key];
+    if (!entity) return;
+    const hardness = this.currentEntityToolHardness();
+    const result = collect(entity, hardness);
+    if (!result.reward && result.next === entity) {
+      // Tool not strong enough — give a hint to the player.
+      const toolId = FARM_TOOL_IDS[this.selectedTool];
+      this.flashAction(
+        toolId === 'axe'
+          ? 'The axe needs more sharpening' // unreachable today; placeholder
+          : 'Need the axe to chop this tree',
+      );
+      return;
+    }
+
+    // Apply stamina cost when a tool action was required.
+    if (entity.kind === 'tree' || entity.kind === 'debris' || entity.kind === 'stump') {
+      const toolId = FARM_TOOL_IDS[this.selectedTool];
+      if (toolId) this.applyToolStamina(toolId);
+    }
+
+    // Drop the reward into the player's inventory.
+    if (result.reward) {
+      const added = addItem(
+        this.save.inventory,
+        result.reward.itemId,
+        result.reward.qty,
+        0,
+      );
+      this.save.inventory = added.container;
+    }
+
+    // Update the world entity (consumed or transformed).
+    const next = { ...this.save.worldEntities };
+    if (result.next) {
+      next[key] = result.next;
+    } else {
+      delete next[key];
+    }
+    this.save.worldEntities = next;
+
+    recordSkillXp(
+      entity.kind === 'tree' || entity.kind === 'debris' ? 'foraging' : 'foraging',
+      entity.kind === 'tree' ? 6 : entity.kind === 'debris' ? 3 : 2,
+    );
+    this.flashAction(entityLabel(entity));
+    this.refreshEntityMeshes();
+    this.rebuildInteractionTargets();
+    this.refreshHotbar();
+    persistActiveSave();
+  }
+
   private triggerSleep(collapsed: boolean): void {
     if (this.dayResolving) return;
     this.dayResolving = true;
@@ -796,6 +936,8 @@ export class FarmScene extends GameScene {
       this.menuOpen = false;
       this.clock = pauseClock(this.clock, false);
       this.refreshCropMeshes();
+      this.refreshEntityMeshes();
+      this.rebuildInteractionTargets();
       this.refreshHud();
     });
   }

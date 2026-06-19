@@ -141,9 +141,15 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
       'defender-blade': 0,
     },
     worldEntities: {
-      'Farm:7,2': { kind: 'tree', itemId: 'driftwood', age: 0 },
-      'Farm:8,3': { kind: 'tree', itemId: 'driftwood', age: 0 },
-      'Farm:5,5': { kind: 'debris', itemId: 'driftwood', age: 0 },
+      // Trees on the bluff side — axe (hardness ≥ 2) chops to stump + driftwood.
+      'Farm:tree-a': { kind: 'tree', itemId: 'driftwood', age: 0 },
+      'Farm:tree-b': { kind: 'tree', itemId: 'driftwood', age: 0 },
+      // Storm debris near the soil plot — any tool clears for driftwood.
+      'Farm:debris-a': { kind: 'debris', itemId: 'driftwood', age: 0 },
+      // First-day visible forage — gives the gather step something tangible.
+      'Farm:forage-shell-a': { kind: 'forage', itemId: 'tide-shell', age: 0 },
+      'Farm:forage-shell-b': { kind: 'forage', itemId: 'tide-shell', age: 0 },
+      'Farm:forage-drift-a': { kind: 'forage', itemId: 'driftwood', age: 0 },
     },
     relationships: {},
     skills: {},

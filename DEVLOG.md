@@ -248,6 +248,66 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## VS-A2 — Gather: visible forage + chop on the Farm (2026-06-19)
+
+Retrofit of Prompt 010's pure `engine/forage.ts` into the running game. Trees,
+debris, and forage spawn visibly on the Farm at fixed anchors; interact picks
+them up; axes (hardness ≥ 2) turn trees into stumps + driftwood; harvested
+state persists and is refreshed after overnight `advanceWorld`.
+
+- **`src/render/farm-entities.ts`** — representative graybox factory per kind:
+  `buildEntityMesh(scene, suffix, entity, anchor)` dispatches to tree (cylinder
+  trunk + canopy parented), stump (short stub), debris (small polyhedron),
+  grass tuft (flattened sphere), or item-specific forage kits (tide-shell =
+  flat sphere with accent color; driftwood = elongated box). `FARM_ENTITY_ANCHORS`
+  fixes the 6 first-day positions. `entityLabel(entity)` returns the action
+  prompt string. Per §0.10 one factory per kind, one material per mesh, all in
+  meters.
+- **`src/engine/saveModel.ts`** — `worldEntities` seed swapped from the
+  placeholder `Farm:7,2` keys to the anchored set: 2 trees (tree-a, tree-b),
+  1 debris (debris-a), and 3 first-day forage items (2 tide-shells, 1
+  driftwood). Visible Day 1 gather target without grinding.
+- **`src/scenes/FarmScene.ts`** — adds `entityMeshes` map, `refreshEntityMeshes`
+  (idempotent diff: reuses meshes whose kind hasn't changed, rebuilds otherwise,
+  disposes orphans), `rebuildInteractionTargets` (composes the static targets
+  with one per world entity), `handleEntityInteract` (routes through
+  `forage.collect` with `currentEntityToolHardness` — held item / forage = 1,
+  tool selected = `hardnessReach(toolId, level)`). Trees + debris + stumps
+  apply `staminaCost(toolId, level)`. Rewards land in the player inventory;
+  foraging XP routes through the existing ledger. The static decorative trees
+  at the entity-tree positions are removed so the live entities are visible.
+  Day summary's wake refreshes the entity meshes + targets so overnight world
+  changes are reflected immediately.
+- **Debug API** extended with `worldEntities()`, `warpToEntity(suffix)`,
+  `entityAnchors()` so the gather e2e can drive interaction deterministically.
+- **`tests/e2e/gather.spec.ts`** — 3 specs across desktop + Pixel 5:
+  fresh-save spawn count + kind coverage, walking to a tide-shell + picking
+  it up, sickle hitting a tree leaves it standing (hardness gate).
+- **`tests/e2e/farm.spec.ts`** — shared `Window.sturdyVolleyDebug` typedef
+  extended with the new debug entries.
+
+**Acceptance criteria**
+
+- [x] A fresh save shows at least 4 forage meshes on the Farm (3 forage + 2
+  trees + 1 debris = 6 entities; e2e asserts ≥ 4).
+- [x] Interact picks up a forage item into the hotbar; spawn count drops;
+  save persists the world-entities map (`tide-shell` e2e covers the full
+  flow; `worldEntities[Farm:forage-shell-a]` is undefined after the pickup).
+- [x] Axe at hardness ≥ 2 turns a tree into a stump + 3 driftwood
+  (`engine/forage.ts.collect` enforces it; sickle e2e confirms the gate
+  still rejects below threshold).
+- [x] Playwright walks to a known spawn, collects, asserts the inventory
+  entry (gather.spec.ts:31).
+- [x] Farm scene remains within the §0.10 mobile budget after the new
+  meshes spawn (perf-budget e2e still passes; Farm draw calls + meshes +
+  triangles stay under the Pixel 5 ceiling).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`212/212` (unchanged — the entity wiring is integration code) · build OK ·
+Playwright `34/34` (28 prior + 6 new gather/perf specs on desktop + Pixel 5).
+
+---
+
 ## VS-A1 — Governance update, scale + mobile performance budgets (2026-06-19)
 
 Bundle commit that re-orients the P-SPR around a playable graybox vertical
