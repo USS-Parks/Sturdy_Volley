@@ -750,6 +750,51 @@ body {
 .pet-collar-label { font-size: 12px; opacity: 0.7; }
 .pet-collars .menu-button { padding: 4px 10px; min-height: 32px; }
 
+/* Fishing panel (Prompt 021). */
+.fishing-panel { width: min(540px, 96vw); }
+.fishing-status { font-weight: 700; margin-bottom: 8px; }
+.fishing-bar {
+  position: relative;
+  height: 32px;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid var(--sv-wood);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+.fishing-fish {
+  position: absolute;
+  top: 4px;
+  width: 12px;
+  height: 24px;
+  background: var(--sv-warm-light, #f8c97a);
+  border-radius: 4px;
+  transform: translateX(-6px);
+}
+.fishing-cursor {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: rgba(108, 196, 165, 0.5);
+  border-left: 2px solid var(--sv-accent, #4eb89a);
+  border-right: 2px solid var(--sv-accent, #4eb89a);
+}
+.fishing-progress {
+  height: 10px;
+  background: rgba(0,0,0,0.1);
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.fishing-progress-fill {
+  height: 100%;
+  background: var(--sv-accent, #4eb89a);
+  transition: width 0.08s linear;
+}
+.fishing-hint { font-size: 12px; opacity: 0.75; margin-bottom: 8px; }
+.fishing-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.fishing-actions .menu-button { flex: 1; min-width: 130px; }
+
 /* Shop panel (Prompt 016). */
 .shop-panel {
   width: min(480px, 94vw);

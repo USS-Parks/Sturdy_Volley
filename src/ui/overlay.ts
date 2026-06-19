@@ -85,6 +85,23 @@ export interface AnimalPanelOptions {
   onClose: () => void;
 }
 
+export interface FishingPanelOptions {
+  /** Player's bait count. */
+  baitCount: number;
+  /** Assist-mode toggle hint to show in the panel header. */
+  assist: boolean;
+  /** "Cast" | "Waiting" | "Reel!" | "Caught" | "Got away". */
+  phase: 'cast' | 'waiting' | 'reel' | 'caught' | 'lost';
+  /** Player's last catch label (used during 'caught'). */
+  lastCatchLabel?: string;
+  /** Live minigame snapshot when phase === 'reel'. */
+  minigame?: { fishPos: number; cursorPos: number; cursorWidth: number; progress: number };
+  onCast: (withBait: boolean) => void;
+  onToggleAssist: () => void;
+  onDropPot: () => void;
+  onClose: () => void;
+}
+
 export interface PetPanelOptions {
   name: string;
   kindLabel: string;
@@ -756,6 +773,111 @@ export class UIOverlay {
     close.type = 'button';
     close.textContent = 'Close';
     close.dataset.testid = 'crafting-close';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /**
+   * Fishing panel (Prompt 021). Cast / Wait / Reel / Catch flow rendered
+   * as a single panel; the minigame bar is rendered as inline divs.
+   * The panel emits intent through three callbacks (cast, drop pot,
+   * toggle assist) and is re-rendered by the scene each tick.
+   */
+  showFishingPanel(opts: FishingPanelOptions): void {
+    this.clear();
+    const panel = this.createPanel('Fishing', `Bait: ${opts.baitCount} · ${opts.assist ? 'Assist on' : 'Assist off'}`);
+    panel.classList.add('fishing-panel');
+    panel.dataset.testid = 'fishing-panel';
+
+    const status = document.createElement('div');
+    status.className = 'fishing-status';
+    status.dataset.testid = 'fishing-status';
+    const labels: Record<FishingPanelOptions['phase'], string> = {
+      cast: 'Cast your line.',
+      waiting: 'Waiting for a bite…',
+      reel: 'Reel! Keep the cursor on the fish.',
+      caught: `Landed: ${opts.lastCatchLabel ?? 'something'}`,
+      lost: 'Line slipped — they got away.',
+    };
+    status.textContent = labels[opts.phase];
+    panel.appendChild(status);
+
+    if (opts.phase === 'reel' && opts.minigame) {
+      const bar = document.createElement('div');
+      bar.className = 'fishing-bar';
+      bar.dataset.testid = 'fishing-bar';
+      const fish = document.createElement('div');
+      fish.className = 'fishing-fish';
+      fish.style.left = `${opts.minigame.fishPos * 100}%`;
+      const cursor = document.createElement('div');
+      cursor.className = 'fishing-cursor';
+      cursor.style.left = `${(opts.minigame.cursorPos - opts.minigame.cursorWidth / 2) * 100}%`;
+      cursor.style.width = `${opts.minigame.cursorWidth * 100}%`;
+      bar.append(cursor, fish);
+      panel.appendChild(bar);
+
+      const progress = document.createElement('div');
+      progress.className = 'fishing-progress';
+      const fill = document.createElement('div');
+      fill.className = 'fishing-progress-fill';
+      fill.dataset.testid = 'fishing-progress';
+      fill.style.width = `${opts.minigame.progress * 100}%`;
+      progress.appendChild(fill);
+      panel.appendChild(progress);
+
+      const hint = document.createElement('div');
+      hint.className = 'fishing-hint';
+      hint.textContent = 'Hold SPACE / tap REEL to pull up. Release to drift down.';
+      panel.appendChild(hint);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'fishing-actions';
+
+    if (opts.phase === 'cast' || opts.phase === 'caught' || opts.phase === 'lost') {
+      const cast = document.createElement('button');
+      cast.type = 'button';
+      cast.className = 'menu-button';
+      cast.textContent = opts.baitCount > 0 ? 'Cast (uses 1 bait)' : 'Cast (no bait)';
+      cast.dataset.testid = 'fishing-cast';
+      cast.addEventListener('click', () => opts.onCast(opts.baitCount > 0));
+      actions.appendChild(cast);
+
+      const pot = document.createElement('button');
+      pot.type = 'button';
+      pot.className = 'menu-button menu-button-secondary';
+      pot.textContent = 'Drop crab pot';
+      pot.dataset.testid = 'fishing-drop-pot';
+      pot.addEventListener('click', opts.onDropPot);
+      actions.appendChild(pot);
+    } else if (opts.phase === 'reel') {
+      const reel = document.createElement('button');
+      reel.type = 'button';
+      reel.className = 'menu-button fishing-reel';
+      reel.textContent = 'REEL (hold)';
+      reel.dataset.testid = 'fishing-reel';
+      panel.dataset.reel = '1';
+      actions.appendChild(reel);
+    }
+
+    const assist = document.createElement('button');
+    assist.type = 'button';
+    assist.className = 'menu-button menu-button-secondary';
+    assist.textContent = opts.assist ? 'Assist: on' : 'Assist: off';
+    assist.dataset.testid = 'fishing-assist';
+    assist.addEventListener('click', opts.onToggleAssist);
+    actions.appendChild(assist);
+
+    panel.appendChild(actions);
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'menu-button';
+    close.textContent = 'Close';
+    close.dataset.testid = 'fishing-close';
     close.addEventListener('click', opts.onClose);
     panel.appendChild(close);
 

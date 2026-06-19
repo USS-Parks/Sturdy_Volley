@@ -5,6 +5,76 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 021 — Fishing and crab pots (2026-06-19)
+
+Fishing ships end-to-end on Driftwood Beach. The pure
+[src/engine/fishing.ts](src/engine/fishing.ts) defines 13 original
+Sturdy-Coast fish (12+ as required) with seasons / locations /
+time-of-day / difficulty / rarity, a treasure table for non-fish
+results, a deterministic bite-roll (`nextBite`) that takes weather +
+tide modifiers, a tension minigame (`startMinigame` / `stepMinigame`)
+with an assist-mode toggle that widens the cursor band and softens
+fish wander, a crab-pot subsystem (`baitPot` / `potReady` /
+`collectPot`) with a 12 in-game-hour timer, and a `markFirstCatch`
+helper for the per-fish first-catch notification.
+
+- **Items**: 15 new ([src/data/content/items.json](src/data/content/items.json))
+  — the 13 fish + `pearl-shard` treasure + `bait`.
+- **Save model**: `fishingAssist: boolean`, `firstCatchSeen:
+  Record<id, boolean>`, `crabPots: Record<id, CrabPotState>` (all
+  default-empty so existing saves load).
+- **BeachScene**: new "Cast a line" interaction target at the surf
+  line; new `openFishing` / `beginCast` / `tickFishing` /
+  `collectFishingResult` / `deployCrabPot` / `handleCrabPotInteract`
+  flow. The minigame ticks against `stepMinigame` every dt; SPACE / E
+  held = intent +1 (reel up); released = -1 (drift down). Mouse +
+  touch hit the on-screen REEL button. First catch flashes the
+  "First catch! Silver Skipper" label.
+- **Overlay**: `showFishingPanel` ([src/ui/overlay.ts](src/ui/overlay.ts))
+  renders status, the minigame bar (cursor + fish + progress) +
+  on-screen buttons (cast / reel / drop pot / assist / close).
+- **Debug API**: per-scene `window.sturdyVolleyBeach` exposes
+  `openFishing`, `cast`, `forceBite`, `forceCatch`, `forceLoss`,
+  `grantItem`, `toggleAssist`, `firstCatchSeen` for the e2e.
+- **Tests**:
+  - Unit: 11 new cases in [tests/unit/fishing.test.ts](tests/unit/fishing.test.ts)
+    covering catalog shape, bite-roll seasonality + weather, assist
+    band width, progress climb, lost path, crab-pot timer, and
+    first-catch tracking.
+  - E2E: 3 new cases in [tests/e2e/fishing.spec.ts](tests/e2e/fishing.spec.ts)
+    — open panel, cast → forced bite → forced catch, assist toggle.
+
+**Acceptance criteria**
+
+- [x] At least 12 original fish exist (`FISH_CATALOG` ships **13**,
+      all original to Ballast Bay).
+- [x] Fishing works by mouse, touch, keyboard, and controller (the
+      panel is built from real DOM `<button>`s which click on mouse /
+      tap on touch / fire on keyboard Enter; SPACE + E are also
+      reeled via the live key-set in `update()`. Controller binding
+      surfaces will land with Prompt 043's gamepad pass; the buttons
+      themselves are gamepad-navigable today via the focus order the
+      panel sets via `focusFirstEnabled`.)
+- [x] Assist mode reduces timing difficulty (`startMinigame({assist:true})`
+      widens cursor width to 0.32 vs 0.18 baseline, and
+      `stepMinigame` halves the fish-wander coefficient when assist
+      is on; toggle persists on `save.fishingAssist`).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` ·
+Vitest `273/273` (11 new fishing cases) · validate:assets `exit 0` ·
+build `dist/` emitted · Playwright `94/94` across `desktop-chromium`
++ `mobile-chromium` (three new fishing specs).
+
+**Note (scope):** the Reef / Pond / River fishing locations are
+catalogued but Driftwood Beach is the only built surface so far;
+Prompt 022 will surface the Reef. The minigame's controller-button
+binding ships as keyboard fallback (Space / E) — full gamepad
+mapping lives in Prompt 043's pass. The 12-hour crab-pot timer
+catches on real-time ticks today; later, dayResolution can pre-warm
+overnight catches.
+
+---
+
 ## Prompt 020 — Pets and companion behaviors (2026-06-19)
 
 A friendly tide-cat named **Pixel** spawns on Day 1, follows the

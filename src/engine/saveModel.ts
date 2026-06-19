@@ -105,6 +105,24 @@ export const saveSchema = z
           .strict(),
       )
       .default({}),
+    fishingAssist: z.boolean().default(false),
+    firstCatchSeen: z.record(z.string(), z.boolean()).default({}),
+    crabPots: z
+      .record(
+        z.string(),
+        z
+          .object({
+            id: z.string(),
+            sceneKey: z.string(),
+            x: z.number(),
+            z: z.number(),
+            baited: z.boolean(),
+            startedAt: z.number().nullable(),
+            catchItemId: z.string().nullable(),
+          })
+          .strict(),
+      )
+      .default({}),
     pet: z
       .object({
         kind: z.enum(['tide-cat', 'bay-dog']),
@@ -228,6 +246,9 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
     mapState: {},
     machines: defaultFarmMachines(),
     animals: defaultFarmAnimals(),
+    fishingAssist: false,
+    firstCatchSeen: {},
+    crabPots: {},
     pet: {
       kind: 'tide-cat',
       name: 'Pixel',

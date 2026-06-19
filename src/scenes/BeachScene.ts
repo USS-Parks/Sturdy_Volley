@@ -26,7 +26,7 @@ import { getGameTime } from '../engine/dayResolution';
 import { createTimeClock, pauseClock, tickClock, type TimeClockState } from '../engine/timeClock';
 import type { Weather } from '../data/schemas';
 import { collect, type WorldEntity } from '../engine/forage';
-import { addItem } from '../engine/inventory';
+import { addItem, countItem, removeItem } from '../engine/inventory';
 import {
   BEACH_ENTITY_ANCHORS,
   beachAnchorFor,
@@ -34,6 +34,18 @@ import {
   beachEntitySuffix,
   buildBeachEntityMesh,
 } from '../render/beach-entities';
+import {
+  FISH_CATALOG,
+  baitPot,
+  collectPot,
+  markFirstCatch,
+  nextBite,
+  startMinigame,
+  stepMinigame,
+  type MinigameState,
+  type WeatherKind,
+} from '../engine/fishing';
+import { absoluteDay } from '../engine/timeSystem';
 
 /**
  * Driftwood Beach (RF-10). Promoted from a 25-line PlaceScene to a walkable
@@ -43,6 +55,19 @@ import {
  * `save.worldEntities` keyed `Beach:*`. Tide-line shells fade below the sand
  * at high/rising tide and are not interactable then.
  */
+interface BeachDebugApi {
+  openFishing: () => void;
+  cast: (withBait: boolean) => void;
+  fishingPhase: () => string;
+  pendingResolvedId: () => string | null;
+  forceBite: () => void;
+  forceCatch: () => void;
+  forceLoss: () => void;
+  grantItem: (itemId: string, qty: number) => void;
+  toggleAssist: () => void;
+  firstCatchSeen: () => Record<string, boolean>;
+}
+
 export class BeachScene extends GameScene {
   private camera!: ArcRotateCamera;
   private player!: AbstractMesh;
@@ -64,6 +89,16 @@ export class BeachScene extends GameScene {
 
   private readonly entityMeshes = new Map<string, AbstractMesh>();
   private tideStrip: AbstractMesh | null = null;
+  // Fishing state (Prompt 021).
+  private fishingOpen = false;
+  private fishingPhase: 'cast' | 'waiting' | 'reel' | 'caught' | 'lost' = 'cast';
+  private fishingWaitTimer = 0;
+  private fishingPendingResolvedId: string | null = null;
+  private fishingPendingIsTreasure = false;
+  private fishingMinigame: MinigameState | null = null;
+  private fishingReelHeld = false;
+  private fishingLastCatch = '';
+  private fishingSeed = 1;
 
   build(): Scene {
     const scene = makeScene(this.ctx.engine, PALETTE.sky);
@@ -138,13 +173,48 @@ export class BeachScene extends GameScene {
     window.addEventListener('keyup', this.onKeyUp);
     this.menuOpen = false;
     this.refreshHud();
+
+    // Prompt 021: debug seam for the fishing e2e.
+    (window as unknown as { sturdyVolleyBeach?: BeachDebugApi }).sturdyVolleyBeach = {
+      openFishing: () => this.openFishing(),
+      cast: (withBait: boolean) => this.beginCast(withBait),
+      fishingPhase: () => this.fishingPhase,
+      pendingResolvedId: () => this.fishingPendingResolvedId,
+      forceBite: () => {
+        this.fishingWaitTimer = 0;
+        this.tickFishing(0.05);
+      },
+      forceCatch: () => {
+        if (!this.fishingMinigame) return;
+        this.fishingMinigame = { ...this.fishingMinigame, progress: 1 };
+        this.collectFishingResult();
+      },
+      forceLoss: () => {
+        this.fishingPhase = 'lost';
+        this.fishingMinigame = null;
+        this.fishingPendingResolvedId = null;
+        this.renderFishingPanel();
+      },
+      grantItem: (itemId: string, qty: number) => {
+        const r = addItem(this.save.inventory, itemId, qty, 0);
+        this.save.inventory = r.container;
+        persistActiveSave();
+      },
+      toggleAssist: () => {
+        this.save.fishingAssist = !(this.save.fishingAssist ?? false);
+        persistActiveSave();
+        this.renderFishingPanel();
+      },
+      firstCatchSeen: () => ({ ...(this.save.firstCatchSeen ?? {}) }),
+    };
   }
 
   override update(dt: number): void {
     if (!this.save) return;
-    if (this.menuOpen) {
+    if (this.menuOpen || this.fishingOpen) {
       this.clock = pauseClock(this.clock, true);
       this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
+      if (this.fishingOpen) this.tickFishing(dt);
       return;
     }
     if (this.clock.paused) this.clock = pauseClock(this.clock, false);
@@ -161,12 +231,17 @@ export class BeachScene extends GameScene {
     const interact = this.pressed.has('e') || this.pressed.has(' ');
     if (interact && !this.ePrev && this.nearest) {
       if (this.nearest.id.startsWith('entity:')) this.handleEntityInteract(this.nearest.id.slice('entity:'.length));
+      else if (this.nearest.id === 'surf-line') this.openFishing();
+      else if (this.nearest.id.startsWith('pot:')) this.handleCrabPotInteract(this.nearest.id.slice('pot:'.length));
       else {
         this.actionLabel = this.nearest.label;
         this.actionTimer = 1.6;
       }
     }
     this.ePrev = interact;
+
+    // Prompt 021: spacebar held while the minigame is up reels the cursor up.
+    this.fishingReelHeld = this.fishingOpen && this.fishingPhase === 'reel' && (this.pressed.has(' ') || this.pressed.has('e'));
     if (this.actionTimer > 0) this.actionTimer -= dt;
 
     const tick = tickClock(this.clock, dt);
@@ -243,6 +318,29 @@ export class BeachScene extends GameScene {
         priority: 3,
       });
     }
+    // Prompt 021: surf line cast target — stand near the tide strip.
+    base.push({
+      id: 'surf-line',
+      kind: 'water-entry',
+      label: 'Cast a line',
+      x: 0,
+      z: -8,
+      radius: 3.0,
+      priority: 4,
+    });
+    // Live crab pots interactable.
+    for (const pot of Object.values(this.save.crabPots ?? {})) {
+      if (pot.sceneKey !== 'Beach') continue;
+      base.push({
+        id: `pot:${pot.id}`,
+        kind: 'prop',
+        label: pot.baited ? 'Check the crab pot' : 'Re-bait the crab pot',
+        x: pot.x,
+        z: pot.z,
+        radius: 1.4,
+        priority: 3,
+      });
+    }
     this.targets = base;
   }
 
@@ -269,6 +367,187 @@ export class BeachScene extends GameScene {
       mesh.dispose();
       this.entityMeshes.delete(suffix);
     }
+  }
+
+  private absoluteMinutesNow(): number {
+    return absoluteDay(this.clock.time) * 1440 + this.clock.time.minutes;
+  }
+
+  private mapWeatherForFishing(): WeatherKind {
+    const id = this.weather?.id ?? 'sunny';
+    if (id === 'rain' || id === 'sea-fog' || id === 'windstorm') return id as WeatherKind;
+    return 'sunny';
+  }
+
+  private openFishing(): void {
+    this.fishingOpen = true;
+    this.fishingPhase = 'cast';
+    this.fishingMinigame = null;
+    this.fishingPendingResolvedId = null;
+    this.fishingWaitTimer = 0;
+    this.renderFishingPanel();
+  }
+
+  private renderFishingPanel(): void {
+    const fishItem = this.fishingPendingResolvedId
+      ? FISH_CATALOG.find((f) => f.id === this.fishingPendingResolvedId)
+      : undefined;
+    const lastCatchLabel = fishItem?.name ?? (this.fishingLastCatch || undefined);
+    this.ctx.overlay.showFishingPanel({
+      baitCount: countItem(this.save.inventory, 'bait'),
+      assist: this.save.fishingAssist ?? false,
+      phase: this.fishingPhase,
+      lastCatchLabel,
+      minigame: this.fishingMinigame
+        ? {
+            fishPos: this.fishingMinigame.fishPos,
+            cursorPos: this.fishingMinigame.cursorPos,
+            cursorWidth: this.fishingMinigame.cursorWidth,
+            progress: this.fishingMinigame.progress,
+          }
+        : undefined,
+      onCast: (withBait) => this.beginCast(withBait),
+      onToggleAssist: () => {
+        this.save.fishingAssist = !(this.save.fishingAssist ?? false);
+        persistActiveSave();
+        this.renderFishingPanel();
+      },
+      onDropPot: () => this.deployCrabPot(),
+      onClose: () => {
+        this.fishingOpen = false;
+        this.fishingPhase = 'cast';
+        this.fishingMinigame = null;
+        this.refreshHud();
+      },
+    });
+  }
+
+  private beginCast(withBait: boolean): void {
+    this.fishingSeed = this.absoluteMinutesNow() + Math.floor(Math.random() * 1000);
+    if (withBait) {
+      const r = removeItem(this.save.inventory, 'bait', 1);
+      if (r.removed === 1) this.save.inventory = r.container;
+      else withBait = false;
+    }
+    const roll = nextBite({
+      timeMinutes: this.clock.time.minutes,
+      season: this.save.calendar.season,
+      weather: this.mapWeatherForFishing(),
+      tide: this.tide,
+      location: 'beach',
+      seed: this.fishingSeed,
+      withBait,
+    });
+    this.fishingPhase = 'waiting';
+    this.fishingWaitTimer = roll.waitSeconds;
+    this.fishingPendingResolvedId = roll.resolvedId;
+    this.fishingPendingIsTreasure = roll.isTreasure;
+    this.renderFishingPanel();
+  }
+
+  private tickFishing(dt: number): void {
+    if (this.fishingPhase === 'waiting') {
+      this.fishingWaitTimer -= dt;
+      if (this.fishingWaitTimer <= 0) {
+        if (this.fishingPendingIsTreasure) {
+          this.collectFishingResult();
+        } else {
+          const def = FISH_CATALOG.find((f) => f.id === this.fishingPendingResolvedId);
+          this.fishingMinigame = startMinigame({
+            difficulty: def?.difficulty ?? 1,
+            assist: this.save.fishingAssist ?? false,
+          });
+          this.fishingPhase = 'reel';
+          this.renderFishingPanel();
+        }
+      } else if (Math.floor(this.fishingWaitTimer * 10) % 5 === 0) {
+        // Re-render every ~0.5s to refresh the panel.
+        this.renderFishingPanel();
+      }
+      return;
+    }
+    if (this.fishingPhase === 'reel' && this.fishingMinigame) {
+      const intent: -1 | 0 | 1 = this.fishingReelHeld ? 1 : -1;
+      this.fishingSeed += 1;
+      const step = stepMinigame({
+        state: this.fishingMinigame,
+        dt,
+        intent,
+        seed: this.fishingSeed,
+        assist: this.save.fishingAssist ?? false,
+      });
+      this.fishingMinigame = step.state;
+      if (step.caught) {
+        this.collectFishingResult();
+      } else if (step.lost) {
+        this.fishingPhase = 'lost';
+        this.fishingMinigame = null;
+        this.fishingPendingResolvedId = null;
+        this.renderFishingPanel();
+      } else {
+        this.renderFishingPanel();
+      }
+    }
+  }
+
+  private collectFishingResult(): void {
+    const id = this.fishingPendingResolvedId;
+    if (!id) return;
+    const added = addItem(this.save.inventory, id, 1, 0);
+    this.save.inventory = added.container;
+    if (!this.fishingPendingIsTreasure) {
+      const r = markFirstCatch(this.save.firstCatchSeen ?? {}, id);
+      this.save.firstCatchSeen = r.seen;
+      if (r.isFirst) {
+        const fish = FISH_CATALOG.find((f) => f.id === id);
+        this.fishingLastCatch = `First catch! ${fish?.name ?? id}`;
+      } else {
+        this.fishingLastCatch = FISH_CATALOG.find((f) => f.id === id)?.name ?? id;
+      }
+      recordSkillXp('angling', 6);
+    } else {
+      this.fishingLastCatch = id;
+    }
+    persistActiveSave();
+    this.fishingPhase = 'caught';
+    this.fishingMinigame = null;
+    this.renderFishingPanel();
+  }
+
+  private deployCrabPot(): void {
+    const id = `Beach:pot:${Object.keys(this.save.crabPots ?? {}).length + 1}`;
+    if (!this.save.crabPots) this.save.crabPots = {};
+    this.save.crabPots[id] = baitPot(
+      { id, sceneKey: 'Beach', x: 0, z: -6, baited: false, startedAt: null, catchItemId: null },
+      this.absoluteMinutesNow(),
+      this.fishingSeed + Object.keys(this.save.crabPots).length,
+    );
+    persistActiveSave();
+    this.fishingLastCatch = 'Dropped a crab pot.';
+    this.fishingPhase = 'caught';
+    this.rebuildTargets();
+    this.renderFishingPanel();
+  }
+
+  private handleCrabPotInteract(id: string): void {
+    const pot = this.save.crabPots?.[id];
+    if (!pot) return;
+    const now = this.absoluteMinutesNow();
+    const result = collectPot(pot, now);
+    if (result.itemId) {
+      const added = addItem(this.save.inventory, result.itemId, 1, 0);
+      this.save.inventory = added.container;
+      this.save.crabPots![id] = result.pot;
+      this.actionLabel = `Pot yielded ${result.itemId}`;
+      this.actionTimer = 1.6;
+    } else {
+      // Re-bait if not ready and not currently baited.
+      this.save.crabPots![id] = baitPot(pot, now, this.fishingSeed + id.length);
+      this.actionLabel = 'Re-baited the pot';
+      this.actionTimer = 1.6;
+    }
+    persistActiveSave();
+    this.rebuildTargets();
   }
 
   private handleEntityInteract(suffix: string): void {

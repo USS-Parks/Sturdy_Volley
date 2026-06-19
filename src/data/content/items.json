@@ -32,5 +32,20 @@
   { "id": "honey-jar", "name": "Honey Jar", "description": "Slow gold poured straight from the spinner.", "category": "artisan", "sellPrice": 160, "stackable": true, "tags": ["artisan"] },
   { "id": "sunmelon-oil", "name": "Sunmelon Oil", "description": "A clear, fragrant cooking oil.", "category": "artisan", "sellPrice": 170, "stackable": true, "tags": ["artisan"] },
   { "id": "dried-harborlime", "name": "Dried Harborlime", "description": "Tart, leathery citrus slices.", "category": "artisan", "sellPrice": 70, "stackable": true, "tags": ["artisan"] },
-  { "id": "hay", "name": "Hay", "description": "A bound bundle of dried grass for the barn.", "category": "material", "sellPrice": 4, "stackable": true, "tags": ["feed"] }
+  { "id": "hay", "name": "Hay", "description": "A bound bundle of dried grass for the barn.", "category": "material", "sellPrice": 4, "stackable": true, "tags": ["feed"] },
+  { "id": "silver-skipper", "name": "Silver Skipper", "description": "A flashing schooler from the surf line.", "category": "fish", "sellPrice": 60, "stackable": true, "tags": ["fish"] },
+  { "id": "striped-mullet", "name": "Striped Mullet", "description": "Striped slate-blue fish that runs the spring breakers.", "category": "fish", "sellPrice": 80, "stackable": true, "tags": ["fish"] },
+  { "id": "kelp-perch", "name": "Kelp Perch", "description": "A pale perch that hides in the kelp.", "category": "fish", "sellPrice": 110, "stackable": true, "tags": ["fish"] },
+  { "id": "lantern-eel", "name": "Lantern Eel", "description": "A glowing eel from the night reef.", "category": "fish", "sellPrice": 220, "stackable": true, "tags": ["fish"] },
+  { "id": "sun-rockfish", "name": "Sun Rockfish", "description": "A bright orange rockfish.", "category": "fish", "sellPrice": 150, "stackable": true, "tags": ["fish"] },
+  { "id": "bluemoon-trout", "name": "Bluemoon Trout", "description": "A river trout with a silver-blue belly.", "category": "fish", "sellPrice": 130, "stackable": true, "tags": ["fish"] },
+  { "id": "salt-pike", "name": "Salt Pike", "description": "A long, brackish-water pike.", "category": "fish", "sellPrice": 175, "stackable": true, "tags": ["fish"] },
+  { "id": "tide-jellies", "name": "Tide Jellies", "description": "Drifting moon jellies from the morning tide.", "category": "fish", "sellPrice": 40, "stackable": true, "tags": ["fish"] },
+  { "id": "reef-snapper", "name": "Reef Snapper", "description": "A reef snapper with rosy fins.", "category": "fish", "sellPrice": 160, "stackable": true, "tags": ["fish"] },
+  { "id": "storm-marlin", "name": "Storm Marlin", "description": "A rare marlin that breaches during gales.", "category": "fish", "sellPrice": 420, "stackable": true, "tags": ["fish"] },
+  { "id": "pond-bream", "name": "Pond Bream", "description": "A pale bream from quiet ponds.", "category": "fish", "sellPrice": 35, "stackable": true, "tags": ["fish"] },
+  { "id": "glasswing-mackerel", "name": "Glasswing Mackerel", "description": "A nearly translucent mackerel.", "category": "fish", "sellPrice": 260, "stackable": true, "tags": ["fish"] },
+  { "id": "pearl-cod", "name": "Pearl Cod", "description": "A winter cod that scales like nacre.", "category": "fish", "sellPrice": 210, "stackable": true, "tags": ["fish"] },
+  { "id": "pearl-shard", "name": "Pearl Shard", "description": "Treasure dredged from the surf.", "category": "material", "sellPrice": 120, "stackable": true, "tags": ["treasure"] },
+  { "id": "bait", "name": "Bait", "description": "Sticky tidepool grubs for the hook.", "category": "material", "sellPrice": 6, "stackable": true, "tags": ["bait"] }
 ]
