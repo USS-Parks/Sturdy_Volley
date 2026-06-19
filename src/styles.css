@@ -795,6 +795,18 @@ body {
 .fishing-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .fishing-actions .menu-button { flex: 1; min-width: 130px; }
 
+/* Reef panel (Prompt 022). */
+.reef-panel { width: min(520px, 96vw); }
+.reef-oxygen { height: 14px; background: rgba(0,0,0,0.18); border-radius: 7px; overflow: hidden; margin-bottom: 4px; }
+.reef-oxygen-fill { height: 100%; background: var(--sv-accent, #4eb89a); transition: width 0.1s linear; }
+.reef-oxygen-fill.reef-oxygen-warning { background: #d04949; }
+.reef-health { height: 10px; background: rgba(0,0,0,0.18); border-radius: 5px; overflow: hidden; margin: 6px 0 4px; }
+.reef-health-fill { height: 100%; background: var(--sv-warm-light, #f8c97a); }
+.reef-meta { font-size: 12px; opacity: 0.85; }
+.reef-encounter { font-style: italic; margin: 6px 0; opacity: 0.9; }
+.reef-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.reef-actions .menu-button { flex: 1; min-width: 120px; }
+
 /* Shop panel (Prompt 016). */
 .shop-panel {
   width: min(480px, 94vw);

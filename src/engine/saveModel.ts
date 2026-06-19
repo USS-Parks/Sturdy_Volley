@@ -107,6 +107,14 @@ export const saveSchema = z
       .default({}),
     fishingAssist: z.boolean().default(false),
     firstCatchSeen: z.record(z.string(), z.boolean()).default({}),
+    reef: z
+      .object({
+        health: z.number().min(0).max(1),
+        fragmentsDonated: z.number().int().nonnegative(),
+        tier: z.number().int().min(0).max(4),
+      })
+      .strict()
+      .default({ health: 0, fragmentsDonated: 0, tier: 0 }),
     crabPots: z
       .record(
         z.string(),
@@ -248,6 +256,7 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
     animals: defaultFarmAnimals(),
     fishingAssist: false,
     firstCatchSeen: {},
+    reef: { health: 0, fragmentsDonated: 0, tier: 0 },
     crabPots: {},
     pet: {
       kind: 'tide-cat',

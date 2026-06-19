@@ -85,6 +85,24 @@ export interface AnimalPanelOptions {
   onClose: () => void;
 }
 
+export interface ReefPanelOptions {
+  /** "open" | "wading" | "closed". */
+  access: 'open' | 'wading' | 'closed';
+  /** Oxygen 0..1. */
+  oxygen: number;
+  oxygenWarning: boolean;
+  /** Reef restoration 0..1. */
+  reefHealth: number;
+  reefTier: number;
+  fragmentsOnHand: number;
+  fragmentsToNextTier: number;
+  lastEncounter: string | null;
+  onHarvest: () => void;
+  onSurface: () => void;
+  onDonate: () => void;
+  onClose: () => void;
+}
+
 export interface FishingPanelOptions {
   /** Player's bait count. */
   baitCount: number;
@@ -773,6 +791,92 @@ export class UIOverlay {
     close.type = 'button';
     close.textContent = 'Close';
     close.dataset.testid = 'crafting-close';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /**
+   * Reef panel (Prompt 022). Snorkeling readout: tide access status,
+   * oxygen meter, reef-health restoration bar, and harvest / surface /
+   * donate / close actions.
+   */
+  showReefPanel(opts: ReefPanelOptions): void {
+    this.clear();
+    const accessLabel = opts.access === 'open' ? 'Low tide — reef open' : opts.access === 'wading' ? 'Falling tide — wading' : 'High tide — reef closed';
+    const panel = this.createPanel('Reef', accessLabel);
+    panel.classList.add('reef-panel');
+    panel.dataset.testid = 'reef-panel';
+
+    const oxygen = document.createElement('div');
+    oxygen.className = 'reef-oxygen';
+    oxygen.dataset.testid = 'reef-oxygen';
+    const oxygenFill = document.createElement('div');
+    oxygenFill.className = 'reef-oxygen-fill';
+    oxygenFill.style.width = `${Math.round(opts.oxygen * 100)}%`;
+    if (opts.oxygenWarning) oxygenFill.classList.add('reef-oxygen-warning');
+    oxygen.appendChild(oxygenFill);
+    panel.appendChild(oxygen);
+    const oxLabel = document.createElement('div');
+    oxLabel.className = 'reef-meta';
+    oxLabel.textContent = `Oxygen ${Math.round(opts.oxygen * 100)}%${opts.oxygenWarning ? ' — surface soon!' : ''}`;
+    panel.appendChild(oxLabel);
+
+    const health = document.createElement('div');
+    health.className = 'reef-health';
+    const healthFill = document.createElement('div');
+    healthFill.className = 'reef-health-fill';
+    healthFill.style.width = `${Math.round(opts.reefHealth * 100)}%`;
+    healthFill.dataset.testid = 'reef-health';
+    health.appendChild(healthFill);
+    panel.appendChild(health);
+    const healthMeta = document.createElement('div');
+    healthMeta.className = 'reef-meta';
+    healthMeta.textContent = `Reef tier ${opts.reefTier} / 4 — ${opts.fragmentsToNextTier} fragment${opts.fragmentsToNextTier === 1 ? '' : 's'} to next restoration`;
+    panel.appendChild(healthMeta);
+
+    if (opts.lastEncounter) {
+      const enc = document.createElement('div');
+      enc.className = 'reef-encounter';
+      enc.dataset.testid = 'reef-encounter';
+      enc.textContent = opts.lastEncounter;
+      panel.appendChild(enc);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'reef-actions';
+    const harvest = document.createElement('button');
+    harvest.type = 'button';
+    harvest.className = 'menu-button';
+    harvest.textContent = 'Harvest';
+    harvest.dataset.testid = 'reef-harvest';
+    harvest.disabled = opts.access === 'closed';
+    harvest.addEventListener('click', opts.onHarvest);
+    actions.appendChild(harvest);
+    const surface = document.createElement('button');
+    surface.type = 'button';
+    surface.className = 'menu-button menu-button-secondary';
+    surface.textContent = 'Surface';
+    surface.dataset.testid = 'reef-surface';
+    surface.addEventListener('click', opts.onSurface);
+    actions.appendChild(surface);
+    const donate = document.createElement('button');
+    donate.type = 'button';
+    donate.className = 'menu-button menu-button-secondary';
+    donate.textContent = `Donate ${opts.fragmentsOnHand} fragment${opts.fragmentsOnHand === 1 ? '' : 's'}`;
+    donate.dataset.testid = 'reef-donate';
+    donate.disabled = opts.fragmentsOnHand === 0 || opts.reefTier >= 4;
+    donate.addEventListener('click', opts.onDonate);
+    actions.appendChild(donate);
+    panel.appendChild(actions);
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'menu-button';
+    close.textContent = 'Close';
+    close.dataset.testid = 'reef-close';
     close.addEventListener('click', opts.onClose);
     panel.appendChild(close);
 

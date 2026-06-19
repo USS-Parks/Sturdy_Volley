@@ -47,5 +47,8 @@
   { "id": "glasswing-mackerel", "name": "Glasswing Mackerel", "description": "A nearly translucent mackerel.", "category": "fish", "sellPrice": 260, "stackable": true, "tags": ["fish"] },
   { "id": "pearl-cod", "name": "Pearl Cod", "description": "A winter cod that scales like nacre.", "category": "fish", "sellPrice": 210, "stackable": true, "tags": ["fish"] },
   { "id": "pearl-shard", "name": "Pearl Shard", "description": "Treasure dredged from the surf.", "category": "material", "sellPrice": 120, "stackable": true, "tags": ["treasure"] },
-  { "id": "bait", "name": "Bait", "description": "Sticky tidepool grubs for the hook.", "category": "material", "sellPrice": 6, "stackable": true, "tags": ["bait"] }
+  { "id": "bait", "name": "Bait", "description": "Sticky tidepool grubs for the hook.", "category": "material", "sellPrice": 6, "stackable": true, "tags": ["bait"] },
+  { "id": "sea-lettuce", "name": "Sea Lettuce", "description": "Pale-green reef greens, crisp from the cold tide.", "category": "forage", "sellPrice": 28, "stackable": true, "tags": ["reef", "forage"] },
+  { "id": "coral-fragment", "name": "Coral Fragment", "description": "A pale shard of broken coral — the nursery can grow from these.", "category": "material", "sellPrice": 45, "stackable": true, "tags": ["reef"] },
+  { "id": "urchin", "name": "Urchin", "description": "A spiny urchin, brined fresh from the reef.", "category": "forage", "sellPrice": 55, "stackable": true, "tags": ["reef", "forage"] }
 ]

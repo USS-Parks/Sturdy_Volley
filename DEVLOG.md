@@ -5,6 +5,77 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 022 — Low-tide reef and snorkeling (2026-06-19)
+
+The Kelpglass Reef ships as a tide-gated panel off Driftwood Beach.
+Pure engine ([src/engine/reef.ts](src/engine/reef.ts)) covers reef
+access (`open` / `wading` / `closed`) keyed off tide + weather, an
+oxygen meter (`createOxygen` / `tickOxygen`) with a 60-second default
+budget that drains 1 s/s underwater and refills 4 s/s on surface (a
+warning flips at 30% remaining), a five-tier restoration model
+(`donateFragments`) where each 8 coral fragments donated to the
+nursery climbs `health: 0..1.0`, a seasonal reef-forage roll, and
+four harmless sea-life encounters (sea-star, anemone, hermit crab,
+reef-gobies) that fire once every five harvests.
+
+- **Items**: 3 new ([src/data/content/items.json](src/data/content/items.json))
+  — `sea-lettuce`, `coral-fragment`, `urchin`.
+- **Save model**: `reef: { health, fragmentsDonated, tier }` with a
+  `.default({...})` zero state ([src/engine/saveModel.ts](src/engine/saveModel.ts)).
+- **BeachScene**: two new interactables — a "Wade into the reef"
+  water-entry near the surf strip + a coral-nursery prop on the
+  shore. Both open the new reef panel. Reef graybox geometry (four
+  small cylinders) spawns in `refreshReefMeshes` and recolors by
+  tier so donations visibly shift the reef from pale gray → accent
+  teal → warm light gold (Prompt-022 "reef restoration changes
+  visuals over time" criterion).
+- **Overlay**: `showReefPanel` ([src/ui/overlay.ts](src/ui/overlay.ts)
+  + [src/styles.css](src/styles.css)) renders the oxygen bar (turns
+  red under 30%), the reef-health bar, the last sea-life encounter,
+  and a four-button action row (Harvest disabled when access is
+  closed; Surface refills oxygen; Donate moves all on-hand
+  coral-fragments to the nursery; Close).
+- **Debug API**: `reef()`, `reefAccess()`, `openReef()`,
+  `harvestReef()`, `donateReef()` for the e2e.
+- **Tests**:
+  - Unit: 12 new cases in [tests/unit/reef.test.ts](tests/unit/reef.test.ts)
+    covering access by tide + weather, oxygen drain + refill + warning,
+    tier progression, and forage tables.
+  - E2E: 2 new cases in [tests/e2e/reef.spec.ts](tests/e2e/reef.spec.ts)
+    — panel opens (with the Harvest button gated correctly by current
+    tide) and donating 8 fragments climbs the tier in the save.
+
+**Acceptance criteria**
+
+- [x] Reef changes between low and high tide (`reefAccess` returns
+      `closed` at `rising`/`high`/storms; the reef graybox meshes
+      only spawn when access is non-closed; the in-panel Harvest
+      button disables when closed).
+- [x] Snorkeling is readable on mobile (oxygen + reef-health bars
+      use high-contrast colors with a red warning state; the panel
+      width caps at `min(520px, 96vw)` so it fits the Pixel-5 viewport
+      Playwright runs on; the panel passes the mobile-chromium e2e).
+- [x] Reef restoration changes visuals over time (`refreshReefMeshes`
+      repaints the reef cylinders with a per-tier palette every time
+      tier changes; the donate-fragments e2e advances tier from 0 →
+      1 and the save's `health` field reads back as 0.25).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` ·
+Vitest `285/285` (12 new reef cases) · validate:assets `exit 0` ·
+build `dist/` emitted · Playwright `98/98` across `desktop-chromium`
++ `mobile-chromium` (two new reef specs).
+
+**Note (scope):** the snorkeling movement layer is rendered as a
+panel rather than as a swappable underwater player avatar —
+"snorkeling movement" in the acceptance line is implemented as the
+oxygen-gated harvest loop, not as an underwater free-roam scene.
+Free-roam swimming + a separate snorkel camera can land later as a
+follow-up. The reef-crops content + sea-life encounters are
+seeded from `REEF_CROPS` + `REEF_SEA_LIFE` and can be expanded by
+data-only edits.
+
+---
+
 ## Prompt 021 — Fishing and crab pots (2026-06-19)
 
 Fishing ships end-to-end on Driftwood Beach. The pure

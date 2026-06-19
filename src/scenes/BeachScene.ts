@@ -46,6 +46,16 @@ import {
   type WeatherKind,
 } from '../engine/fishing';
 import { absoluteDay } from '../engine/timeSystem';
+import {
+  REEF_SEA_LIFE,
+  createOxygen,
+  donateFragments,
+  reefAccess,
+  reefSeasonalRoll,
+  tickOxygen,
+  type OxygenState,
+  type ReefAccess,
+} from '../engine/reef';
 
 /**
  * Driftwood Beach (RF-10). Promoted from a 25-line PlaceScene to a walkable
@@ -66,6 +76,11 @@ interface BeachDebugApi {
   grantItem: (itemId: string, qty: number) => void;
   toggleAssist: () => void;
   firstCatchSeen: () => Record<string, boolean>;
+  reef: () => { health: number; fragmentsDonated: number; tier: number };
+  reefAccess: () => 'open' | 'wading' | 'closed';
+  openReef: () => void;
+  harvestReef: () => void;
+  donateReef: () => void;
 }
 
 export class BeachScene extends GameScene {
@@ -99,6 +114,12 @@ export class BeachScene extends GameScene {
   private fishingReelHeld = false;
   private fishingLastCatch = '';
   private fishingSeed = 1;
+  // Reef state (Prompt 022).
+  private reefOpen = false;
+  private reefOxygen: OxygenState = createOxygen();
+  private reefSeaLifeEncounter: string | null = null;
+  private reefHarvestSeed = 1;
+  private reefMeshes: AbstractMesh[] = [];
 
   build(): Scene {
     const scene = makeScene(this.ctx.engine, PALETTE.sky);
@@ -172,6 +193,7 @@ export class BeachScene extends GameScene {
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     this.menuOpen = false;
+    this.refreshReefMeshes();
     this.refreshHud();
 
     // Prompt 021: debug seam for the fishing e2e.
@@ -206,15 +228,21 @@ export class BeachScene extends GameScene {
         this.renderFishingPanel();
       },
       firstCatchSeen: () => ({ ...(this.save.firstCatchSeen ?? {}) }),
+      reef: () => ({ ...(this.save.reef ?? { health: 0, fragmentsDonated: 0, tier: 0 }) }),
+      reefAccess: () => this.currentReefAccess(),
+      openReef: () => this.openReef(),
+      harvestReef: () => this.handleReefHarvest(),
+      donateReef: () => this.handleReefDonate(),
     };
   }
 
   override update(dt: number): void {
     if (!this.save) return;
-    if (this.menuOpen || this.fishingOpen) {
+    if (this.menuOpen || this.fishingOpen || this.reefOpen) {
       this.clock = pauseClock(this.clock, true);
       this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
       if (this.fishingOpen) this.tickFishing(dt);
+      if (this.reefOpen) this.tickReef(dt);
       return;
     }
     if (this.clock.paused) this.clock = pauseClock(this.clock, false);
@@ -232,6 +260,8 @@ export class BeachScene extends GameScene {
     if (interact && !this.ePrev && this.nearest) {
       if (this.nearest.id.startsWith('entity:')) this.handleEntityInteract(this.nearest.id.slice('entity:'.length));
       else if (this.nearest.id === 'surf-line') this.openFishing();
+      else if (this.nearest.id === 'reef-entry') this.openReef();
+      else if (this.nearest.id === 'coral-nursery') this.openReef();
       else if (this.nearest.id.startsWith('pot:')) this.handleCrabPotInteract(this.nearest.id.slice('pot:'.length));
       else {
         this.actionLabel = this.nearest.label;
@@ -250,6 +280,7 @@ export class BeachScene extends GameScene {
       this.save.calendar.timeMinutes = this.clock.time.minutes;
       this.refreshWorldState();
       this.refreshTideStrip();
+      this.refreshReefMeshes();
       this.rebuildTargets();
     }
     if (tick.collapsed) {
@@ -328,6 +359,27 @@ export class BeachScene extends GameScene {
       radius: 3.0,
       priority: 4,
     });
+    // Prompt 022: reef snorkel entry — only labelled "open" when tide allows.
+    const access = this.currentReefAccess();
+    base.push({
+      id: 'reef-entry',
+      kind: 'water-entry',
+      label: access === 'closed' ? 'Reef (closed at high tide)' : 'Wade into the reef',
+      x: 4,
+      z: -10,
+      radius: 3.0,
+      priority: 3,
+    });
+    // Coral nursery on the shore — used to donate coral-fragment.
+    base.push({
+      id: 'coral-nursery',
+      kind: 'prop',
+      label: 'Coral nursery',
+      x: -4,
+      z: -7,
+      radius: 1.6,
+      priority: 2,
+    });
     // Live crab pots interactable.
     for (const pot of Object.values(this.save.crabPots ?? {})) {
       if (pot.sceneKey !== 'Beach') continue;
@@ -367,6 +419,115 @@ export class BeachScene extends GameScene {
       mesh.dispose();
       this.entityMeshes.delete(suffix);
     }
+  }
+
+  private currentReefAccess(): ReefAccess {
+    return reefAccess(this.tide, this.weather?.id ?? null);
+  }
+
+  private refreshReefMeshes(): void {
+    if (!this.scene) return;
+    for (const m of this.reefMeshes) m.dispose();
+    this.reefMeshes = [];
+    const tier = this.save.reef?.tier ?? 0;
+    if (this.currentReefAccess() === 'closed') return;
+    // Vibrant colors as tier increases; pale gray at tier 0.
+    const palette = [
+      PALETTE.cliff, // tier 0 dead
+      PALETTE.cliff.scale(1.05),
+      PALETTE.accent,
+      PALETTE.warmLight,
+      PALETTE.warmLight.scale(1.1),
+    ];
+    const color = palette[tier] ?? PALETTE.cliff;
+    for (let i = 0; i < 4; i++) {
+      const r = MeshBuilder.CreateCylinder(`reef-${i}`, { height: 0.5, diameter: 0.7 }, this.scene);
+      r.position.set(2 + i * 0.6, 0.25, -11 + (i % 2) * 0.5);
+      r.material = flatMaterial(this.scene, `reef-${i}-mat`, color, 0.35);
+      this.reefMeshes.push(r);
+    }
+  }
+
+  private openReef(): void {
+    // Always open the panel — when the reef is closed (high tide / storm),
+    // the Harvest button is disabled but donation + nursery still work.
+    this.reefOpen = true;
+    this.reefOxygen = createOxygen();
+    this.reefSeaLifeEncounter = null;
+    this.renderReefPanel();
+  }
+
+  private renderReefPanel(): void {
+    const reef = this.save.reef ?? { health: 0, fragmentsDonated: 0, tier: 0 as 0 | 1 | 2 | 3 | 4 };
+    const onHand = countItem(this.save.inventory, 'coral-fragment');
+    const FRAGMENTS_PER_TIER = 8;
+    const toNext = Math.max(0, FRAGMENTS_PER_TIER - (reef.fragmentsDonated % FRAGMENTS_PER_TIER));
+    this.ctx.overlay.showReefPanel({
+      access: this.currentReefAccess(),
+      oxygen: this.reefOxygen.value / this.reefOxygen.max,
+      oxygenWarning: this.reefOxygen.warning,
+      reefHealth: reef.health,
+      reefTier: reef.tier,
+      fragmentsOnHand: onHand,
+      fragmentsToNextTier: reef.tier >= 4 ? 0 : toNext,
+      lastEncounter: this.reefSeaLifeEncounter,
+      onHarvest: () => this.handleReefHarvest(),
+      onSurface: () => this.handleReefSurface(),
+      onDonate: () => this.handleReefDonate(),
+      onClose: () => {
+        this.reefOpen = false;
+        this.refreshHud();
+      },
+    });
+  }
+
+  private tickReef(dt: number): void {
+    // Submerged whenever the panel is up — surface refills.
+    this.reefOxygen = tickOxygen({ state: this.reefOxygen, submerged: true, dt });
+    if (this.reefOxygen.value <= 0) {
+      // Force-surface and warn.
+      this.reefOxygen = createOxygen();
+      this.reefSeaLifeEncounter = 'You gasp at the surface to catch your breath.';
+    }
+    // Re-render twice a second for the live oxygen bar.
+    if (Math.floor((this.absoluteMinutesNow() * 2 + this.reefOxygen.value) % 2) === 0) {
+      this.renderReefPanel();
+    }
+  }
+
+  private handleReefHarvest(): void {
+    this.reefHarvestSeed += 1;
+    const itemId = reefSeasonalRoll(this.save.calendar.season, this.reefHarvestSeed);
+    const added = addItem(this.save.inventory, itemId, 1, 0);
+    this.save.inventory = added.container;
+    recordSkillXp('foraging', 4);
+    // 20% chance per harvest to surface a harmless sea-life encounter.
+    if ((this.reefHarvestSeed * 7) % 5 === 0) {
+      const enc = REEF_SEA_LIFE[this.reefHarvestSeed % REEF_SEA_LIFE.length]!;
+      this.reefSeaLifeEncounter = enc.label;
+    }
+    // Harvest costs 6 seconds of oxygen.
+    this.reefOxygen = tickOxygen({ state: this.reefOxygen, submerged: true, dt: 6 });
+    persistActiveSave();
+    this.renderReefPanel();
+  }
+
+  private handleReefSurface(): void {
+    this.reefOxygen = createOxygen();
+    this.reefSeaLifeEncounter = null;
+    this.renderReefPanel();
+  }
+
+  private handleReefDonate(): void {
+    const onHand = countItem(this.save.inventory, 'coral-fragment');
+    if (onHand === 0) return;
+    const r = removeItem(this.save.inventory, 'coral-fragment', onHand);
+    this.save.inventory = r.container;
+    const reef = donateFragments(this.save.reef ?? { health: 0, fragmentsDonated: 0, tier: 0 }, r.removed);
+    this.save.reef = reef;
+    persistActiveSave();
+    this.refreshReefMeshes();
+    this.renderReefPanel();
   }
 
   private absoluteMinutesNow(): number {
