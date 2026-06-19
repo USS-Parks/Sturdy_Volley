@@ -207,6 +207,41 @@ Playwright workers set to 1 (Babylon software-WebGL is CPU-heavy).
 
 **Prompt status under Babylon:** P-001 (3D scaffold + title diorama +
 canvas-pixel checks) ✓ · P-002 (data pipeline) ✓ unchanged · P-003 (scene
-manager + saves) ✓ on Babylon. Prompt 004+ (3D world renderer onward) are
-**paused pending the art track**; meantime work is the renderer-agnostic
-simulation core.
+manager + saves) ✓ on Babylon.
+
+---
+
+## Prompt 004 — Playable 3D Breakpoint Farm (core) (2026-06-18)
+
+After the volleyball scrub, resumed the roster in order. P-001/002/003 verified
+satisfied on Babylon; built the core of P-004 — the first walkable 3D scene.
+
+- **`engine/farmGrid.ts`** — `FarmGrid`: deterministic, addressable farm cells
+  (`get`/`set`/`inBounds`/`index`/`cellToWorld`/`worldToCell`/`forEach`),
+  centered-grid world mapping. Pure, 8 unit tests (the P-004 "farm cells remain
+  deterministic and addressable" criterion).
+- **FarmScene** rewritten from a placeholder card into a real 3D scene: grass
+  terrain, a grid-aware tilled soil plot (rendered from `FarmGrid`), placeholder
+  farmhouse + roof, trees, a tide-fed pond, and invisible world-bound walls.
+  A third-person **player capsule** walkable by **keyboard (WASD/arrows)** and
+  **touch** (canvas floating-joystick → `computeMoveVector`), moved
+  camera-relative via Babylon **ellipsoid collisions** (`moveWithCollisions`)
+  against the house/trees/pond/bounds. **Follow camera** (`ArcRotateCamera`
+  `lockedTarget`, no jitter). Theme-3 fog + warm/cool lighting. HUD + pause menu
+  (Town / Beach / Mine / Save & quit) preserved.
+- New Theme-3 `soil` palette color.
+
+**Acceptance criteria (core met):**
+- [x] Player walks the farm with keyboard + touch (keyboard e2e-verified on
+  desktop + mobile; touch joystick wired via `computeMoveVector`)
+- [x] Collision correct for the present props (building, trees, water, bounds)
+- [x] Camera follows without jitter (lockedTarget follow)
+- [x] Farm cells remain deterministic + addressable (FarmGrid + tests)
+- [x] Mobile viewport keeps player + UI readable (mobile e2e passes)
+- [ ] *Remaining for a later P-004 pass:* animated water, instanced grass,
+  doors/region exits, more collision prop types (fences/rocks/slopes/stairs/
+  cliffs), camera clip-avoidance + indoor reframe.
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest `51/51`
+(8 files) · build `dist/` · Playwright `10/10` (desktop + mobile, incl. the 3D
+farm walk test + canvas-pixel check).

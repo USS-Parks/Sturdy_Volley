@@ -24,6 +24,7 @@ export const PALETTE = {
   grassAlt: new Color3(0.29, 0.56, 0.34),
   sea: new Color3(0.16, 0.43, 0.56),
   sand: new Color3(0.85, 0.76, 0.54),
+  soil: new Color3(0.42, 0.3, 0.19),
   cliff: new Color3(0.37, 0.34, 0.31),
   wood: new Color3(0.71, 0.46, 0.29),
   roof: new Color3(0.55, 0.25, 0.2),
