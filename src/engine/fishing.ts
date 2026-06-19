@@ -209,10 +209,12 @@ export function stepMinigame(input: MinigameInput): MinigameStep {
     progress,
     fishVelocity,
   };
+  // Only fire `lost` when the player had progress and just slipped to
+  // zero — never on the very first tick where progress starts at 0.
   return {
     state: next,
     caught: progress >= 1,
-    lost: progress <= 0 && state.progress < PROGRESS_RATE * dt,
+    lost: progress <= 0 && state.progress > SLIP_RATE * dt * 2,
   };
 }
 

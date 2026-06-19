@@ -46,6 +46,12 @@ import {
 import { recordRelationshipChange } from '../engine/gameState';
 import { removeItem } from '../engine/inventory';
 import { hoursFor, isShopOpen, type ShopHours } from '../engine/shops';
+import {
+  activeBehaviorFor as npcActiveBehaviorFor,
+  pickMoment as npcPickMoment,
+  profileFor as npcProfileFor,
+  reactiveGreeting as npcReactiveGreeting,
+} from '../engine/npcLifeBehaviors';
 
 interface TownBuilding {
   id: string;
@@ -551,6 +557,10 @@ export class TownScene extends GameScene {
     let line = `${status} · energy ${stamina}%`;
     if (this.actionTimer > 0) line += ` · ✔ ${this.actionLabel}`;
     else if (this.nearest) line += ` · [E] ${this.nearest.label}`;
+    // Prompt 024: rotate a small "unscripted moment" line behind the
+    // status so the town reads as inhabited.
+    const moment = npcPickMoment(this.clock.time.minutes);
+    if (moment) line += ` · ${moment}`;
     this.ctx.overlay.showHud('Ballast Bay', line, () => this.openMenu());
   }
 
@@ -677,10 +687,26 @@ export class TownScene extends GameScene {
     }
 
     const points = this.save.relationships[seed.id] ?? 0;
+    // Prompt 024: prepend a reactive greeting + active-behavior banner to
+    // the dialogue body so NPCs feel responsive to recent actions and
+    // present at their daily-life task.
+    const greeting = npcReactiveGreeting(seed.id, {
+      visitedReefToday: false,
+      visitedMineToday: this.save.location.sceneKey === 'Mine',
+      pettedAnimalToday: this.save.pet?.pettedToday ?? false,
+      caughtFirstFishToday: Object.keys(this.save.firstCatchSeen ?? {})[0],
+      matchedSeason: this.save.calendar.season,
+    });
+    const activeBehavior = npcActiveBehaviorFor(seed.id, this.clock.time.minutes, this.save.calendar.season);
+    const profile = npcProfileFor(seed.id);
+    const lifeBanner = activeBehavior && profile
+      ? `[${profile.workTrade}] `
+      : '';
+    const decoratedBody = greeting ? `${lifeBanner}${greeting}\n\n${lastLine}` : `${lifeBanner}${lastLine}`;
     this.ctx.overlay.showDialoguePanel({
       speaker: seed.name,
       portraitColor: seed.portraitCss,
-      body: lastLine,
+      body: decoratedBody,
       rapportLevel: relationshipLevel(points),
       rapportMaxLevel: 10,
       tierFlash,

@@ -40,6 +40,18 @@ import {
   type MineHealthState,
   type OreNode,
 } from '../engine/mine';
+import {
+  CAVE_CRITTER_LOOT,
+  WEAPON_DEFS,
+  applyHitToPlayer,
+  createPlayerCombat,
+  rollLoot,
+  swingHit,
+  tickIframes,
+  tickTelegraph,
+  type CreatureSnapshot,
+  type WeaponId,
+} from '../engine/combat';
 
 interface MineDebugApi {
   level: () => number;
@@ -50,6 +62,10 @@ interface MineDebugApi {
   jump: (level: number) => void;
   swing: (nodeId: string) => void;
   checkpoints: () => number[];
+  creatures: () => Array<{ id: string; hp: number; phase: string; x: number; z: number }>;
+  forceSwing: () => void;
+  teleport: (x: number, z: number) => void;
+  equipWeapon: (id: 'fists' | 'driftwood-club' | 'tide-blade' | 'storm-spear') => void;
 }
 
 /**
@@ -79,6 +95,12 @@ export class MineScene extends GameScene {
   private readonly oreMeshes = new Map<string, AbstractMesh>();
   private readonly hazardMeshes: AbstractMesh[] = [];
   private readonly creatureMeshes: AbstractMesh[] = [];
+  /** Active creature snapshots aligned with `creatureMeshes` order. */
+  private creatures: CreatureSnapshot[] = [];
+  private playerCombat = createPlayerCombat();
+  private swingCooldown = 0;
+  private equippedWeapon: WeaponId = 'fists';
+  private fPrev = false;
   private readonly pressed = new Set<string>();
   private readonly onKeyDown = (e: KeyboardEvent) => this.pressed.add(e.key.toLowerCase());
   private readonly onKeyUp = (e: KeyboardEvent) => this.pressed.delete(e.key.toLowerCase());
@@ -149,6 +171,15 @@ export class MineScene extends GameScene {
       },
       swing: (nodeId: string) => this.handleSwing(nodeId),
       checkpoints: () => [...(this.save.mineProgress?.checkpoints ?? [])],
+      creatures: () =>
+        this.creatures.map((c) => ({ id: c.id, hp: c.hp, phase: c.phase, x: c.x, z: c.z })),
+      forceSwing: () => this.performSwing(),
+      teleport: (x: number, z: number) => {
+        this.player.position.set(x, 0.9, z);
+      },
+      equipWeapon: (id: 'fists' | 'driftwood-club' | 'tide-blade' | 'storm-spear') => {
+        this.equippedWeapon = id;
+      },
     };
   }
 
@@ -193,6 +224,7 @@ export class MineScene extends GameScene {
       this.hazardMeshes.push(haz);
     }
     const creatureCount = Math.floor(def.creatureDensity * 5);
+    this.creatures = [];
     for (let i = 0; i < creatureCount; i++) {
       const x = ((i * 53) % 16) - 8;
       const z = ((i * 89) % 16) - 8;
@@ -200,6 +232,15 @@ export class MineScene extends GameScene {
       c.position.set(x, 0.3, z);
       c.material = flatMaterial(this.scene!, `mine-creature-${def.index}-${i}-mat`, PALETTE.marsh, 0.25);
       this.creatureMeshes.push(c);
+      this.creatures.push({
+        id: `c-${def.index}-${i}`,
+        hp: 12 + def.index,
+        maxHp: 12 + def.index,
+        phase: 'idle',
+        phaseTime: 1.4 + ((i * 17) % 30) / 10,
+        x,
+        z,
+      });
     }
     if (def.checkpoint) {
       this.save.mineProgress = recordCheckpoint(this.save.mineProgress!, def.index);
@@ -254,6 +295,10 @@ export class MineScene extends GameScene {
     if (this.actionTimer > 0) this.actionTimer -= dt;
     const tick = tickClock(this.clock, dt);
     this.clock = tick.state;
+    // Combat tick (Prompt 024). Always advance creature telegraphs +
+    // i-frames so the player can swing without waiting for a clock minute.
+    this.tickCombat(dt);
+
     if (tick.advancedMinutes > 0) {
       this.save.calendar.timeMinutes = this.clock.time.minutes;
       this.refreshWorldState();
@@ -343,6 +388,97 @@ export class MineScene extends GameScene {
       },
       formatWorldStatus(this.save, { weather: this.weather, tide: this.tide, gold: this.save.wallet.gold }),
     );
+  }
+
+  private tickCombat(dt: number): void {
+    this.swingCooldown = Math.max(0, this.swingCooldown - dt);
+    this.playerCombat = tickIframes(this.playerCombat, dt);
+
+    // Advance each creature telegraph and resolve strikes against the player.
+    for (let i = 0; i < this.creatures.length; i++) {
+      const next = tickTelegraph(this.creatures[i]!, dt);
+      this.creatures[i] = next.creature;
+      // Sync mesh transform (knockback may have moved it).
+      const mesh = this.creatureMeshes[i];
+      if (mesh) {
+        mesh.position.x = next.creature.x;
+        mesh.position.z = next.creature.z;
+        // Visual cue: scale up subtly during windup.
+        mesh.scaling.x = next.creature.phase === 'windup' ? 1.3 : 1;
+        mesh.scaling.z = next.creature.phase === 'windup' ? 1.3 : 1;
+      }
+      // On a strike, check overlap with player and apply damage.
+      if (next.striking) {
+        const dx = next.creature.x - this.player.position.x;
+        const dz = next.creature.z - this.player.position.z;
+        if (Math.hypot(dx, dz) < 1.3) {
+          const hit = applyHitToPlayer({ state: this.playerCombat, damage: 6, dt });
+          this.playerCombat = hit.state;
+          if (hit.damaged) {
+            this.mineHealth = hurtPlayer(this.mineHealth, 6);
+            if (this.mineHealth.hp === 0 || hit.defeated) {
+              this.actionLabel = 'You stumbled out of the mine — recover on the farm.';
+              this.actionTimer = 1.8;
+              this.goTo('Farm', { entry: 'farmhouse-door' });
+              return;
+            }
+          }
+        }
+      }
+    }
+
+    // Player F-key swing.
+    const swingPressed = this.pressed.has('f');
+    if (swingPressed && !this.fPrev && this.swingCooldown === 0) {
+      this.performSwing();
+    }
+    this.fPrev = swingPressed;
+  }
+
+  private performSwing(): void {
+    const weapon = WEAPON_DEFS[this.equippedWeapon];
+    // Find nearest creature within reach.
+    let bestIndex = -1;
+    let bestDist = Infinity;
+    for (let i = 0; i < this.creatures.length; i++) {
+      const c = this.creatures[i]!;
+      const d = Math.hypot(c.x - this.player.position.x, c.z - this.player.position.z);
+      if (d < bestDist) {
+        bestDist = d;
+        bestIndex = i;
+      }
+    }
+    if (bestIndex < 0 || bestDist > 1.8) {
+      this.swingCooldown = weapon.cooldown;
+      this.actionLabel = `Swing whiffs`;
+      this.actionTimer = 0.8;
+      return;
+    }
+    const result = swingHit({
+      weapon,
+      creature: this.creatures[bestIndex]!,
+      playerX: this.player.position.x,
+      playerZ: this.player.position.z,
+    });
+    this.creatures[bestIndex] = result.creature;
+    this.swingCooldown = weapon.cooldown;
+    if (result.downed) {
+      const lootSeed = (this.save.mineProgress?.currentLevel ?? 0) * 17 + bestIndex * 11;
+      const itemId = rollLoot(CAVE_CRITTER_LOOT, lootSeed);
+      const added = addItem(this.save.inventory, itemId, 1, 0);
+      this.save.inventory = added.container;
+      const mesh = this.creatureMeshes[bestIndex];
+      if (mesh) mesh.dispose();
+      this.creatureMeshes.splice(bestIndex, 1);
+      this.creatures.splice(bestIndex, 1);
+      this.actionLabel = `Felled a critter (+${itemId})`;
+      this.actionTimer = 1.4;
+      recordSkillXp('combat', 6);
+      persistActiveSave();
+    } else {
+      this.actionLabel = `${weapon.name} hit (${result.damage})`;
+      this.actionTimer = 0.8;
+    }
   }
 
   private handleSwing(nodeId: string): void {

@@ -9,6 +9,10 @@ interface MineApi {
   jump: (level: number) => void;
   swing: (nodeId: string) => void;
   checkpoints: () => number[];
+  creatures: () => Array<{ id: string; hp: number; phase: string; x: number; z: number }>;
+  forceSwing: () => void;
+  teleport: (x: number, z: number) => void;
+  equipWeapon: (id: 'fists' | 'driftwood-club' | 'tide-blade' | 'storm-spear') => void;
 }
 interface SturdyVolleyApi {
   manager: { goTo: (k: string, d?: unknown, fade?: boolean) => Promise<void> };

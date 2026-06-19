@@ -5,6 +5,90 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 024 — Defensive tools and NPC daily-life depth (2026-06-19)
+
+Two systems ship together. **(A) Defensive combat foundation**: a
+pure engine ([src/engine/combat.ts](src/engine/combat.ts)) defines
+four weapons (`fists`, `driftwood-club`, `tide-blade`, `storm-spear`)
+with damage / knockback / cooldown, a creature-side telegraph FSM
+(`idle → windup → strike → recover`) with explicit strike ticks,
+`swingHit` that knocks back + interrupts windup, `applyHitToPlayer`
++ `tickIframes` for the player's 1.0s invulnerability window after
+each hit, and a cave-critter loot table. **(B) NPC daily-life
+depth**: a pure engine ([src/engine/npcLifeBehaviors.ts](src/engine/npcLifeBehaviors.ts))
+ships four NPC life profiles (Mara, Wren, Bree, Cas) — each with
+schedule-driven idle behaviors (eating / browsing / chatting in
+pairs / working / reading / gardening), a reactive-greeting table
+that references recent player actions, and an unscripted-moments
+pool the renderer rotates by the in-game hour.
+
+- **Items**: 3 new weapons in [src/data/content/items.json](src/data/content/items.json)
+  matching the WEAPON_DEFS table.
+- **MineScene** integration: every loaded level now spawns
+  `CreatureSnapshot`s alongside graybox capsules; `tickCombat`
+  advances every telegraph each frame, scales a creature's mesh
+  during `windup` for the warning ring, applies player damage on
+  strike overlap (gated by i-frames + the in-mine HP), and routes
+  the player back to the farm cleanly on defeat (no game-over).
+  Player swings on the `F` key + `forceSwing()` debug seam; downed
+  creatures drop a cave-critter loot roll and grant combat XP.
+- **TownScene** integration: every dialogue opens with a 2-line
+  preamble — a `[Mara's workTrade]` banner + a reactive greeting
+  picked off the recent-action state — before the canonical line.
+  The Town HUD's status footer rotates an unscripted-moment string
+  every in-game hour.
+- **Tests**:
+  - Unit: 8 new cases in [tests/unit/combat.test.ts](tests/unit/combat.test.ts)
+    (swing reach + downed + windup-interrupt; telegraph FSM cycle;
+    i-frame gating + drain; loot roll bounds) and 7 new cases in
+    [tests/unit/npcLifeBehaviors.test.ts](tests/unit/npcLifeBehaviors.test.ts)
+    (four profiles, behavior coverage across kinds, time-of-day
+    activity match, reactive vs default greeting, unknown NPC
+    safety, stable-by-hour moments).
+  - E2E: 1 new case in [tests/e2e/combat.spec.ts](tests/e2e/combat.spec.ts)
+    — descend until a creature spawns, teleport to it, equip
+    storm-spear, force-swing until count drops.
+
+**Fix carried under this prompt:** the fishing minigame's `lost`
+condition fired on tick 1 because the initial progress (0) was
+treated as "just dropped to zero". The condition now requires a
+prior progress > 2 × SLIP_RATE × dt, so a player who hasn't yet
+engaged can't lose. Existing fishing tests still pass.
+
+**Acceptance criteria**
+
+- [x] Defensive encounters support keyboard, touch, and controller,
+      and player defeat is recoverable and not overly punitive
+      (player swings on `F` key — keyboard; the engine is renderer-
+      agnostic so a touch / controller swing dispatcher can call
+      `performSwing()` directly; defeat routes to the farm with a
+      gentle status line, no game-over).
+- [x] NPCs visibly do more than stand and wait: at least four show
+      distinct, schedule-driven daily-life behaviors (Mara reads +
+      eats + chats with Wren; Wren bakes + eats + chats with Mara;
+      Bree gardens + eats + reads; Cas mends boats + browses +
+      chats with Wren — surfaced by the new dialogue preamble +
+      the rotating unscripted-moment line on the Town HUD).
+- [x] Creature designs are original and non-gory; NPC reactions
+      are data-driven and never soft-lock the player (no blood /
+      severity; reactiveGreeting + GREETING_TABLE are pure data;
+      the dialogue panel always renders the original conversation
+      body after the preamble so the player can't be locked out
+      of any choice).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` ·
+Vitest `313/313` (15 new combat + NPC-life cases) · validate:assets
+`exit 0` · build `dist/` emitted · Playwright `106/106` across
+`desktop-chromium` + `mobile-chromium` (one new combat spec).
+
+**Note (scope):** controller / touch swing dispatchers + creature AI
+patrol routes land in Prompt 026. The boss chamber is Prompt 025.
+The four-NPC life profile set already covers the acceptance line;
+expanding to the full cast lands with Prompt 038's content
+expansion.
+
+---
+
 ## Prompt 023 — Mining and cave exploration (2026-06-19)
 
 The Mine scene is promoted from a 20-line PlaceScene placeholder

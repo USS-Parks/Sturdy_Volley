@@ -58,5 +58,8 @@
   { "id": "silver-vein", "name": "Silver Vein", "description": "Bright silver ore.", "category": "mineral", "sellPrice": 120, "stackable": true, "tags": ["mine"] },
   { "id": "lampstone", "name": "Lampstone", "description": "A glowing stone from the deep galleries.", "category": "mineral", "sellPrice": 75, "stackable": true, "tags": ["mine"] },
   { "id": "cold-iron", "name": "Cold Iron", "description": "An unusually cold iron, found near rainhall passages.", "category": "mineral", "sellPrice": 180, "stackable": true, "tags": ["mine"] },
-  { "id": "sun-amber", "name": "Sun Amber", "description": "A warm-glowing amber from the deepest atrium.", "category": "mineral", "sellPrice": 320, "stackable": true, "tags": ["mine"] }
+  { "id": "sun-amber", "name": "Sun Amber", "description": "A warm-glowing amber from the deepest atrium.", "category": "mineral", "sellPrice": 320, "stackable": true, "tags": ["mine"] },
+  { "id": "driftwood-club", "name": "Driftwood Club", "description": "A heavy, twice-knot driftwood club.", "category": "gear", "sellPrice": 80, "stackable": false, "tags": ["weapon"] },
+  { "id": "tide-blade", "name": "Tide Blade", "description": "A short blade cold-forged from salt-iron.", "category": "gear", "sellPrice": 220, "stackable": false, "tags": ["weapon"] },
+  { "id": "storm-spear", "name": "Storm Spear", "description": "A long spear that crackles in damp air.", "category": "gear", "sellPrice": 380, "stackable": false, "tags": ["weapon"] }
 ]
