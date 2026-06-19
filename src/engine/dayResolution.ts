@@ -11,6 +11,8 @@ import type { Crop, Festival, Item, Npc, Weather } from '../data/schemas';
 import type { DayLedger } from './gameState';
 import { buildItemCatalog, containerSellValue } from './itemCatalog';
 import { advanceCrops, buildCropIndex } from './soil';
+import { advanceWorld, type RegionForageTable } from './forage';
+import { absoluteDay } from './timeSystem';
 
 /** Sync from the save's flat `calendar` into the timeSystem's `GameTime`. */
 export function getGameTime(save: SaveData): GameTime {
@@ -65,6 +67,7 @@ export interface ResolveDayInput {
   npcs: readonly Npc[];
   items: readonly Item[];
   crops: readonly Crop[];
+  forageTables?: readonly RegionForageTable[];
   todayWeatherId?: string | null;
   penalty?: CollapsePenalty;
 }
@@ -77,6 +80,7 @@ export interface ResolveDayResult {
   cropsGrew: number;
   cropsMatured: number;
   cropsKilled: number;
+  forageSpawned: number;
 }
 
 /**
@@ -108,6 +112,14 @@ export function resolveDay(input: ResolveDayInput): ResolveDayResult {
   });
   save.plantings = cropResult.plantings;
 
+  const worldResult = advanceWorld({
+    entities: save.worldEntities,
+    newSeason: nextTime.season,
+    tables: input.forageTables ?? [],
+    seed: absoluteDay(nextTime),
+  });
+  save.worldEntities = worldResult.entities;
+
   const tomorrowFestival = festivalOn(nextTime, festivals);
   const tomorrowBirthdays = birthdaysOn(nextTime, npcs).map((n) => n.name);
 
@@ -134,6 +146,12 @@ export function resolveDay(input: ResolveDayInput): ResolveDayResult {
     );
   }
 
+  if (worldResult.spawned > 0) {
+    summary.notices.push(
+      `${worldResult.spawned} forage item${worldResult.spawned === 1 ? '' : 's'} appeared in the wild.`,
+    );
+  }
+
   return {
     summary,
     nextTime,
@@ -142,6 +160,7 @@ export function resolveDay(input: ResolveDayInput): ResolveDayResult {
     cropsGrew: cropResult.grew,
     cropsMatured: cropResult.matured,
     cropsKilled: cropResult.killed,
+    forageSpawned: worldResult.spawned,
   };
 }
 

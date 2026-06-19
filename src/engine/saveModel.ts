@@ -72,6 +72,17 @@ export const saveSchema = z
     tilledCells: z.array(z.string()),
     plantings: z.record(z.string(), plantingSchema),
     toolLevels: z.record(z.string(), z.number().int().min(0).max(3)),
+    worldEntities: z.record(
+      z.string(),
+      z
+        .object({
+          kind: z.enum(['forage', 'tree', 'stump', 'grass', 'debris']),
+          itemId: z.string().nullable(),
+          age: z.number().int().nonnegative(),
+          meta: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
+        })
+        .strict(),
+    ),
     relationships: z.record(z.string(), z.number()),
     skills: z.record(z.string(), z.number()),
     flags: z.record(z.string(), z.union([z.boolean(), z.number(), z.string()])),
@@ -128,6 +139,11 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
       sickle: 0,
       'fishing-rod': 0,
       'defender-blade': 0,
+    },
+    worldEntities: {
+      'Farm:7,2': { kind: 'tree', itemId: 'driftwood', age: 0 },
+      'Farm:8,3': { kind: 'tree', itemId: 'driftwood', age: 0 },
+      'Farm:5,5': { kind: 'debris', itemId: 'driftwood', age: 0 },
     },
     relationships: {},
     skills: {},

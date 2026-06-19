@@ -248,6 +248,44 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## Prompt 010 — Foraging, debris, trees, and regrowth (2026-06-19, core)
+
+Stood up the forage / debris / tree-regrowth layer: a `WorldEntity` map
+shared by every scene, deterministic per-day spawning + regrowth via
+`advanceWorld`, and a `collect` rules engine for the player-side rewards.
+
+- **`engine/forage.ts`** — pure: `EntityKind`, `WorldEntity`, `EntityMap`,
+  `advanceWorld` (regrow stumps after `TREE_REGROW_DAYS = 5`, spawn seasonal
+  forage at `FORAGE_SPAWN_CHANCE = 0.35` into empty cells, spread grass at
+  `GRASS_SPREAD_CHANCE = 0.2`), `collect` (forage/grass yield 1 immediately;
+  debris yields 1 at hardness ≥ 1; trees become stumps + 3 wood at hardness
+  ≥ 2; stumps yield 1 at hardness ≥ 1), `forageQualityRoll(seed, skill)` with
+  skill-bias toward higher tiers. 11 unit tests.
+- **`engine/saveModel.ts`** — `worldEntities: Record<key, WorldEntity>` keyed
+  by `"{sceneKey}:{col},{row}"`. New saves seed two trees + one debris pile
+  on the Farm to give Prompt 010 something to swing the axe at.
+- **`engine/dayResolution.ts`** — `resolveDay` accepts `forageTables` and now
+  walks `advanceWorld` after the calendar rolls. Day summary surfaces
+  "N forage items appeared in the wild." when any spawn.
+
+**Acceptance criteria (core met):**
+- [x] Forage spawns in valid map regions (`RegionForageTable.cellKeys` + the
+  `FORAGE_SPAWN_CHANCE` roll only fills empty cells; deterministic seed = the
+  absolute day so save/load doesn't shift the spawn pattern).
+- [x] Trees and grass regrow over time (stumps → trees after 5 days; grass
+  spreads via `GRASS_SPREAD_CHANCE`; unit-tested).
+- [x] Foraged item quality can be influenced by skill (`forageQualityRoll`
+  applies a +0.02 bias per foraging skill level, capped at +0.3 at level 15;
+  unit-tested by comparing skill-0 vs skill-12 totals over 100 rolls).
+- [ ] Scene-side spawn rendering + collect-on-interact wired into Beach /
+  Marsh / Ridge as those scenes ship (the engine + save / day-resolution
+  contract is the stable surface).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`164/164` (21 files, +10 new specs) · build OK.
+
+---
+
 ## Prompt 009 — Tools and upgrades (2026-06-19, core)
 
 Stood up the tool + upgrade data layer: a typed catalog (`ToolId`), per-level
