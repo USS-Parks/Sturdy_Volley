@@ -248,6 +248,43 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## Prompt 012 — Dialogue engine (2026-06-19, core)
+
+Stood up the dialogue graph engine: typed nodes with optional conditions,
+effects, and branching choices; a deterministic runner that walks the graph
+until a choice or end; line-seen tracking (per-day + per-ever); rapport,
+flag, item-check, weather, season conditions; rapport / flag / item-consume
+/ quest-start / cutscene-start effects.
+
+- **`engine/dialogue.ts`** — pure: `DialogueGraph`, `DialogueNode`,
+  `DialogueChoice`, `DialogueState`, `Condition` (flag / rapportAtLeast /
+  hasItem / weather / season / lineNotSeenToday / lineNotSeenEver),
+  `Effect` (setFlag / addRapport / consumeItem / startQuest /
+  startCutscene / markLineSeenToday / markLineSeenEver), `run` walks until
+  a choice node and emits a flat `DialogueEvent[]`; `pickChoice` resumes
+  from the chosen branch and returns the next event run. Cycle-guarded so a
+  bad graph can't infinite-loop. 6 unit tests covering condition eval, effect
+  application, the runner, and the choice resumption.
+
+**Acceptance criteria (core met):**
+- [x] Dialogue supports daily repeats, once-only lines, weather lines, and
+  relationship lines (`lineNotSeenToday`, `lineNotSeenEver`, `weather`,
+  `rapportAtLeast` conditions cover the four categories).
+- [x] Choices can set flags and change rapport (`addRapport`, `setFlag`
+  effects on `DialogueChoice.effects`; unit-tested via the "yes / no /
+  rich" branch).
+- [x] Dialogue can start quests and cutscenes (`startQuest`, `startCutscene`
+  effects emitted as `DialogueEvent` for callers to route; runner doesn't
+  consume them so they survive to the renderer wave).
+- [ ] Renderer-side portraits, typewriter option, scene triggers wire into
+  the UIOverlay in the dialogue-UI wave (the engine emits the typed event
+  stream; the overlay panel + typewriter land next to it).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`179/179` (23 files, +6 new specs) · build OK.
+
+---
+
 ## Prompt 011 — NPC schedule engine (2026-06-19, core)
 
 Stood up the schedule + abstract-pathing engine plus four NPC schedules
