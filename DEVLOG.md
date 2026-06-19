@@ -5,6 +5,77 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 018 — Machines and artisan goods (2026-06-19)
+
+Five-machine artisan layer ships end-to-end on the Farm. A pure engine
+([src/engine/machines.ts](src/engine/machines.ts)) defines a per-kind
+recipe catalog (`brine-barrel`, `herb-dryer`, `cheese-drum`,
+`honey-spinner`, `oil-press`) with input/fuel/process-minutes/output
+quality fields, plus `loadMachine` / `collectMachine` / `statusOf` /
+`remainingMinutes` / `newlyReady` / `isDaylight`. Machine state lives on
+`save.machines: Record<id, MachineState>`; a fresh save seeds one of
+each kind in a cluster along the south Farm fence. The FarmScene builds
+a graybox prop per kind ([src/render/farm-machines.ts](src/render/farm-machines.ts))
+with a coloured "status light" sphere that repaints idle → processing
+→ ready every tick. The overlay's new `showMachinePanel`
+([src/ui/overlay.ts](src/ui/overlay.ts)) renders the live status line,
+load buttons (disabled with a tooltip when an input or fuel is short, or
+the herb dryer is asked to run after dark), and a Collect button when
+the recipe finishes. A minimal WebAudio one-shot
+([src/audio/cues.ts](src/audio/cues.ts)) plays a "ready" chime when any
+machine crosses the ready threshold during a tick — the audio
+architecture proper lands with Prompt 035.
+
+- **Items**: 4 new ([src/data/content/items.json](src/data/content/items.json))
+  — `raw-honeycomb`, `honey-jar`, `sunmelon-oil`, `dried-harborlime`.
+- **Save model**: `machines: Record<string, MachineState>` with
+  `.default({})` ([src/engine/saveModel.ts](src/engine/saveModel.ts));
+  `createNewSave` seeds the five-machine cluster.
+- **FarmScene**: interaction targets + open/render/load/collect panel
+  flow + overnight catch-up after sleep
+  ([src/scenes/FarmScene.ts](src/scenes/FarmScene.ts)). Init-order fix:
+  `refreshMachineMeshes` + `absoluteMinutesNow` now run *after* the
+  clock is initialised on scene enter (was the cause of a brief regression
+  in the farm e2e suite during this prompt's development).
+- **Debug API**: `machines()`, `openMachine(id)`, `grantItem(id, qty)`,
+  `fastForwardMinutes(minutes)` exposed for the e2e.
+- **Tests**:
+  - Unit: 10 new cases in [tests/unit/machines.test.ts](tests/unit/machines.test.ts)
+    covering catalog shape, recipe lookup, load (including fuel + dark
+    rejection), status transitions, collect, the `newlyReady` window,
+    and a save round-trip.
+  - E2E: 2 new cases in [tests/e2e/machines.spec.ts](tests/e2e/machines.spec.ts)
+    — fresh-save cluster, and a load → fast-forward → collect cycle on
+    the cheese drum.
+
+**Acceptance criteria**
+
+- [x] Brine barrel, herb dryer, cheese drum, honey spinner, and oil
+      press work (`MACHINE_CATALOG` covers all five; each has at least
+      one recipe and the FarmScene cluster surfaces them).
+- [x] Machines process across day transitions (overnight time advance
+      is checked at sleep-summary continue; the `newlyReady` ledger
+      compares the pre-sleep tick to the next-morning tick and fires
+      the ready chime + flash for any machine that crossed the
+      threshold while the player was asleep).
+- [x] Audio and visual states make readiness obvious (status-light
+      colour transitions on every tick via `paintMachineStatus`; a
+      WebAudio triangle-wave chime plays once per machine that becomes
+      ready in a tick window).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` ·
+Vitest `243/243` (10 new machine cases) · validate:assets `exit 0` ·
+build `dist/` emitted · Playwright `74/74` across `desktop-chromium` +
+`mobile-chromium` (two new machines specs).
+
+**Note (audio scope):** the audio system proper is Prompt 035. The
+chime here is a deliberate, ~1 KB WebAudio one-shot scoped to the
+ready transition so the acceptance line ships with a real audible cue.
+The cue is silent under jsdom / Node tests because the helper bails
+when no `AudioContext` is available.
+
+---
+
 ## Prompt 017 — Crafting and recipes (2026-06-19)
 
 Crafting subsystem ships end-to-end: a pure engine, a known-recipes UI on a

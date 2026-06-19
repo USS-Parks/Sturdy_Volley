@@ -15,6 +15,10 @@ declare global {
       worldEntities: () => Record<string, { kind: string; itemId: string | null; age: number }>;
       warpToEntity: (suffix: string) => boolean;
       entityAnchors: () => Record<string, { x: number; z: number }>;
+      machines: () => Record<string, { kind: string; status: string; recipeIndex: number | null }>;
+      openMachine: (id: string) => void;
+      grantItem: (itemId: string, qty: number) => void;
+      fastForwardMinutes: (minutes: number) => void;
     };
   }
 }

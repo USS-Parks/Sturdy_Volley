@@ -59,8 +59,27 @@ import {
   farmEntitySuffix,
   FARM_ENTITY_ANCHORS,
 } from '../render/farm-entities';
+import { buildMachineMesh, paintMachineStatus, type MachineMesh } from '../render/farm-machines';
+import {
+  MACHINE_CATALOG,
+  collectMachine,
+  loadMachine,
+  newlyReady,
+  remainingMinutes,
+  statusOf,
+} from '../engine/machines';
+import { absoluteDay } from '../engine/timeSystem';
+import { playReadyChime } from '../audio/cues';
 
 const FARM_HALF = 20;
+
+function formatProcessLabel(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
 const TOOLS = ['Hoe', 'Watering Can', 'Axe', 'Pick', 'Sickle'] as const;
 /** Parallel ToolId array matching the TOOLS display labels by index. */
 export const FARM_TOOL_IDS: readonly ToolId[] = ['hoe', 'watering-can', 'axe', 'pick', 'sickle'];
@@ -78,6 +97,10 @@ interface DebugApi {
   worldEntities: () => Record<string, { kind: string; itemId: string | null; age: number }>;
   warpToEntity: (suffix: string) => boolean;
   entityAnchors: () => Record<string, { x: number; z: number }>;
+  machines: () => Record<string, { kind: string; status: string; recipeIndex: number | null }>;
+  openMachine: (id: string) => void;
+  grantItem: (itemId: string, qty: number) => void;
+  fastForwardMinutes: (minutes: number) => void;
 }
 
 type PartnerKind = 'chest' | 'shipping-bin' | null;
@@ -122,6 +145,11 @@ export class FarmScene extends GameScene {
   private readonly cropMeshes = new Map<string, BabylonMesh>();
   /** Live meshes for `Farm:*` worldEntities keyed by the bare suffix. */
   private readonly entityMeshes = new Map<string, BabylonMesh>();
+  /** Live machine meshes keyed by machine id; per Prompt 018. */
+  private readonly machineMeshes = new Map<string, MachineMesh>();
+  private machinePanelOpen = false;
+  private machinePanelId: string | null = null;
+  private lastMachineCheckMinutes = 0;
   private readonly homePosition = new Vector3(-8, 0.9, -5.4);
   private readonly plotOrigin = new Vector3(-6, 0, -4);
   private static readonly SCENE_KEY = 'Farm';
@@ -262,6 +290,8 @@ export class FarmScene extends GameScene {
     this.controller = createControllerState();
     this.clock = createTimeClock(getGameTime(save));
     this.refreshWorldState();
+    this.refreshMachineMeshes();
+    this.lastMachineCheckMinutes = this.absoluteMinutesNow();
     this.rebuildInteractionTargets();
 
     // Honor cross-scene entry handoff. Coming back from the farmhouse interior
@@ -335,6 +365,29 @@ export class FarmScene extends GameScene {
         return true;
       },
       entityAnchors: () => ({ ...FARM_ENTITY_ANCHORS }),
+      machines: () => {
+        const out: Record<string, { kind: string; status: string; recipeIndex: number | null }> = {};
+        const now = this.absoluteMinutesNow();
+        for (const [k, m] of Object.entries(this.save.machines ?? {})) {
+          out[k] = { kind: m.kind, status: statusOf(m, now), recipeIndex: m.recipeIndex };
+        }
+        return out;
+      },
+      openMachine: (id: string) => this.openMachine(id),
+      grantItem: (itemId: string, qty: number) => {
+        const r = addItem(this.save.inventory, itemId, qty, 0);
+        this.save.inventory = r.container;
+        persistActiveSave();
+        this.refreshHotbar();
+      },
+      fastForwardMinutes: (minutes: number) => {
+        const next = { ...this.clock.time, minutes: Math.min(this.clock.time.minutes + minutes, 25 * 60) };
+        this.clock = setClockTime(this.clock, next);
+        applyGameTime(this.save, next);
+        this.checkMachineReadyTransitions();
+        this.paintAllMachines();
+        persistActiveSave();
+      },
     };
   }
 
@@ -351,7 +404,7 @@ export class FarmScene extends GameScene {
         return;
       }
     }
-    if (this.menuOpen || this.inventoryOpen || this.dayResolving) {
+    if (this.menuOpen || this.inventoryOpen || this.dayResolving || this.machinePanelOpen) {
       this.clock = pauseClock(this.clock, true);
       this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
       return;
@@ -382,6 +435,8 @@ export class FarmScene extends GameScene {
         this.handlePlotInteract();
       } else if (this.nearest.id.startsWith('entity:')) {
         this.handleEntityInteract(this.nearest.id.slice('entity:'.length));
+      } else if (this.nearest.id.startsWith('machine:')) {
+        this.openMachine(this.nearest.id.slice('machine:'.length));
       } else {
         this.actionLabel = this.nearest.label;
         this.actionTimer = 1.6;
@@ -400,6 +455,8 @@ export class FarmScene extends GameScene {
     if (tick.advancedMinutes > 0) {
       applyGameTime(this.save, this.clock.time);
       this.refreshWorldState();
+      this.checkMachineReadyTransitions();
+      this.paintAllMachines();
     }
     if (tick.collapsed) {
       this.triggerSleep(true);
@@ -837,7 +894,54 @@ export class FarmScene extends GameScene {
         priority: entity.kind === 'forage' ? 3 : 2,
       });
     }
+    // Prompt 018: machine cluster on the Farm.
+    for (const machine of Object.values(this.save.machines ?? {})) {
+      if (machine.sceneKey !== 'Farm') continue;
+      const def = MACHINE_CATALOG[machine.kind];
+      base.push({
+        id: `machine:${machine.id}`,
+        kind: 'machine',
+        label: `Use the ${def.name}`,
+        x: machine.x,
+        z: machine.z,
+        radius: 1.5,
+        priority: 3,
+      });
+    }
     this.targets = base;
+  }
+
+  private absoluteMinutesNow(): number {
+    return absoluteDay(this.clock.time) * 1440 + this.clock.time.minutes;
+  }
+
+  private refreshMachineMeshes(): void {
+    if (!this.scene) return;
+    const live = this.save.machines ?? {};
+    // Remove stale meshes.
+    for (const [id, mesh] of [...this.machineMeshes.entries()]) {
+      if (!live[id] || live[id]!.sceneKey !== 'Farm') {
+        mesh.body.dispose();
+        mesh.statusLight.dispose();
+        this.machineMeshes.delete(id);
+      }
+    }
+    // Spawn missing meshes.
+    for (const m of Object.values(live)) {
+      if (m.sceneKey !== 'Farm') continue;
+      if (this.machineMeshes.has(m.id)) continue;
+      this.machineMeshes.set(m.id, buildMachineMesh(this.scene, m.id, m.kind, { x: m.x, z: m.z }));
+    }
+    this.paintAllMachines();
+  }
+
+  private paintAllMachines(): void {
+    const now = this.absoluteMinutesNow();
+    for (const [id, mesh] of this.machineMeshes) {
+      const state = this.save.machines?.[id];
+      if (!state) continue;
+      paintMachineStatus(mesh, statusOf(state, now));
+    }
   }
 
   private refreshEntityMeshes(): void {
@@ -873,6 +977,142 @@ export class FarmScene extends GameScene {
     const toolId = FARM_TOOL_IDS[this.selectedTool];
     if (!toolId) return 1;
     return hardnessReach(toolId, this.save.toolLevels[toolId] ?? 0);
+  }
+
+  private openMachine(id: string): void {
+    const state = this.save.machines?.[id];
+    if (!state) return;
+    this.machinePanelOpen = true;
+    this.machinePanelId = id;
+    this.renderMachinePanel();
+  }
+
+  private renderMachinePanel(): void {
+    const id = this.machinePanelId;
+    if (!id) return;
+    const state = this.save.machines?.[id];
+    if (!state) return;
+    const def = MACHINE_CATALOG[state.kind];
+    const now = this.absoluteMinutesNow();
+    const status = statusOf(state, now);
+    const content = loadGameContent();
+    const itemsById = new Map(content.items.map((i) => [i.id, i] as const));
+    const nameOf = (iid: string) => itemsById.get(iid)?.name ?? iid;
+    const have = (iid: string) => {
+      let total = 0;
+      for (const s of this.save.inventory.slots) {
+        if (s && s.itemId === iid) total += s.qty;
+      }
+      return total;
+    };
+    let statusLine: string;
+    let collectLabel: string | undefined;
+    let recipes: import('../ui/overlay').MachinePanelRecipeRow[] | undefined;
+    if (status === 'ready') {
+      const recipe = def.recipes[state.recipeIndex!]!;
+      statusLine = `Ready: ${recipe.outputQty}× ${nameOf(recipe.outputItemId)}`;
+      collectLabel = `Collect ${nameOf(recipe.outputItemId)}`;
+    } else if (status === 'processing') {
+      const recipe = def.recipes[state.recipeIndex!]!;
+      const left = remainingMinutes(state, now);
+      const hrs = Math.floor(left / 60);
+      const min = left % 60;
+      statusLine = `Processing ${nameOf(recipe.outputItemId)} · ${hrs > 0 ? `${hrs}h ` : ''}${min}m left`;
+    } else {
+      statusLine = 'Idle — load an input.';
+      recipes = def.recipes.map((recipe, recipeIndex) => {
+        const inputHave = have(recipe.inputItemId);
+        const fuelHave = recipe.fuelItemId ? have(recipe.fuelItemId) : undefined;
+        const inputOk = inputHave >= recipe.inputQty;
+        const fuelOk = recipe.fuelItemId ? (fuelHave ?? 0) >= (recipe.fuelQty ?? 1) : true;
+        const daylightOk = !def.daylightOnly || (now % 1440 >= 6 * 60 && now % 1440 < 20 * 60);
+        const loadable = inputOk && fuelOk && daylightOk;
+        const reason = !inputOk
+          ? 'Missing input'
+          : !fuelOk
+          ? `Missing ${nameOf(recipe.fuelItemId!)}`
+          : !daylightOk
+          ? 'Needs daylight'
+          : undefined;
+        return {
+          recipeIndex,
+          inputItemName: nameOf(recipe.inputItemId),
+          inputQty: recipe.inputQty,
+          inputHave,
+          outputItemName: nameOf(recipe.outputItemId),
+          outputQty: recipe.outputQty,
+          fuelItemName: recipe.fuelItemId ? nameOf(recipe.fuelItemId) : undefined,
+          fuelQty: recipe.fuelQty,
+          fuelHave,
+          processLabel: formatProcessLabel(recipe.processMinutes),
+          loadable,
+          loadDisabledReason: reason,
+        };
+      });
+    }
+    this.ctx.overlay.showMachinePanel({
+      title: def.name,
+      statusLine,
+      recipes,
+      collectLabel,
+      onLoad: (recipeIndex) => this.handleMachineLoad(id, recipeIndex),
+      onCollect: () => this.handleMachineCollect(id),
+      onClose: () => {
+        this.machinePanelOpen = false;
+        this.machinePanelId = null;
+        this.refreshHud();
+      },
+    });
+  }
+
+  private handleMachineLoad(id: string, recipeIndex: number): void {
+    const state = this.save.machines?.[id];
+    if (!state) return;
+    const def = MACHINE_CATALOG[state.kind];
+    const recipe = def.recipes[recipeIndex];
+    if (!recipe) return;
+    const result = loadMachine({
+      state,
+      container: this.save.inventory,
+      itemId: recipe.inputItemId,
+      nowAbsoluteMinutes: this.absoluteMinutesNow(),
+    });
+    if (!result.accepted) return;
+    this.save.machines![id] = result.state;
+    this.save.inventory = result.container;
+    persistActiveSave();
+    this.paintAllMachines();
+    this.renderMachinePanel();
+  }
+
+  private handleMachineCollect(id: string): void {
+    const state = this.save.machines?.[id];
+    if (!state) return;
+    const result = collectMachine({
+      state,
+      container: this.save.inventory,
+      nowAbsoluteMinutes: this.absoluteMinutesNow(),
+    });
+    if (!result.accepted) return;
+    this.save.machines![id] = result.state;
+    this.save.inventory = result.container;
+    persistActiveSave();
+    this.paintAllMachines();
+    this.refreshHotbar();
+    this.renderMachinePanel();
+  }
+
+  private checkMachineReadyTransitions(): void {
+    const now = this.absoluteMinutesNow();
+    const ready = newlyReady(Object.values(this.save.machines ?? {}), this.lastMachineCheckMinutes, now);
+    this.lastMachineCheckMinutes = now;
+    if (ready.length > 0) {
+      playReadyChime();
+      const def = MACHINE_CATALOG[ready[0]!.kind];
+      this.flashAction(
+        ready.length === 1 ? `${def.name} is ready` : `${ready.length} machines ready`,
+      );
+    }
   }
 
   private handleEntityInteract(suffix: string): void {
@@ -1003,6 +1243,9 @@ export class FarmScene extends GameScene {
       this.clock = pauseClock(this.clock, false);
       this.refreshCropMeshes();
       this.refreshEntityMeshes();
+      // Catch up overnight machine transitions before the next tick fires.
+      this.checkMachineReadyTransitions();
+      this.paintAllMachines();
       this.rebuildInteractionTargets();
       this.refreshHud();
     });

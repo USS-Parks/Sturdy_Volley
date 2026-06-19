@@ -27,5 +27,9 @@
   { "id": "turnip-soup", "name": "Turnip Soup", "description": "A briny, warming soup.", "category": "cooking", "sellPrice": 100, "stackable": true, "tags": ["cooked", "buff"] },
   { "id": "sunmelon-juice", "name": "Sunmelon Juice", "description": "A glass of summer.", "category": "cooking", "sellPrice": 85, "stackable": true, "tags": ["cooked"] },
   { "id": "root-stew", "name": "Root Stew", "description": "Slow-cooked roots in goat milk.", "category": "cooking", "sellPrice": 150, "stackable": true, "tags": ["cooked", "buff"] },
-  { "id": "radish-pickle", "name": "Radish Pickle", "description": "Salty-tart pickled radish.", "category": "artisan", "sellPrice": 80, "stackable": true, "tags": ["artisan"] }
+  { "id": "radish-pickle", "name": "Radish Pickle", "description": "Salty-tart pickled radish.", "category": "artisan", "sellPrice": 80, "stackable": true, "tags": ["artisan"] },
+  { "id": "raw-honeycomb", "name": "Raw Honeycomb", "description": "Hexagonal slab still dripping with comb honey.", "category": "animal", "sellPrice": 60, "stackable": true, "tags": [] },
+  { "id": "honey-jar", "name": "Honey Jar", "description": "Slow gold poured straight from the spinner.", "category": "artisan", "sellPrice": 160, "stackable": true, "tags": ["artisan"] },
+  { "id": "sunmelon-oil", "name": "Sunmelon Oil", "description": "A clear, fragrant cooking oil.", "category": "artisan", "sellPrice": 170, "stackable": true, "tags": ["artisan"] },
+  { "id": "dried-harborlime", "name": "Dried Harborlime", "description": "Tart, leathery citrus slices.", "category": "artisan", "sellPrice": 70, "stackable": true, "tags": ["artisan"] }
 ]

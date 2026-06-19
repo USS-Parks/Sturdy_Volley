@@ -89,6 +89,22 @@ export const saveSchema = z
     skills: z.record(z.string(), z.number()),
     flags: z.record(z.string(), z.union([z.boolean(), z.number(), z.string()])),
     mapState: z.record(z.string(), z.unknown()),
+    machines: z
+      .record(
+        z.string(),
+        z
+          .object({
+            id: z.string(),
+            kind: z.enum(['brine-barrel', 'herb-dryer', 'cheese-drum', 'honey-spinner', 'oil-press']),
+            sceneKey: z.string(),
+            x: z.number(),
+            z: z.number(),
+            startMinutes: z.number().nullable(),
+            recipeIndex: z.number().int().nonnegative().nullable(),
+          })
+          .strict(),
+      )
+      .default({}),
   })
   .strict();
 export type SaveData = z.infer<typeof saveSchema>;
@@ -173,6 +189,63 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
     skills: {},
     flags: {},
     mapState: {},
+    machines: defaultFarmMachines(),
+  };
+}
+
+/**
+ * Initial machine cluster on the Farm. The Prompt 018 acceptance set ships
+ * five kinds; placing one of each near the farmhouse gives the player a
+ * working machine pad on Day 1 without forcing them to craft and place
+ * any first.
+ */
+function defaultFarmMachines(): Record<string, import('./machines').MachineState> {
+  return {
+    'Farm:brine-barrel:1': {
+      id: 'Farm:brine-barrel:1',
+      kind: 'brine-barrel',
+      sceneKey: 'Farm',
+      x: -4.5,
+      z: -8.4,
+      startMinutes: null,
+      recipeIndex: null,
+    },
+    'Farm:herb-dryer:1': {
+      id: 'Farm:herb-dryer:1',
+      kind: 'herb-dryer',
+      sceneKey: 'Farm',
+      x: -2.5,
+      z: -8.4,
+      startMinutes: null,
+      recipeIndex: null,
+    },
+    'Farm:cheese-drum:1': {
+      id: 'Farm:cheese-drum:1',
+      kind: 'cheese-drum',
+      sceneKey: 'Farm',
+      x: -0.5,
+      z: -8.4,
+      startMinutes: null,
+      recipeIndex: null,
+    },
+    'Farm:honey-spinner:1': {
+      id: 'Farm:honey-spinner:1',
+      kind: 'honey-spinner',
+      sceneKey: 'Farm',
+      x: 1.5,
+      z: -8.4,
+      startMinutes: null,
+      recipeIndex: null,
+    },
+    'Farm:oil-press:1': {
+      id: 'Farm:oil-press:1',
+      kind: 'oil-press',
+      sceneKey: 'Farm',
+      x: 3.5,
+      z: -8.4,
+      startMinutes: null,
+      recipeIndex: null,
+    },
   };
 }
 

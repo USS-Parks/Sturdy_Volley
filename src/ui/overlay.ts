@@ -40,6 +40,34 @@ export interface CraftingPanelOptions {
   onClose: () => void;
 }
 
+export interface MachinePanelRecipeRow {
+  recipeIndex: number;
+  inputItemName: string;
+  inputQty: number;
+  inputHave: number;
+  outputItemName: string;
+  outputQty: number;
+  fuelItemName?: string;
+  fuelQty?: number;
+  fuelHave?: number;
+  processLabel: string;
+  loadable: boolean;
+  loadDisabledReason?: string;
+}
+
+export interface MachinePanelOptions {
+  title: string;
+  /** "Idle", "Processing — 4h left", or "Ready: Goat Cheese". */
+  statusLine: string;
+  /** When idle, shows recipe rows; otherwise hidden in favor of Collect. */
+  recipes?: MachinePanelRecipeRow[];
+  /** Shown when the loaded recipe finishes — clicking moves output to inventory. */
+  collectLabel?: string;
+  onLoad?: (recipeIndex: number) => void;
+  onCollect?: () => void;
+  onClose: () => void;
+}
+
 export interface ShopPanelEntry {
   itemId: string;
   itemName: string;
@@ -695,6 +723,78 @@ export class UIOverlay {
     close.type = 'button';
     close.textContent = 'Close';
     close.dataset.testid = 'crafting-close';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /**
+   * Machine panel (Prompt 018). Three modes depending on state:
+   * - idle: a list of supported recipes the player can load.
+   * - processing: status line with the remaining time.
+   * - ready: a single Collect button at the top.
+   */
+  showMachinePanel(opts: MachinePanelOptions): void {
+    this.clear();
+    const panel = this.createPanel(opts.title, opts.statusLine);
+    panel.classList.add('machine-panel');
+    panel.dataset.testid = 'machine-panel';
+
+    if (opts.collectLabel) {
+      const collect = document.createElement('button');
+      collect.type = 'button';
+      collect.className = 'menu-button machine-collect';
+      collect.textContent = opts.collectLabel;
+      collect.dataset.testid = 'machine-collect';
+      collect.addEventListener('click', () => opts.onCollect?.());
+      panel.appendChild(collect);
+    } else if (opts.recipes && opts.recipes.length > 0) {
+      const list = document.createElement('ul');
+      list.className = 'machine-list';
+      list.dataset.testid = 'machine-list';
+      for (const r of opts.recipes) {
+        const li = document.createElement('li');
+        li.className = 'machine-row';
+        li.dataset.testid = `machine-row-${r.recipeIndex}`;
+
+        const head = document.createElement('div');
+        head.className = 'machine-head';
+        const title = document.createElement('span');
+        title.className = 'machine-title';
+        title.textContent = `${r.inputQty}× ${r.inputItemName} → ${r.outputQty}× ${r.outputItemName}`;
+        head.appendChild(title);
+
+        const info = document.createElement('div');
+        info.className = 'machine-info';
+        const parts = [`${r.inputHave}/${r.inputQty} ${r.inputItemName}`];
+        if (r.fuelItemName && r.fuelQty !== undefined) {
+          parts.push(`${r.fuelHave ?? 0}/${r.fuelQty} ${r.fuelItemName}`);
+        }
+        parts.push(r.processLabel);
+        info.textContent = parts.join(' · ');
+
+        const loadBtn = document.createElement('button');
+        loadBtn.type = 'button';
+        loadBtn.className = 'menu-button machine-load';
+        loadBtn.textContent = 'Load';
+        loadBtn.dataset.testid = `machine-load-${r.recipeIndex}`;
+        loadBtn.disabled = !r.loadable;
+        if (!r.loadable && r.loadDisabledReason) loadBtn.title = r.loadDisabledReason;
+        loadBtn.addEventListener('click', () => opts.onLoad?.(r.recipeIndex));
+
+        li.append(head, info, loadBtn);
+        list.appendChild(li);
+      }
+      panel.appendChild(list);
+    }
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'menu-button';
+    close.textContent = 'Close';
+    close.dataset.testid = 'machine-close';
     close.addEventListener('click', opts.onClose);
     panel.appendChild(close);
 
