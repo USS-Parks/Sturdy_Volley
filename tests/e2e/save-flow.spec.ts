@@ -12,6 +12,13 @@ test.describe('Save bootstrap', () => {
 
     // Farm: canvas renders + HUD shows the location and the player's status.
     await expect(page.locator('#game-canvas')).toBeVisible();
+    // RF-14: dismiss the first-morning cutscene before the HUD check.
+    const skip = page.getByTestId('cutscene-skip');
+    try {
+      await skip.waitFor({ state: 'visible', timeout: 4000 });
+      await skip.click();
+      await skip.waitFor({ state: 'hidden', timeout: 4000 });
+    } catch { /* cutscene already gone */ }
     await expect(page.getByText('Breakpoint Farm', { exact: false })).toBeVisible();
     await expect(page.getByText('Wren', { exact: false })).toBeVisible();
 

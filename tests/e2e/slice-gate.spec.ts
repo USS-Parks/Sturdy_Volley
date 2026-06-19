@@ -74,6 +74,12 @@ async function newGameWithPerf(
   await page.getByTestId('field-name').fill(name);
   await page.getByTestId('form-submit').click();
   await expect(page.locator('#game-canvas')).toBeVisible();
+  const skip = page.getByTestId('cutscene-skip');
+  try {
+    await skip.waitFor({ state: 'visible', timeout: 4000 });
+    await skip.click();
+    await skip.waitFor({ state: 'hidden', timeout: 4000 });
+  } catch { /* cutscene already gone */ }
   await page.waitForFunction(() => Boolean(window.sturdyVolleyDebug?.warpToEntity));
   return await page.evaluate(() => {
     const api = window.sturdyVolleyDebug!;

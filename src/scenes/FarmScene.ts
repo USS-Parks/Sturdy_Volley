@@ -38,6 +38,8 @@ import type { Weather } from '../data/schemas';
 import { addItem, moveBetween, placeOrMerge, clearSlot, removeItem } from '../engine/inventory';
 import { buildItemCatalog, getItem, type ItemCatalog } from '../engine/itemCatalog';
 import type { SlotMove } from '../ui/overlay';
+import { startCutscene } from '../render/cutscene-runner';
+import { FIRST_MORNING_CUTSCENE } from '../data/content/cutscenes/first-morning';
 import {
   buildCropIndex,
   harvest,
@@ -113,6 +115,7 @@ export class FarmScene extends GameScene {
   private partnerKind: PartnerKind = null;
   private partnerId: string | null = null;
   private catalog!: ItemCatalog;
+  private cutsceneRunner: ReturnType<typeof startCutscene> | null = null;
   private cropIndex!: ReturnType<typeof buildCropIndex>;
   private seedToCropId: Map<string, string> = new Map();
   private readonly cellMeshes = new Map<string, BabylonMesh>();
@@ -283,6 +286,9 @@ export class FarmScene extends GameScene {
     this.refreshHud();
     this.refreshHotbar();
 
+    // RF-14: play the first-morning cutscene exactly once, gated by a flag.
+    if (!save.flags['first-morning-seen']) this.startFirstMorningCutscene();
+
     (window as unknown as { sturdyVolleyDebug?: DebugApi }).sturdyVolleyDebug = {
       player: () => ({ x: this.player.position.x, z: this.player.position.z }),
       controller: () => ({
@@ -334,6 +340,17 @@ export class FarmScene extends GameScene {
 
   override update(dt: number): void {
     if (!this.player) return;
+    // RF-14: cutscene ticks while it's running and blocks gameplay.
+    if (this.cutsceneRunner && !this.cutsceneRunner.isFinished()) {
+      this.cutsceneRunner.tick(dt);
+      if (this.cutsceneRunner.isFinished()) {
+        this.endCutscene();
+      } else {
+        this.clock = pauseClock(this.clock, true);
+        this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
+        return;
+      }
+    }
     if (this.menuOpen || this.inventoryOpen || this.dayResolving) {
       this.clock = pauseClock(this.clock, true);
       this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
@@ -910,6 +927,44 @@ export class FarmScene extends GameScene {
     this.rebuildInteractionTargets();
     this.refreshHotbar();
     persistActiveSave();
+  }
+
+  private startFirstMorningCutscene(): void {
+    if (this.cutsceneRunner) return;
+    const previousTarget = this.camera.lockedTarget;
+    this.camera.lockedTarget = null;
+    const anchors: Record<string, Vector3> = {
+      'farm-overview': new Vector3(0, 0.5, 0),
+      'farmhouse-door': new Vector3(-10, 0.9, -5.6),
+    };
+    this.cutsceneRunner = startCutscene(FIRST_MORNING_CUTSCENE, {
+      scene: this.scene,
+      camera: this.camera,
+      overlay: this.ctx.overlay,
+      resolveAnchor: (id) => anchors[id]?.clone() ?? Vector3.Zero(),
+      onSetFlag: (flag, value) => {
+        this.save.flags[flag] = value;
+        persistActiveSave();
+      },
+      onGiveItem: (itemId, qty, quality) => {
+        const added = addItem(this.save.inventory, itemId, qty, quality ?? 0);
+        this.save.inventory = added.container;
+        persistActiveSave();
+        this.refreshHotbar();
+      },
+    });
+    // Restore camera target when the cutscene ends.
+    this.save.flags['_cutscene-resume-target'] = JSON.stringify({
+      // marker only — used by endCutscene to restore the locked target
+    });
+    void previousTarget; // restored via endCutscene calling lockedTarget = this.player
+  }
+
+  private endCutscene(): void {
+    this.camera.lockedTarget = this.player;
+    this.cutsceneRunner = null;
+    this.refreshHud();
+    this.refreshHotbar();
   }
 
   private triggerSleep(collapsed: boolean): void {

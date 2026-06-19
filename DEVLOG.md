@@ -248,6 +248,73 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## RF-14 — First-morning cutscene + Babylon camera/character mover (2026-06-19)
+
+Wired `engine/cutscene.ts`'s pure beat runner onto a live Babylon scene + the
+dialogue overlay. Ships the Day-1 first-morning cutscene at Breakpoint Farm:
+the player wakes, the camera sweeps from a farm overview to the farmhouse
+door, Aunt Nessa welcomes them with two lines, a packet of 5 Bell Pea Seeds
+is granted, and the `first-morning-seen` flag is set so the scene never
+replays.
+
+- **`src/render/cutscene-runner.ts`** — `startCutscene(cutscene, deps)`
+  returns a controller with `tick(dt)` / `skip()` / `isFinished()` /
+  `dispose()`. Maps each `Beat` kind to a Babylon-side effect: `cameraTo`
+  tweens `camera.target` toward an anchor (`resolveAnchor`); `moveCharacter`
+  tweens an NPC mesh; `fade` interpolates the opacity of a `.cutscene-fade`
+  full-screen overlay; `dialogue` routes through `overlay.showDialoguePanel`
+  with an `onDismiss` that advances the cursor; `giveItem` / `setFlag`
+  call the deps' `onGiveItem` / `onSetFlag` handlers. Mounts a
+  `.cutscene-skip` button; on Skip, `collectSideEffects` applies every
+  remaining `setFlag` + `giveItem` so the scene's persistent state is
+  delivered atomically, then `skipToEnd` finishes the cursor.
+- **`src/data/content/cutscenes/first-morning.ts`** — 8 beats: fade in,
+  camera to farm overview, line 1, camera to farmhouse door, line 2,
+  giveItem (5 bell-pea-seeds), setFlag `first-morning-seen`, fade out.
+- **`src/styles.css`** — `.cutscene-fade` (z-index 70, full-screen, smooth
+  opacity transition) + `.cutscene-skip` (parchment button corner).
+- **`src/scenes/FarmScene.ts`** — on `enter()` checks
+  `save.flags['first-morning-seen']`; if unset, calls
+  `startFirstMorningCutscene()` which unlocks the camera target,
+  instantiates the runner, registers `onSetFlag` to mutate
+  `save.flags[flag]` + persist, and `onGiveItem` to addItem + persist.
+  `update()` ticks the runner before the normal gameplay path and pauses
+  the controller + clock while it runs; on finish, restores
+  `camera.lockedTarget = this.player`, clears the runner, refreshes HUD +
+  hotbar.
+- **`tests/e2e/cutscene.spec.ts`** — 2 specs across desktop + Pixel 5:
+  cutscene mounts on fresh save, Skip applies the giveItem + setFlag
+  side-effects, post-skip save shows `first-morning-seen === true` +
+  `inventory[0].qty === 10` (starter 5 + cutscene 5); reload + Continue
+  with the flag set does NOT replay the cutscene.
+- **e2e harness updates** — all New-Game-bootstrapping specs
+  (`farm`, `gather`, `inventory`, `time`, `slice-gate`, `beach`, `npc`,
+  `save-flow`, `perf-budget`) now call a `cutscene-skip` dismissal that
+  waits for the button, clicks it, then waits for it to hide. The
+  inventory spec's starter-seed quantity check + shipping-bin overnight
+  earnings assertion bumped from 5 seeds / 40 g to 10 seeds / 80 g to
+  reflect the new starter inventory.
+
+**Acceptance criteria (§0.9 / RF-14):**
+- [x] Babylon camera + character mover bound to `engine/cutscene.ts`
+  (camera tween via `Vector3.Lerp` with ease-in-out smoothstep; character
+  tween parallel; `resolveAnchor` deps callback maps anchor ids → world
+  positions).
+- [x] Skip button mounted on every cutscene; applies side-effects on
+  skip (`collectSideEffects` over the remaining beats; cutscene e2e
+  confirms `first-morning-seen` flag + 10 Bell Pea Seeds in slot 0).
+- [x] One playable scene shipped (`FIRST_MORNING_CUTSCENE`; 8 beats,
+  triggered on Day 1 first enter, gated by `save.flags`).
+- [x] Cutscene doesn't replay once `first-morning-seen` is set
+  (e2e covers the reload + Continue path).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`218/218` (unchanged — runner is integration code, engine was already
+covered) · build OK · Playwright `60/60` (56 prior + 4 new cutscene
+specs on desktop + Pixel 5).
+
+---
+
 ## RF-13 — Gift handoff + rapport bar (2026-06-19)
 
 Wired `engine/friendship.ts`'s gift engine into the live dialogue surface.

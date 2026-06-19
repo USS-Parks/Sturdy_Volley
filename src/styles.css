@@ -589,6 +589,31 @@ body {
   text-align: center;
 }
 
+/* Cutscene runtime overlays (RF-14). */
+.cutscene-fade {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  background: #0c1822;
+  pointer-events: none;
+  transition: opacity 0.1s linear;
+}
+
+.cutscene-skip {
+  position: absolute;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  right: 16px;
+  z-index: 80;
+  padding: 8px 14px;
+  font-family: inherit;
+  font-weight: 700;
+  color: var(--sv-ink);
+  background: linear-gradient(180deg, var(--sv-parchment) 0%, var(--sv-parchment-2) 100%);
+  border: 2px solid var(--sv-wood);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
 .dialogue-tier-loved { background: rgba(201, 162, 75, 0.32); color: #f6dca8; }
 .dialogue-tier-liked { background: rgba(84, 185, 172, 0.22); color: #b6f0e8; }
 .dialogue-tier-neutral { background: rgba(255, 255, 255, 0.08); color: var(--sv-muted); }

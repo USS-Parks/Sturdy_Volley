@@ -22,6 +22,13 @@ async function newGameWithPerf(
   await page.getByTestId('field-name').fill(name);
   await page.getByTestId('form-submit').click();
   await expect(page.locator('#game-canvas')).toBeVisible();
+  // RF-14: dismiss the first-morning cutscene.
+  const skip = page.getByTestId('cutscene-skip');
+  try {
+    await skip.waitFor({ state: 'visible', timeout: 4000 });
+    await skip.click();
+    await skip.waitFor({ state: 'hidden', timeout: 4000 });
+  } catch { /* cutscene already gone */ }
   // Wait for the FarmScene HUD so the perf strip has a real label to read.
   await expect(page.getByText('Breakpoint Farm', { exact: false })).toBeVisible();
 }

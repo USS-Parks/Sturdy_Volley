@@ -19,12 +19,25 @@ declare global {
   }
 }
 
+async function dismissFirstMorningCutscene(page: import('@playwright/test').Page): Promise<void> {
+  const skip = page.getByTestId('cutscene-skip');
+  try {
+    await skip.waitFor({ state: 'visible', timeout: 4000 });
+    await skip.click();
+    await skip.waitFor({ state: 'hidden', timeout: 4000 });
+  } catch {
+    // Cutscene already dismissed or never mounted — fine.
+  }
+}
+
 async function newGame(page: import('@playwright/test').Page, name = 'Wren'): Promise<void> {
   await page.goto('/');
   await page.getByTestId('title-start').click();
   await page.getByTestId('field-name').fill(name);
   await page.getByTestId('form-submit').click();
   await expect(page.locator('#game-canvas')).toBeVisible();
+  // RF-14: dismiss the Day-1 first-morning cutscene before gameplay starts.
+  await dismissFirstMorningCutscene(page);
   await page.waitForFunction(() => Boolean(window.sturdyVolleyDebug?.controller));
 }
 
