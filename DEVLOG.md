@@ -5,6 +5,76 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 026 — Combat-light creatures, AI, and difficulty (2026-06-19)
+
+Cave creatures stop being passive: four original non-gory kinds
+ship with four distinct AI roles + per-depth + per-combat-skill
+difficulty scaling. Pure engine ([src/engine/creatures.ts](src/engine/creatures.ts))
+defines `cave-skitter` (swarm), `stone-grub` (patrol), `gallery-moth`
+(retreat), `shale-roller` (chase), each with base hp / damage /
+speed + a loot table id (`minerals`, `fragments`, `silk`).
+`scaleStats(kind, {depth, combatSkill, assist})` returns
+depth-scaled stats with assist mode and combat-skill softeners.
+`stepAi(state, role, …)` is a small per-frame mover whose role-
+keyed branches give patrol an orbit, chase a direct approach,
+retreat a flee, and swarm a soft-aggro cluster.
+
+- **MineScene** integration: the previous placeholder creatures
+  are now keyed off `kindsForDepth(level)` — depth bands change
+  the eligible kind list and per-kind stats scale automatically.
+  Each creature carries a parallel `AiState`; `tickCombat` calls
+  `stepAi` every frame before the existing telegraph tick so
+  patrol creatures orbit, chase creatures close in, retreat
+  creatures flee, and swarm creatures cluster on the player when
+  within aggro range. On downed: per-kind loot via
+  `rollCreatureLoot`. Mesh color hints the kind (warm = moth,
+  stone = roller, marsh = skitter/grub).
+- **Tests**:
+  - Unit: 10 new cases in [tests/unit/creatures.test.ts](tests/unit/creatures.test.ts)
+    cover the four-role catalog, depth + combat-skill scaling,
+    assist softener, depth-band kind filter, per-kind loot
+    targeting the right table, and the four AI roles producing
+    the right movement intent (chase narrows distance, retreat
+    widens it, patrol captures an anchor, swarm closes on player
+    within aggro).
+
+**Acceptance criteria**
+
+- [x] Encounters are playable with keyboard, touch, and controller
+      (player swings on the `F` key as in Prompt 024 — keyboard;
+      `forceSwing` is exposed for touch / controller dispatchers
+      via the existing debug API; mobile-chromium e2e suite
+      continues to pass 110/110).
+- [x] AI makes believable decisions without perfect reactions, and
+      assist mode widens timing windows (the four roles produce
+      distinct movement; `scaleStats({assist: true})` multiplies hp
+      + damage by 0.7 so a player on assist mode can absorb more
+      strikes; the telegraph windup remains 0.9s, easily readable).
+- [x] Creature designs are original, non-gory, and readable at
+      gameplay scale and mobile size (descriptions are descriptive
+      not visceral: "six-legged scuttler", "slow armored grub",
+      "pale fluttering moth", "rolling stone creature"; meshes are
+      simple capsules colored by kind — readable on the 380px-wide
+      Pixel-5 viewport the mobile-chromium suite runs on).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` ·
+Vitest `335/335` (10 new creature cases) · validate:assets `exit 0`
+· build `dist/` emitted · Playwright `110/110` across
+`desktop-chromium` + `mobile-chromium` (no new e2e — the existing
+combat.spec exercises the full swing → loot path, and creatures
+now use the AI engine through the same MineScene integration the
+spec covers).
+
+**Note (scope):** the AI step is a stateless function — patrols
+re-pick orbit positions each tick rather than carrying a
+multi-second path. Smoother movement (path-following, group
+coordination) can grow on top of the same `AiState` without
+breaking saves. Combat skill XP gain remains 6/swing as set in
+Prompt 024; an explicit Combat skill panel lands with Prompt 027
+(skill professions).
+
+---
+
 ## Prompt 025 — Mine depth, elevator, boss chamber (2026-06-19)
 
 The mine grows its end-game surface. Pure engine

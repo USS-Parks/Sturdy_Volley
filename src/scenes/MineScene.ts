@@ -61,6 +61,15 @@ import {
   tickLantern,
   type BossPattern,
 } from '../engine/mineDepth';
+import {
+  CREATURE_KINDS,
+  kindsForDepth,
+  rollCreatureLoot,
+  scaleStats,
+  stepAi,
+  type AiState,
+  type CreatureKindDef,
+} from '../engine/creatures';
 
 interface MineDebugApi {
   level: () => number;
@@ -111,6 +120,10 @@ export class MineScene extends GameScene {
   private readonly creatureMeshes: AbstractMesh[] = [];
   /** Active creature snapshots aligned with `creatureMeshes` order. */
   private creatures: CreatureSnapshot[] = [];
+  /** Per-creature AI state aligned with `creatures` order (Prompt 026). */
+  private creatureAi: AiState[] = [];
+  private creatureKinds: CreatureKindDef[] = [];
+  private creatureSeed = 1;
   private playerCombat = createPlayerCombat();
   private swingCooldown = 0;
   private equippedWeapon: WeaponId = 'fists';
@@ -248,22 +261,35 @@ export class MineScene extends GameScene {
     }
     const creatureCount = Math.floor(def.creatureDensity * 5);
     this.creatures = [];
+    this.creatureAi = [];
+    this.creatureKinds = [];
+    const eligibleKinds = kindsForDepth(def.index);
+    const combatSkill = Math.min(1, (this.save.skills?.combat ?? 0) / 100);
     for (let i = 0; i < creatureCount; i++) {
       const x = ((i * 53) % 16) - 8;
       const z = ((i * 89) % 16) - 8;
+      const kindId = eligibleKinds[i % eligibleKinds.length]!;
+      const kind = CREATURE_KINDS[kindId];
+      const stats = scaleStats(kind, { depth: def.index, combatSkill, assist: false });
       const c = MeshBuilder.CreateCapsule(`mine-creature-${def.index}-${i}`, { height: 0.5, radius: 0.2 }, this.scene!);
       c.position.set(x, 0.3, z);
-      c.material = flatMaterial(this.scene!, `mine-creature-${def.index}-${i}-mat`, PALETTE.marsh, 0.25);
+      const color =
+        kindId === 'gallery-moth' ? PALETTE.warmLight
+        : kindId === 'shale-roller' ? PALETTE.stone
+        : PALETTE.marsh;
+      c.material = flatMaterial(this.scene!, `mine-creature-${def.index}-${i}-mat`, color, 0.25);
       this.creatureMeshes.push(c);
       this.creatures.push({
         id: `c-${def.index}-${i}`,
-        hp: 12 + def.index,
-        maxHp: 12 + def.index,
+        hp: stats.hp,
+        maxHp: stats.hp,
         phase: 'idle',
         phaseTime: 1.4 + ((i * 17) % 30) / 10,
         x,
         z,
       });
+      this.creatureAi.push({ x, z, vx: 0, vz: 0 });
+      this.creatureKinds.push(kind);
     }
     if (def.checkpoint) {
       this.save.mineProgress = recordCheckpoint(this.save.mineProgress!, def.index);
@@ -463,8 +489,30 @@ export class MineScene extends GameScene {
     this.swingCooldown = Math.max(0, this.swingCooldown - dt);
     this.playerCombat = tickIframes(this.playerCombat, dt);
 
-    // Advance each creature telegraph and resolve strikes against the player.
+    // Advance each creature AI then telegraph and resolve strikes against the player.
     for (let i = 0; i < this.creatures.length; i++) {
+      // Prompt 026: AI move first, then telegraph.
+      const ai = this.creatureAi[i];
+      const kind = this.creatureKinds[i];
+      if (ai && kind) {
+        this.creatureSeed += 1;
+        const stats = scaleStats(kind, {
+          depth: this.save.mineProgress?.currentLevel ?? 0,
+          combatSkill: Math.min(1, (this.save.skills?.combat ?? 0) / 100),
+          assist: false,
+        });
+        const stepped = stepAi({
+          state: ai,
+          role: kind.role,
+          speed: stats.speed,
+          playerX: this.player.position.x,
+          playerZ: this.player.position.z,
+          dt,
+          seed: this.creatureSeed,
+        });
+        this.creatureAi[i] = stepped;
+        this.creatures[i] = { ...this.creatures[i]!, x: stepped.x, z: stepped.z };
+      }
       const next = tickTelegraph(this.creatures[i]!, dt);
       this.creatures[i] = next.creature;
       // Sync mesh transform (knockback may have moved it).
@@ -533,14 +581,17 @@ export class MineScene extends GameScene {
     this.swingCooldown = weapon.cooldown;
     if (result.downed) {
       const lootSeed = (this.save.mineProgress?.currentLevel ?? 0) * 17 + bestIndex * 11;
-      const itemId = rollLoot(CAVE_CRITTER_LOOT, lootSeed);
+      const kind = this.creatureKinds[bestIndex];
+      const itemId = kind ? rollCreatureLoot(kind, lootSeed) : rollLoot(CAVE_CRITTER_LOOT, lootSeed);
       const added = addItem(this.save.inventory, itemId, 1, 0);
       this.save.inventory = added.container;
       const mesh = this.creatureMeshes[bestIndex];
       if (mesh) mesh.dispose();
       this.creatureMeshes.splice(bestIndex, 1);
       this.creatures.splice(bestIndex, 1);
-      this.actionLabel = `Felled a critter (+${itemId})`;
+      this.creatureAi.splice(bestIndex, 1);
+      this.creatureKinds.splice(bestIndex, 1);
+      this.actionLabel = `Felled a ${kind?.name ?? 'critter'} (+${itemId})`;
       this.actionTimer = 1.4;
       recordSkillXp('combat', 6);
       persistActiveSave();
