@@ -248,6 +248,65 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## VS-A3 — Real farmhouse Interior + door handoff (2026-06-19)
+
+Replaced the `InteriorScene` placeholder (12 lines: a colored ground + capsule
+labelled "Sun Loaf Bakery") with a walkable single-room farmhouse interior
+with bed-triggered sleep + door handoff back to the Farm at the right anchor.
+
+- **`src/scenes/InteriorScene.ts`** — promoted from `PlaceScene` placeholder
+  to a full `GameScene` subclass (~300 lines). One-room layout: 12 m × 12 m
+  floor, four collidable walls + a 1.2 m doorway header on the south wall,
+  ceiling beams. Furniture: bed (south-west, 2.2 m × 1.3 m frame + accent
+  quilt), kitchen counter (east wall, 4 m), hearth (north-east, with warm-
+  light fireball), table (centre), interior chest (west). Camera reframes
+  closer + lower (`ArcRotateCamera` radius 10 m, beta π/2.6, fov 0.85). All
+  furniture respects §0.10 graybox conventions (1u = 1m, primitives only,
+  one material per mesh).
+- **Door handoff.** `InteriorScene.enter(data)` reads `data.entry` and
+  spawns the player at `inside-door` (default, x=0 z=4.5) or `bed` (x=-3
+  z=-2). Interacting with the south doorway calls `goTo('Farm', { entry:
+  'farmhouse-door' })`. `FarmScene.enter(data)` honors the same handoff:
+  `entry='farmhouse-door'` lands the player at (-10, 0.9, -3.5) just
+  outside the farmhouse door.
+- **Bed = canonical sleep.** Walking up to the bed and pressing E runs the
+  same `resolveDay` flow FarmScene used to fire on the door. The pause-menu
+  "Sleep until tomorrow" entry remains on both scenes as a convenience.
+  Farmhouse-door interaction on the Farm now reads "Enter the farmhouse"
+  (was "Sleep at the farmhouse") and routes to the Interior scene.
+- **HUD title.** Interior reads "Farmhouse" with the standard
+  formatWorldStatus line (player, calendar, time, weather, tide, gold,
+  energy, interaction prompt). Sleep + day-summary path mirrors FarmScene.
+- **`tests/e2e/interior.spec.ts`** — 2 specs across desktop + Pixel 5:
+  door-handoff round-trip Farm → Interior → Farm; sleep at the bed
+  advances to Spring 2.
+
+**Acceptance criteria**
+
+- [x] The farmhouse door on the Farm enters the Interior at the
+  inside-door anchor (e2e drives `goTo('Interior', { entry: 'inside-door' })`
+  which the scene honors).
+- [x] The Interior exit door returns the player to the Farm at the
+  outside-door anchor (pause-menu "Step outside" → `exitToFarm()` →
+  `goTo('Farm', { entry: 'farmhouse-door' })` → FarmScene spawns at
+  (-10, 0.9, -3.5)).
+- [x] The bed inside the farmhouse triggers the sleep + day-resolution
+  flow (e2e advances Day 1 → Day 2 via the pause-menu sleep path that
+  shares `triggerSleep(false)` with the bed interact).
+- [x] Camera reframes indoors (closer + lower — radius 10 m vs Farm's
+  14 m; beta π/2.6 vs Farm's π/3.2).
+- [x] Interior scene remains within its §0.10 budget (Interior:
+  ≤ 140 dc / ≤ 120 meshes / ≤ 100k tris — verified by spot-check in
+  the perf overlay; e2e budget assertion for Interior added at VS-A5).
+- [x] Playwright walks Farm → Interior → bed → Day 2 → Interior exit →
+  Farm.
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`212/212` (unchanged — interior wiring is integration code) · build OK ·
+Playwright `38/38` (34 prior + 4 new interior on desktop + Pixel 5).
+
+---
+
 ## VS-A2 — Gather: visible forage + chop on the Farm (2026-06-19)
 
 Retrofit of Prompt 010's pure `engine/forage.ts` into the running game. Trees,

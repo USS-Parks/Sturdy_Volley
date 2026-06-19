@@ -239,7 +239,7 @@ export class FarmScene extends GameScene {
     });
   }
 
-  override enter(): void {
+  override enter(data?: unknown): void {
     const save = getActiveSave();
     if (!save) {
       this.goTo('Title', undefined, false);
@@ -260,6 +260,17 @@ export class FarmScene extends GameScene {
     this.clock = createTimeClock(getGameTime(save));
     this.refreshWorldState();
     this.rebuildInteractionTargets();
+
+    // Honor cross-scene entry handoff. Coming back from the farmhouse interior
+    // spawns the player at the outside-door anchor; otherwise the build-time
+    // position from build() stands.
+    const entry =
+      typeof data === 'object' && data !== null && 'entry' in data
+        ? String((data as { entry?: unknown }).entry ?? '')
+        : '';
+    if (entry === 'farmhouse-door') {
+      this.player.position.set(-10, 0.9, -3.5);
+    }
 
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
@@ -345,7 +356,7 @@ export class FarmScene extends GameScene {
     const interact = this.pressed.has('e') || this.pressed.has(' ');
     if (interact && !this.ePrev && this.nearest) {
       if (this.nearest.id === 'farmhouse-door') {
-        this.triggerSleep(false);
+        this.goTo('Interior', { entry: 'inside-door' });
       } else if (this.nearest.id === 'shipping-bin') {
         this.openInventory({ kind: 'shipping-bin', id: 'shipping-bin' });
       } else if (this.nearest.id === 'porch-chest') {
@@ -787,7 +798,7 @@ export class FarmScene extends GameScene {
 
   private rebuildInteractionTargets(): void {
     const base: InteractTarget[] = [
-      { id: 'farmhouse-door', kind: 'door', label: 'Sleep at the farmhouse', x: -10, z: -5.6, radius: 2.6, priority: 5 },
+      { id: 'farmhouse-door', kind: 'door', label: 'Enter the farmhouse', x: -10, z: -5.6, radius: 2.6, priority: 5 },
       { id: 'shipping-bin', kind: 'prop', label: 'Open the shipping bin', x: -6.2, z: -7.6, radius: 2.2, priority: 4 },
       { id: 'porch-chest', kind: 'prop', label: 'Open the porch chest', x: -12, z: -6, radius: 2.2, priority: 4 },
       { id: 'tilled-plot', kind: 'farm-cell', label: 'Tend the soil', x: -6, z: -4, radius: 4, priority: 3 },
