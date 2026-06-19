@@ -1,12 +1,19 @@
 :root {
-  --sv-bg: #0b1b2b;
-  --sv-panel: rgba(19, 40, 61, 0.84);
-  --sv-panel-border: rgba(127, 209, 196, 0.42);
-  --sv-button: #16304a;
-  --sv-button-hover: #1d3e5e;
-  --sv-accent: #7fd1c4;
-  --sv-text: #eaf4f4;
-  --sv-muted: #9bb3c0;
+  /* Theme 3 "cozy coastal" UI — slate-blue panels, wood/rope frames, parchment
+     cards, teal + brass accents, warm cream text. Drawn from the UI mood board. */
+  --sv-bg: #101c26;
+  --sv-slate: #223a4e;
+  --sv-slate-2: #1a2c3c;
+  --sv-wood: #8a6a3c;
+  --sv-wood-light: #b89a66;
+  --sv-rope: rgba(196, 170, 122, 0.55);
+  --sv-parchment: #e9ddc0;
+  --sv-parchment-2: #d8c69e;
+  --sv-ink: #3a2c1b;
+  --sv-accent: #54b9ac;
+  --sv-brass: #c9a24b;
+  --sv-text: #f1e8d4;
+  --sv-muted: #c3b491;
 }
 
 * {
@@ -50,7 +57,7 @@ body {
   position: absolute;
   inset: 0;
   z-index: 50;
-  background: #050f18;
+  background: #0c1822;
   opacity: 0;
   pointer-events: none;
 }
@@ -66,25 +73,33 @@ body {
   pointer-events: none;
 }
 
+/* Slate-blue panel inside a wood frame with a rope-highlight ring. */
 .menu-panel {
   pointer-events: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
   width: min(360px, 86vw);
-  padding: 24px;
-  background: var(--sv-panel);
-  border: 1px solid var(--sv-panel-border);
-  border-radius: 18px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(6px);
+  padding: 22px;
+  color: var(--sv-text);
+  background: linear-gradient(180deg, #284058 0%, #1d3144 100%);
+  border: 3px solid var(--sv-wood);
+  border-radius: 16px;
+  box-shadow:
+    inset 0 0 0 2px var(--sv-rope),
+    inset 0 2px 16px rgba(0, 0, 0, 0.38),
+    0 18px 48px rgba(0, 0, 0, 0.55);
 }
 
 .menu-title {
   margin: 0;
   text-align: center;
-  font-size: clamp(24px, 6vw, 32px);
-  letter-spacing: 0.5px;
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-size: clamp(24px, 6vw, 33px);
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--sv-text);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
 }
 
 .menu-subtitle {
@@ -94,25 +109,35 @@ body {
   font-size: 13px;
 }
 
+/* Wood-framed parchment tile — the mood board's interactive button look. */
 .menu-button {
   pointer-events: auto;
   min-height: 48px;
   padding: 12px 18px;
   font-size: 18px;
   font-family: inherit;
-  border-radius: 12px;
-  border: 1px solid var(--sv-panel-border);
-  background: var(--sv-button);
-  color: var(--sv-text);
+  font-weight: 700;
+  color: var(--sv-ink);
+  border-radius: 10px;
+  border: 2px solid var(--sv-wood);
+  background: linear-gradient(180deg, var(--sv-parchment) 0%, var(--sv-parchment-2) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 2px 0 rgba(0, 0, 0, 0.28);
   cursor: pointer;
   transition:
     transform 0.08s ease,
-    background 0.15s ease;
+    filter 0.15s ease;
 }
 
 .menu-button:hover:not(:disabled) {
-  background: var(--sv-button-hover);
+  filter: brightness(1.06);
   transform: translateY(-1px);
+}
+
+.menu-button:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .menu-button:focus-visible {
@@ -121,19 +146,28 @@ body {
 }
 
 .menu-button:disabled {
-  opacity: 0.45;
+  opacity: 0.42;
   cursor: not-allowed;
 }
 
+/* Secondary (Back / Cancel) — recessed wood-framed slate instead of parchment. */
+.menu-button-secondary {
+  color: var(--sv-text);
+  background: linear-gradient(180deg, #2b4257 0%, #203342 100%);
+  border-color: #6f5532;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Parchment note card (credits / settings body text). */
 .panel-body {
   margin: 0;
   max-width: 100%;
+  padding: 14px 16px;
   line-height: 1.55;
-  color: var(--sv-muted);
-}
-
-.menu-button-secondary {
-  background: transparent;
+  color: var(--sv-ink);
+  background: var(--sv-parchment);
+  border: 2px solid var(--sv-wood);
+  border-radius: 10px;
 }
 
 /* In-game HUD (top bar) */
@@ -151,13 +185,16 @@ body {
 
 .hud-info {
   pointer-events: auto;
-  padding: 8px 12px;
+  padding: 8px 13px;
   border-radius: 12px;
-  background: var(--sv-panel);
-  border: 1px solid var(--sv-panel-border);
+  color: var(--sv-text);
+  background: linear-gradient(180deg, #284058 0%, #1d3144 100%);
+  border: 2px solid var(--sv-wood);
+  box-shadow: inset 0 0 0 2px var(--sv-rope);
 }
 
 .hud-title {
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
   font-size: 16px;
   font-weight: 700;
 }
@@ -196,10 +233,10 @@ body {
   padding: 10px 12px;
   font-size: 16px;
   font-family: inherit;
+  color: var(--sv-ink);
   border-radius: 10px;
-  border: 1px solid var(--sv-panel-border);
-  background: rgba(0, 0, 0, 0.25);
-  color: var(--sv-text);
+  border: 2px solid var(--sv-wood);
+  background: #f3ead2;
 }
 
 .form-input:focus-visible {
@@ -239,7 +276,7 @@ body {
   gap: 10px;
   padding: 6px 8px;
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(0, 0, 0, 0.2);
   font-size: 14px;
 }
 
@@ -255,7 +292,7 @@ body {
 }
 
 .report-ok {
-  background: rgba(127, 209, 196, 0.22);
+  background: rgba(84, 185, 172, 0.22);
   color: var(--sv-accent);
 }
 
