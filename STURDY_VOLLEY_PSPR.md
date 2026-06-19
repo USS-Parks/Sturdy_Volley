@@ -3,9 +3,11 @@
 Prepared: 2026-06-18  
 Target: browser-first, mobile-ready, controller-friendly cozy life sim  
 Format: P-SPR, meaning Plan-Sequential Prompt Roster  
-Core promise: a long-life cozy adventure about restoring a storm-worn coastal town through farming, friendships, animal care, exploration, crafting, festivals, and expressive volleyball play.
+Core promise: a long-life cozy adventure about restoring a storm-worn coastal town through farming, friendships, animal care, fishing, mining, foraging, crafting, cooking, festivals, and seasonal community life.
 
-Revision status: Theme 3 approved. Babylon.js is the required 3D engine. Production direction is original N64-era low-poly 3D with model turnarounds, wireframes, reusable rigs, authored movement/posture libraries, and a complete validated item catalog.
+Title note: the title "Sturdy Volley" is provisional and under review. The original name was a Stardew-Valley-style pun built around a volleyball theme that has since been removed; the pun is now defunct. A rename (for example "Willa Crick") is under consideration, but the title is kept as "Sturdy Volley" throughout this document until the rename is confirmed.
+
+Revision status: Revised 2026-06-18 to remove volleyball (an erroneous editing-pass drift); the game has nothing to do with volleyball or any sport. It is a cozy life sim modeled after Stardew Valley, rendered in 3D with Babylon.js in the Theme 3 original N64-era low-poly adventure style. Theme 3 approved. Babylon.js is the required 3D engine (with Havok physics and glTF/.glb assets). Production direction is original N64-era low-poly 3D with model turnarounds, wireframes, reusable rigs, authored movement/posture libraries, and a complete validated item catalog.
 
 ---
 
@@ -60,9 +62,9 @@ Borrow only general genre ideas:
 
 Make the identity new:
 
-- Setting: a cliffside volleyball harbor town rebuilding after a century storm.
-- Core theme: steadiness, teamwork, craft, tide ecology, and chosen community.
-- Signature mechanic: a cozy-athletic volleyball system that intersects with friendship, town rebuilding, animals, weather, festivals, and exploration.
+- Setting: a cliffside harbor town on a storm-battered coast, rebuilding after a century storm.
+- Core theme: steadiness, craft, tide ecology, mutual aid, and chosen community.
+- Signature mechanic: a tide-and-season community-restoration loop in which farming, animal care, fishing, mining, foraging, crafting, and cooking intersect with friendship, town rebuilding, weather, festivals, and exploration.
 
 ---
 
@@ -71,8 +73,8 @@ Make the identity new:
 1. Cozy routine with meaningful pressure  
    Every day gives the player more they want to do than they can do, but failure rarely ends a path.
 
-2. Sport as social language  
-   Volleyball is not a separate arcade mode. Passing, setting, serving, blocking, and rally rhythm become ways to befriend NPCs, solve quests, train animals, celebrate festivals, and unlock areas.
+2. Community restoration is the heart  
+   Rebuilding Ballast Bay is not a side activity. Repairing the harbor, the market hall, the boardwalk, and the lighthouse beacon ties farming, crafting, gifts, quests, and festivals together so that the player's everyday work visibly heals the town.
 
 3. A living coastal town  
    The town breathes through tides, gullies, sea caves, ferry schedules, cliff paths, market days, fog, lantern nights, storm debris, and NPC movement.
@@ -93,22 +95,22 @@ Game title: Sturdy Volley
 Town name: Ballast Bay  
 Region name: The Sturdy Coast  
 Player property: Breakpoint Farm  
-Primary landmark: The Old Netlight, a lighthouse with a half-court built into its storm wall  
-Main conflict: a massive storm damaged the town's court, farms, harbor, tide pools, and trade routes. The player inherits Breakpoint Farm and helps rebuild Ballast Bay by growing food, restoring habitats, repairing courts, building community trust, and reviving the annual Skyserve Cup.
+Primary landmark: The Old Netlight, a lighthouse whose dark beacon must be relit to guide boats home again  
+Main conflict: a massive storm damaged the town's farms, harbor, tide pools, lighthouse, and trade routes. The player inherits Breakpoint Farm and helps rebuild Ballast Bay by growing food, restoring habitats, repairing the harbor and lighthouse beacon, building community trust, and reviving the town's annual Founders Harvest Fair.
 
 ### Core map regions
 
 1. Breakpoint Farm  
-   Flexible farm with soil plots, windbreak hedges, animal paddocks, a practice court, old shed, tide-fed irrigation channel, orchard bluff, greenhouse ruin, and optional terrain themes.
+   Flexible farm with soil plots, windbreak hedges, animal paddocks, a kitchen garden, old shed, tide-fed irrigation channel, orchard bluff, greenhouse ruin, and optional terrain themes.
 
 2. Ballast Bay Town  
-   Dense walkable town with market lane, clinic, schoolhouse, library, gear shop, bakery, fishmonger, community hall, apartment row, tram stop, and beach court.
+   Dense walkable town with market lane, clinic, schoolhouse, library, gear shop, bakery, fishmonger, community hall, apartment row, tram stop, and beach access.
 
 3. Netlight Point  
-   Lighthouse, cliff court, observatory deck, signal puzzles, late-night NPC scenes, wind training, secret storm-cellar archive.
+   Lighthouse, beacon room, observatory deck, signal puzzles, late-night NPC scenes, cliff-top stargazing, secret storm-cellar archive.
 
 4. Driftwood Beach  
-   Shell collecting, beach forage, volleyball pickup games, crab pots, picnic dates, summer festivals, turtle nesting protection, tide events.
+   Shell collecting, beach forage, tidepooling, crab pots, picnic dates, summer festivals, turtle nesting protection, tide events.
 
 5. Kelpglass Reefs  
    Low-tide reef exploration, snorkeling minigame, seaweed farming, coral restoration, rare fish, ocean-weather secrets.
@@ -117,23 +119,23 @@ Main conflict: a massive storm damaged the town's court, farms, harbor, tide poo
    Wetland forage, frogs, reeds, medicinal herbs, boardwalk repairs, fog navigation, birdwatching collection.
 
 7. Ironroot Quarry  
-   Mining, crystal caves, old rail lifts, hazards, crafting metals, earth fauna, underground court ruins.
+   Mining, crystal caves, old rail lifts, hazards, crafting metals, earth fauna, underground machine ruins.
 
 8. The Rainhall Caverns  
-   Combat-light exploration with echo creatures, mineral springs, ancient ball courts, tide doors, rhythm puzzles, and rare crafting resources.
+   Combat-light exploration with echo creatures, mineral springs, ancient flooded halls, tide doors, rhythm puzzles, and rare crafting resources.
 
 9. Splitwind Ridge  
-   Mountain forage, windmills, glider shortcuts, snow-season training, goats, high-altitude crops, storm chaser quests.
+   Mountain forage, windmills, glider shortcuts, snow-season foraging, goats, high-altitude crops, storm chaser quests.
 
 10. Outer Islets  
-   Late-game ferry unlocks with unusual crops, migratory animals, tournaments, map fragments, and eco-restoration projects.
+   Late-game ferry unlocks with unusual crops, migratory animals, traveling merchant visits, map fragments, and eco-restoration projects.
 
 ### Farm map variants
 
 Each farm type changes layout, starting perk, and early-game strategy.
 
-1. Open Court Farm  
-   Most tillable space. Starts with a damaged practice court. Best for balanced farming and volleyball training.
+1. Open Meadow Farm  
+   Most tillable space. Starts with a wide cleared field and a sturdy old shed. Best for balanced, large-scale farming.
 
 2. Tideplot Farm  
    Less soil, more water channels. Starts with crab pots and seaweed beds. Best for fishing and aquatic crafting.
@@ -147,14 +149,14 @@ Each farm type changes layout, starting perk, and early-game strategy.
 5. Marshlight Farm  
    Wetland plots, frogs, reeds, and rare flowers. Best for ecology quests and potion/cooking ingredients.
 
-6. Rallystead Farm  
+6. Fourwinds Farm  
    Four corner-like zones for local co-op or NPC helper assignment. Best for multiplayer and automation.
 
-7. Meadowcup Farm  
+7. Pasturewell Farm  
    Starts with two mooncalf hens, sweetgrass pasture, and a small barn. Best for animal husbandry.
 
 8. Stormbreak Farm  
-   Hard mode. Debris, wind, uneven terrain, rare storm resources, and early court hazards. Best for challenge runs.
+   Hard mode. Debris, wind, uneven terrain, rare storm resources, and early hazard cleanup. Best for challenge runs.
 
 ---
 
@@ -165,18 +167,18 @@ Each farm type changes layout, starting perk, and early-game strategy.
 Morning:
 
 - Wake to weather, tide, mail, pet/animal needs, calendar, and optional morning stretch buff.
-- Choose a short-term plan: farm, fish, train, shop, socialize, explore, quest, or tournament.
+- Choose a short-term plan: farm, fish, mine, forage, cook, shop, socialize, explore, or take on a quest.
 
 Day:
 
-- Spend stamina and time on contextual world actions, movement, dialogue, crafting, court play, and exploration.
+- Spend stamina and time on contextual world actions, movement, dialogue, crafting, cooking, and exploration.
 - Tides reshape beaches and reefs twice per day.
 - NPCs follow schedules influenced by season, weather, relationship, festivals, and town repairs.
 
 Night:
 
 - Shops close, lighting changes, rare NPC scenes appear, nocturnal forage emerges.
-- Bedtime summary resolves crops, machines, animals, skill XP, relationship mail, court ranking, and town project progress.
+- Bedtime summary resolves crops, machines, animals, skill XP, relationship mail, and town project progress.
 
 ### Main skills
 
@@ -193,60 +195,53 @@ Night:
    Fishing, crab pots, snorkeling, fish ponds, bait crafting.
 
 5. Crafting  
-   Machines, buildings, court equipment, artisan goods, home decor.
+   Machines, buildings, artisan goods, home decor, building parts.
 
 6. Exploring  
    Mines, reefs, caves, ruins, secrets, map shortcuts.
 
-7. Volleycraft  
-   Serving, receiving, setting, spiking, blocking, stamina control, court strategy, team synergy.
+7. Combat  
+   Self-defense tools, dodging, knockback, monster lore, dungeon survival, hazard handling in the quarry and caverns.
 
 8. Rapport  
-   Dialogue choices, gift insight, team chemistry, diplomacy, conflict repair.
+   Dialogue choices, gift insight, mutual aid, diplomacy, conflict repair.
 
-Skill levels unlock recipes, tool moves, movement options, perks, court techniques, map access, and profession branches. Do not clone Stardew's exact XP numbers or profession tree.
+Skill levels unlock recipes, tool moves, movement options, perks, defensive techniques, map access, and profession branches. Do not clone Stardew's exact XP numbers or profession tree.
 
-### Volleyball system
+### Mining, caverns, and combat-light dungeons
 
-The volleyball system should feel simple enough for mobile but deep enough to master.
+The quarry-and-caverns system gives the game its long-tail "one more level" pull, the same way Stardew's mines do. It should feel calm and exploratory on the surface and tense but fair at depth.
 
-Core controls:
+Descent model:
 
-- Tap/click/press to move target marker.
-- Hold and release to charge serve, set, or spike.
-- Swipe or stick direction controls shot angle.
-- Context chooses bump, set, spike, block, dive, or soft tip based on ball height and player stance.
-- Optional assist mode gives generous timing windows.
+- Ironroot Quarry and the Rainhall Caverns are layered into descending floors reached by ladders, shafts, and an elevator-style lift that banks checkpoints every few floors so a run never wastes a full day.
+- Each floor is procedurally dressed from authored room kits: ore pockets, breakable rock, geode clusters, mineral springs, collapsed rail, tide doors, and the occasional carved chamber that hides lore or a rare resource.
+- Light is a resource: lanterns, glow mushrooms, and crystal seams push back the dark, and deeper floors demand better light or grant less preview.
 
-Rally model:
+Resources and hazards:
 
-- Ball has position, velocity, spin, arc, shadow, target zone, and hit-state.
-- Player/NPC athletes have speed, jump, focus, power, technique, stamina, and teamwork.
-- Court surfaces alter bounce and slide: sand, packed clay, cliff stone, spring grass, ice, festival mats.
-- Weather affects play: wind bends arcs, rain reduces traction, heat drains stamina, fog narrows preview.
+- Ore tiers, gems, geodes, clay, coal, fossils, and rare storm-fused minerals gate tool upgrades, building parts, and artisan recipes.
+- Hazards stay readable: falling rock, flooded tide-door rooms, slick stone, fragile floors, and timed mineral-spring vents.
+- A health bar separate from stamina governs combat-light danger; defeat sends the player home with a recoverable, non-punishing setback rather than a game over.
 
-Modes:
+Combat-light encounters:
 
-- Practice drills: serves, receives, quick sets, blocks, dives.
-- Pickup games: casual social play.
-- Quest matches: custom rules for NPC arcs.
-- Festivals: bracket tournaments, trick-shot contests, glowball nights.
-- Doubles and triples: team composition matters.
-- Animal assist exhibitions: noncompetitive cute events with trained animals fetching, cheering, or creating buffs.
+- Original, non-gory creatures — echo crawlers, cave moths, glimmer slimes, rail wraiths, quarry geckos gone feral — telegraph attacks clearly and reward patience over reflexes.
+- Defensive tools (a sturdy pick, a tide-iron blade, a thrown lure bomb, a shield charm) read at a glance and respect the Combat skill's perks.
+- Encounters scale with depth and with the Combat skill, and an assist mode widens timing windows and reduces incoming damage for players who want exploration without pressure.
 
 Progression:
 
-- Volleycraft skill unlocks shot types: float serve, topspin serve, soft roll, quick set, line spike, cross spike, jump block, rescue dive, tide lob, wind read.
-- Friendship unlocks team synergy moves with NPCs.
-- Gear changes style, not raw pay-to-win dominance.
-- Court repairs unlock new training stations and local leagues.
+- The Combat skill unlocks moves, perks, and professions: deeper safe-descent, better drop quality, knockback control, hazard resistance, and a defender/forager profession split.
+- Mine depth gates a mid-game boss chamber and a late-game "deepest floor" mystery tied to the Storm Archive.
+- Quarry Lift restoration unlocks rail carts, faster returns, and access to the rare-ore floors.
 
 ### Farming and ecology
 
 Crops are original and coastal:
 
 - Spring: bell peas, rainroot, blush radish, glasslettuce, poppy kale, tide turnip.
-- Summer: sunmelon, saltcorn, bright okra, blueleaf basil, courtlime, shellbean.
+- Summer: sunmelon, saltcorn, bright okra, blueleaf basil, harborlime, shellbean.
 - Fall: ember squash, copper beet, dusk yam, maplenut, velvet cabbage, cider pear.
 - Winter: frost fennel, snowmoss, lantern leek, powderberry, ice carrot.
 - Reef crops: kelp ribbons, pearl algae, brine lotus, coral mint.
@@ -278,22 +273,22 @@ Crafting categories:
 
 - Farm tools: sprinklers, windbreaks, scare kites, composters, seed press.
 - Artisan machines: brine barrel, herb dryer, cheese drum, honey spinner, oil press, pickle crock, smokehouse.
-- Court gear: net upgrades, ball press, chalk line kit, agility ladder, rebound wall, training posts.
+- Preserving and refining gear: kiln, loom, mayonnaise churn, preserves jar, seed maker, bait maker, ore furnace.
 - Exploration gear: lantern, rope kit, reef shoes, mine cart battery, glider canvas.
-- Decor: furniture, wall pieces, rugs, court banners, planters, aquariums, trophies.
+- Decor: furniture, wall pieces, rugs, hanging banners, planters, aquariums, trophies.
 
 Economy principles:
 
 - Avoid one dominant crop. Use rotating demand, weather effects, shipping contracts, artisan time, storage pressure, and NPC preferences.
-- Let players earn through farming, fishing, matches, commissions, animal products, crafting, cooking, and exploration.
+- Let players earn through farming, fishing, mining, foraging, commissions, animal products, crafting, cooking, and exploration.
 - Add fair late-game automation, but preserve player choice and tactile charm.
 
 ### Community restoration
 
 Replace the "community center bundle" idea with original civic projects:
 
-1. The Netlight Court  
-   Restores practice, local games, tournaments, and character scenes.
+1. The Netlight Beacon  
+   Relights the lighthouse, makes night sailing safe again, unlocks the observatory deck, and triggers key character scenes.
 
 2. Market Lane Canopies  
    Restores shops, traveling vendors, and rainy-day schedules.
@@ -327,11 +322,11 @@ All characters are original. Each major NPC needs daily schedule tables, gift ta
 ### Romance candidates
 
 1. Mara Vale  
-   Role: harbor mechanic and former league setter.  
+   Role: harbor mechanic and former shipwright's apprentice.  
    Personality: direct, funny, guarded, precise.  
-   Arc: rebuilding trust after a match-fixing accusation she did not commit.  
-   Gameplay: repairs machines, unlocks court gadgets, elite setting drills.  
-   Loved gifts: gear oil blend, courtlime tart, polished copper beet, stormglass charm.
+   Arc: rebuilding trust after a salvage-fraud accusation she did not deserve.  
+   Gameplay: repairs machines, unlocks workshop gadgets, advanced tool tinkering.  
+   Loved gifts: gear oil blend, harborlime tart, polished copper beet, stormglass charm.
 
 2. Jun Park  
    Role: bakery owner and beach cleanup organizer.  
@@ -351,7 +346,7 @@ All characters are original. Each major NPC needs daily schedule tables, gift ta
    Role: courier, glider pilot, and wind reader.  
    Personality: charming, restless, avoids grief through motion.  
    Arc: confronting the storm night when they failed to deliver a warning.  
-   Gameplay: shortcuts, glider traversal, wind serve techniques.  
+   Gameplay: shortcuts, glider traversal, wind-route foraging tips.  
    Loved gifts: feather charm, cloud cacao, smoked shellbean, ridge map.
 
 5. Cora Bell  
@@ -362,18 +357,18 @@ All characters are original. Each major NPC needs daily schedule tables, gift ta
    Loved gifts: lantern leek soup, medicinal reeds, pearl algae balm, songbook.
 
 6. Tavi Stone  
-   Role: quarry sculptor and defensive blocker.  
+   Role: quarry sculptor and stoneworker.  
    Personality: calm, tactile, protective, slow to speak.  
    Arc: learning to make art for joy after years of commission work.  
-   Gameplay: stone decor, mining perks, block training.  
+   Gameplay: stone decor, mining perks, geode cutting.  
    Loved gifts: echo crystal, ember squash stew, carved driftwood, goat cheese.
 
 7. Lio Marin  
-   Role: fishmonger, reef diver, and trick-shot legend.  
+   Role: fishmonger and reef diver.  
    Personality: flamboyant, generous, conflict-avoidant.  
    Arc: admitting fear of deep water after the storm.  
    Gameplay: fishing lures, snorkeling, reef restoration.  
-   Loved gifts: cave jelly, courtlime ceviche, reef mint, rare shell.
+   Loved gifts: cave jelly, harborlime ceviche, reef mint, rare shell.
 
 8. Petra Quill  
    Role: librarian, local historian, rules expert.  
@@ -386,7 +381,7 @@ All characters are original. Each major NPC needs daily schedule tables, gift ta
    Role: traveling musician and festival announcer.  
    Personality: magnetic, evasive, emotionally observant.  
    Arc: deciding whether Ballast Bay can become home.  
-   Gameplay: music layers, rhythm drills, festival variants.  
+   Gameplay: music layers, festival performances, seasonal song variants.  
    Loved gifts: honeyed tea, rare vinyl, velvet cabbage roll, stage lantern.
 
 10. Imani Brooks  
@@ -404,11 +399,11 @@ All characters are original. Each major NPC needs daily schedule tables, gift ta
    Loved gifts: sweetgrass, mooncalf feather, lantern honey, turtle charm.
 
 12. Bash Calder  
-   Role: former pro spiker, now school coach.  
+   Role: former harbor rescue diver, now schoolhouse groundskeeper and youth mentor.  
    Personality: loud, kind, secretly insecure.  
-   Arc: redefining worth after injury.  
-   Gameplay: spike drills, youth team quests, confidence buffs.  
-   Loved gifts: protein stew, court banner, sunmelon juice, polished knee brace.
+   Arc: redefining worth after the injury that ended his rescue career.  
+   Gameplay: schoolhouse repair quests, kids' nature-club quests, confidence buffs.  
+   Loved gifts: protein stew, woven banner, sunmelon juice, polished brass compass.
 
 ### Core non-romance NPCs
 
@@ -416,18 +411,18 @@ All characters are original. Each major NPC needs daily schedule tables, gift ta
 - Milo and Min Bell: twins who run the general store and disagree about modernization.
 - Dr. Oren Quay: clinic lead, collector of odd shells.
 - Aunt Nessa: player's relative, writes tutorial letters, visits seasonally.
-- Coach Rell: retired champion who unlocks mastery and late-game tournaments.
+- Elder Rell: retired master forager and quarry hand who unlocks skill mastery and late-game deep-cavern access.
 - Fern: shy school kid who names stray animals and starts the turtle sanctuary quest.
 - Captain Oda: ferry captain whose boat is damaged until the winch project is complete.
 - Sable: blacksmith with a soft spot for poetry and high-quality ore.
 - Rumi: bathhouse owner and weather watcher.
 - Etta Finch: elderly birdwatcher who tracks seasonal fauna.
-- The Brine Club: three rival athletes who become friends over multiple tournaments.
+- The Brine Club: three salty old fisherfolk who bicker, swap tall tales, and warm to the player over many shared seasons on the docks.
 
 ### Relationship mechanics
 
 - 10 friendship levels for most NPCs; 14 for spouse/partner equivalent if romance exists.
-- Daily talk, gifts, birthdays, quests, team play, festival participation, and dialogue choices affect rapport.
+- Daily talk, gifts, birthdays, quests, shared work, festival participation, and dialogue choices affect rapport.
 - Each NPC has at least:
   - 120 ambient lines.
   - 40 seasonal/weather lines.
@@ -435,7 +430,7 @@ All characters are original. Each major NPC needs daily schedule tables, gift ta
   - 12 gift reactions.
   - 8 relationship scenes.
   - 3 conflict scenes where the player can help, worsen, or delay resolution.
-  - 2 volleyball/team chemistry scenes.
+  - 2 shared-project or working-side-by-side scenes.
   - 1 late-game "years later" scene.
 
 ---
@@ -458,7 +453,7 @@ Weather must alter:
 
 - Crop growth.
 - NPC schedules.
-- Court physics.
+- Mining and cavern hazards.
 - Fish tables.
 - Ambient audio.
 - Lighting and shadows.
@@ -471,10 +466,10 @@ Weather must alter:
 - Chunky low-polygon geometry, strong silhouettes, hand-painted low-resolution textures, restrained texture filtering, vertex-color accents, baked ambient shading, atmospheric distance fog, and jewel-toned environmental lighting.
 - Characters use expressive simplified anatomy, reusable humanoid rigs, readable hands and feet, face texture swaps or lightweight facial joints, and personality-specific posture layers.
 - Every character, animal, plant, building, tool, machine, crop, and collectible receives a model reference set: hero render, orthographic turnaround, wireframe/topology view, UV/material sheet, scale comparison, and movement/posture sheet where applicable.
-- Character motion library includes idle, walk, jog, sprint, pivot, stop, slope, stair, carry, tool, gift, converse, emote, serve, set, spike, block, dive, swim/snorkel, sit, sleep, and festival variants.
+- Character motion library includes idle, walk, jog, sprint, pivot, stop, slope, stair, carry, tool, gift, converse, emote, mine, chop, fish, defend/dodge, swim/snorkel, sit, sleep, and festival variants.
 - Creature motion includes breathing, looking, locomotion, feeding, grazing, playing, resting, weather reaction, affection, product behavior, and species-specific personality loops.
 - Flora motion uses lightweight wind phases, growth stages, harvest reactions, seasonal transitions, shoreline movement, and distance-based animation reduction.
-- Environmental animation includes grass sway, shoreline foam, tide lines, window lights, moths, drifting pollen, flags, hanging nets, water caustics, fog volumes, and lantern flicker.
+- Environmental animation includes grass sway, shoreline foam, tide lines, window lights, moths, drifting pollen, flags, hanging fishing nets, water caustics, fog volumes, and lantern flicker.
 - Camera uses a three-quarter third-person adventure view with smooth orbit constraints, context-sensitive framing, occlusion handling, indoor camera volumes, and mobile-safe zoom bands.
 - Day/night rendering combines directional light, ambient/hemisphere light, baked lightmaps where useful, vertex color, localized lights, fog, and restrained post-processing.
 - Approved reference images live under `art-production/style-themes/theme-03-n64-low-poly-adventure/` and are the visual source of truth.
@@ -491,7 +486,7 @@ Recommended stack:
 - Data: JSON or YAML converted to typed JSON at build time.
 - 3D authoring: Blender using shared unit scale, naming, rig, origin, transform, UV, and export conventions.
 - Runtime assets: glTF 2.0 binary `.glb`, Draco or Meshopt geometry compression, KTX2/Basis texture compression, and split animation libraries where beneficial.
-- Physics/collision: Rapier for character, trigger, ball, and lightweight rigid-body collision. Keep farming interactions grid-aware while rendering the world freely in 3D.
+- Physics/collision: Havok (via the Babylon.js Havok plugin) for character, trigger, and lightweight rigid-body collision. Keep farming interactions grid-aware while rendering the world freely in 3D.
 - Navigation: baked navigation meshes with schedule waypoints, local avoidance, doors, off-mesh links, and recovery behavior.
 - Maps: modular 3D scene chunks assembled from authored terrain, buildings, props, collision proxies, navigation data, spawn points, camera volumes, and interaction anchors.
 - Saves: IndexedDB with localStorage fallback and export/import save files.
@@ -507,7 +502,7 @@ Recommended stack:
 - Favor one material per simple prop and tightly controlled materials per character or building kit.
 - Use small hand-painted texture atlases, vertex colors, and reusable trim sheets instead of high-resolution unique textures everywhere.
 - Separate collision meshes from visible meshes. Collision must remain simple, stable, and invisible.
-- Author explicit animation clip names and loop rules. Root motion is reserved for controlled cutscenes or special sports moves.
+- Author explicit animation clip names and loop rules. Root motion is reserved for controlled cutscenes or special scripted actions.
 - Preserve topology around shoulders, elbows, hips, knees, neck, wrists, ankles, jaws, tails, wings, and plant bend points.
 - Build level-of-detail variants for large scenery and expensive repeated assets. Use impostors or billboards only when their transition is visually acceptable.
 
@@ -531,10 +526,10 @@ Accessibility:
 - Remappable controls.
 - Touch, keyboard, mouse, and controller.
 - Reduce motion option.
-- High-contrast targeting reticle for volleyball.
+- High-contrast interaction and targeting reticle.
 - Dyslexia-friendly font option for UI text.
 - No time pressure assist mode.
-- Fishing and volleyball timing assist.
+- Fishing and combat timing assist.
 - Colorblind-safe quality markers.
 
 ---
@@ -567,7 +562,7 @@ Acceptance criteria:
 
 ### Prompt 003 - Scene manager and save bootstrap
 
-Implement scene transitions for Boot, Preload, Title, NewGame, Farm, Town, Interior, Court, Mine, and UI overlay. Add a save model with player identity, day, season, time, inventory, map state, relationships, skills, and flags.
+Implement scene transitions for Boot, Preload, Title, NewGame, Farm, Town, Interior, Beach, Mine, and UI overlay. Add a save model with player identity, day, season, time, inventory, map state, relationships, skills, and flags.
 
 Acceptance criteria:
 
@@ -596,7 +591,7 @@ Create a model specification matrix for every asset class. Define approximate tr
 
 Acceptance criteria:
 
-- Budgets exist for hero characters, background NPCs, large animals, small animals, crops, trees, tools, machines, buildings, modular terrain, court props, and collectibles.
+- Budgets exist for hero characters, background NPCs, large animals, small animals, crops, trees, tools, machines, buildings, modular terrain, cave/mine props, and collectibles.
 - Repeated assets have stricter draw-call and instancing requirements.
 - Every item in the art roster can be assigned to a documented class.
 
@@ -631,14 +626,14 @@ Acceptance criteria:
 - Hand props attach through named sockets and align through authored interaction anchors.
 - Social clips can be mirrored or lightly retargeted without obvious errors.
 
-### Theme 3 Prompt A06 - Volleyball animation and ball-contact library
+### Theme 3 Prompt A06 - Combat, tool-impact, and festival animation library
 
-Create the full volleyball motion set for serve types, ready stance, shuffle, bump, overhead set, jump set, approach, spike, soft tip, block, dive, roll recovery, emergency save, landing, fatigue, celebration, disappointment, teammate high-five, and injury-safe recovery. Define exact ball-contact frames and hand/forearm contact zones.
+Create the full action motion set: ready stance, dodge roll, sidestep, guard, light and heavy tool/weapon swings, thrown-item wind-up and release, hit reaction, knockback, stagger, get-up, mining strike, ore-break recovery, exhaustion, celebration, disappointment, congratulatory clap, and injury-safe fall recovery. Add festival and social-event motions: dance steps, cheering, toasting, lantern lifting, and crowd idle loops. Define exact contact frames and tool/hand impact zones.
 
 Acceptance criteria:
 
-- Gameplay owns ball physics while animation supplies readable timing and contact events.
-- Each technique has beginner, skilled, and personality variants where valuable.
+- Gameplay owns hit detection and damage while animation supplies readable timing and contact events.
+- Each action has beginner, skilled, and personality variants where valuable.
 - Transitions remain responsive on keyboard, touch, and controller.
 
 ### Theme 3 Prompt A07 - Animal rigs, behavior, and posture library
@@ -663,7 +658,7 @@ Acceptance criteria:
 
 ### Theme 3 Prompt A09 - Complete item and prop library
 
-Build a master inventory of all tools, seeds, crops, forage, fish, ore, wood, stone, shells, food, recipes, gifts, quest objects, court equipment, machines, furniture, clothing, books, letters, trophies, building parts, and festival props. For each item define world model, inventory icon render, held orientation, collision, scale, material, quality variants, animation needs, and destruction/placement rules.
+Build a master inventory of all tools, seeds, crops, forage, fish, ore, wood, stone, shells, food, recipes, gifts, quest objects, weapons and defensive gear, machines, furniture, clothing, books, letters, trophies, building parts, and festival props. For each item define world model, inventory icon render, held orientation, collision, scale, material, quality variants, animation needs, and destruction/placement rules.
 
 Acceptance criteria:
 
@@ -696,7 +691,7 @@ Acceptance criteria:
 
 ### Prompt 005 - Player controller and interaction model
 
-Implement third-person player movement, facing, jogging, sprinting, acceleration, braking, pivots, slope/stair handling, stamina drain, contextual interact button, tool slot selection, and 3D action targeting. Add an interaction resolver for farm cell, prop, NPC, animal, machine, door, pickup, court zone, water entry, and climb link interactions. Drive movement through a reusable humanoid rig and animation state machine.
+Implement third-person player movement, facing, jogging, sprinting, acceleration, braking, pivots, slope/stair handling, stamina drain, contextual interact button, tool slot selection, and 3D action targeting. Add an interaction resolver for farm cell, prop, NPC, animal, machine, door, pickup, ore node, water entry, and climb link interactions. Drive movement through a reusable humanoid rig and animation state machine.
 
 Acceptance criteria:
 
@@ -741,7 +736,7 @@ Acceptance criteria:
 
 ### Prompt 009 - Tools and upgrades
 
-Add low-poly hoe, watering can, axe, pick, sickle, fishing rod, net wrench, and training ball models. Add hand sockets, carried/stowed states, tool levels, charge actions, 3D area previews projected onto terrain, contact events, and upgrade-specific materials.
+Add low-poly hoe, watering can, axe, pick, sickle, fishing rod, and a basic defensive blade/tool model. Add hand sockets, carried/stowed states, tool levels, charge actions, 3D area previews projected onto terrain, contact events, and upgrade-specific materials.
 
 Acceptance criteria:
 
@@ -840,7 +835,7 @@ Implement machine processing with input slots, fuel rules where needed, timers, 
 
 Acceptance criteria:
 
-- Brine barrel, herb dryer, cheese drum, honey spinner, and ball press work.
+- Brine barrel, herb dryer, cheese drum, honey spinner, and oil press work.
 - Machines process across day transitions.
 - Audio and visual states make readiness obvious.
 
@@ -894,46 +889,46 @@ Acceptance criteria:
 - Progress can be saved through elevator-style checkpoints.
 - Combat is light, readable, and optional-friendly where possible.
 
-### Prompt 024 - Combat-light creature encounters
+### Prompt 024 - Defensive tools and NPC daily-life depth
 
-Implement simple defensive tools, knockback, creature telegraphs, health, invulnerability frames, loot, and difficulty scaling.
-
-Acceptance criteria:
-
-- Encounters support keyboard, touch, and controller.
-- Player defeat is recoverable and not overly punitive.
-- Creature designs are original and non-gory.
-
-### Prompt 025 - Volleyball physics prototype
-
-Build the 3D volleyball court scene with deterministic ball physics, serve, receive, set, spike, block, scoring, court bounds, net collision, ball shadow/landing marker, animation contact events, character facing, camera framing, and timing windows.
+Implement the foundational self-defense layer (simple defensive tools, knockback, creature telegraphs, a health bar, invulnerability frames, and loot) that Prompts 025-026 build on. Then deepen NPC daily life: richer schedule branches by season/weather/relationship, idle "living" behaviors (eating, browsing shops, chatting in pairs, working their trade), reactive greetings that reference recent player actions, and small unscripted moments that make the town feel inhabited.
 
 Acceptance criteria:
 
-- Player can complete a rally against a simple AI.
-- Ball arc and shadow make height clear.
-- Mobile controls feel playable with one thumb plus action button.
-- Ball contact is controlled by gameplay events and never depends on unreliable visual mesh collision alone.
+- Defensive encounters support keyboard, touch, and controller, and player defeat is recoverable and not overly punitive.
+- NPCs visibly do more than stand and wait: at least four show distinct, schedule-driven daily-life behaviors.
+- Creature designs are original and non-gory; NPC reactions are data-driven and never soft-lock the player.
 
-### Prompt 026 - Volleyball AI and team play
+### Prompt 025 - Mine depth, elevator, and boss chamber
 
-Add teammate/opponent AI roles, positioning, shot choice, stamina, mistakes, communication bubbles, and difficulty profiles.
-
-Acceptance criteria:
-
-- Doubles matches are playable.
-- AI makes believable decisions without perfect reactions.
-- Team chemistry modifies behavior subtly.
-
-### Prompt 027 - Volleyball progression and drills
-
-Add Volleycraft XP, drills, skill unlocks, trainer NPC, gear, court upgrades, and technique tutorials.
+Build the deterministic descending-floor system for Ironroot Quarry and the Rainhall Caverns: procedurally dressed floors from authored room kits, ladders and shafts, an elevator-style checkpoint lift, ore/geode/fossil nodes, breakable rock, tide-door and flooded-room hazards, light-as-resource lanterns, a separate health bar, and a mid-game boss chamber gated by depth.
 
 Acceptance criteria:
 
-- At least 8 drills exist.
-- New shot types unlock through progression.
-- Tutorials are playable and skippable.
+- Player can descend, bank checkpoints at the lift, and return home safely after a defeat with a recoverable, non-punishing setback.
+- Floor generation is deterministic from a seed for save/load and testing.
+- The boss chamber has a clear telegraphed pattern and a fair, optional-assist-friendly fight.
+- Mobile controls feel playable with one thumb plus an action button.
+
+### Prompt 026 - Combat-light creatures, AI, and difficulty
+
+Add original non-gory cave creatures with telegraphed attacks, simple defensive AI roles (patrol, chase, retreat, swarm), knockback, invulnerability frames, loot drops, and difficulty profiles that scale with depth and the Combat skill.
+
+Acceptance criteria:
+
+- Encounters are playable with keyboard, touch, and controller.
+- AI makes believable decisions without perfect reactions, and assist mode widens timing windows.
+- Creature designs are original, non-gory, and readable at gameplay scale and mobile size.
+
+### Prompt 027 - Skill professions and mastery
+
+Add the skill XP, level, and profession system for Cultivation, Husbandry, Foraging, Angling, Crafting, Exploring, Combat, and Rapport: branching profession choices at milestone levels, perk effects on tool cost and yields, a trainer/mentor NPC, and a late-game mastery track that re-engages maxed skills.
+
+Acceptance criteria:
+
+- At least one branching profession choice exists per skill.
+- Profession perks measurably change play (energy cost, yield, drop quality, prices, hazard resistance) without trivializing progression.
+- Tutorials and mastery prompts are playable and skippable, and no exact Stardew XP numbers or profession tree are copied.
 
 ### Prompt 028 - Quest system
 
@@ -941,7 +936,7 @@ Implement quest journal, story quests, daily requests, special orders, objective
 
 Acceptance criteria:
 
-- At least 12 quests exist across farming, fishing, crafting, exploration, social, and volleyball.
+- At least 12 quests exist across farming, fishing, crafting, mining, foraging, exploration, and social arcs.
 - Quest UI is touch-friendly.
 - Failed timed quests do not break story paths.
 
@@ -957,47 +952,47 @@ Acceptance criteria:
 
 ### Prompt 030 - Festivals phase one
 
-Create the seasonal festival framework and implement three festivals: Spring Netraising, Summer Glowball Night, and Fall Harvest Rally.
+Create the seasonal festival framework and implement three festivals: Spring Seed Blessing, Summer Glowtide Night, and Fall Harvest Fair.
 
 Acceptance criteria:
 
 - Festival days alter schedules, shops, map setup, and music.
-- Each festival has at least one minigame, special shop, and relationship opportunity.
+- Each festival has at least one non-sport minigame (a foraging hunt, a cook-off, a lantern release, a fishing contest), special shop, and relationship opportunity.
 - Multiplayer hooks are considered even if multiplayer is later.
 
 ### Prompt 031 - Festivals phase two
 
-Add Winter Icecourt Classic, Lantern Tide, Marsh Chorus, Skyserve Cup, and rotating second-year variants.
+Add the Winter Frostlight Festival, Lantern Tide, Marsh Chorus, the Founders Harvest Fair, and rotating second-year variants.
 
 Acceptance criteria:
 
 - Festivals have year-two dialogue/map variations.
-- Skyserve Cup depends on court restoration and NPC team arcs.
+- The Founders Harvest Fair depends on town-restoration progress (lighthouse beacon, market hall, boardwalk) and NPC relationship arcs.
 - Festival rewards are unique but not mandatory for main progression.
 
 ### Prompt 032 - Mail, news, and world reactivity
 
-Add mail system, town notice board, weather/tide forecast, sports standings, birthday reminders, lost-and-found, and dynamic news after player actions.
+Add mail system, town notice board, weather/tide forecast, shipping and town-restoration progress notes, birthday reminders, lost-and-found, and dynamic news after player actions.
 
 Acceptance criteria:
 
 - Mail can deliver items, recipes, quests, and story.
 - Notice board creates daily and weekly reasons to visit town.
-- News reacts to projects, festivals, and tournaments.
+- News reacts to projects, festivals, and restoration milestones.
 
 ### Prompt 033 - Cooking and buffs
 
-Implement kitchen, recipes, ingredient tags, cooking UI, food buffs, favorite meals, picnic scenes, and team meals before matches.
+Implement kitchen, recipes, ingredient tags, cooking UI, food buffs, favorite meals, picnic scenes, and shared meals at festivals and community work days.
 
 Acceptance criteria:
 
 - At least 25 original recipes exist.
-- Buffs affect stamina, skill, movement, fishing, mining, or volleyball.
+- Buffs affect stamina, skill, movement, fishing, mining, foraging, or combat.
 - NPC meal preferences integrate with relationships.
 
 ### Prompt 034 - Home, decor, and customization
 
-Add farmhouse interiors, furniture placement, wallpaper/flooring, renovations, wardrobe, player appearance, court banners, trophy shelves, and photo mode.
+Add farmhouse interiors, furniture placement, wallpaper/flooring, renovations, wardrobe, player appearance, decorative banners, trophy and curio shelves, and photo mode.
 
 Acceptance criteria:
 
@@ -1007,7 +1002,7 @@ Acceptance criteria:
 
 ### Prompt 035 - Audio architecture
 
-Implement music manager, ambient layers, positional sound, UI sounds, tool sounds, court sounds, weather ambience, festival stingers, and accessibility volume controls.
+Implement music manager, ambient layers, positional sound, UI sounds, tool sounds, mine and cavern sounds, weather ambience, festival stingers, and accessibility volume controls.
 
 Acceptance criteria:
 
@@ -1028,7 +1023,7 @@ Acceptance criteria:
 
 ### Prompt 037 - Visual polish pass two
 
-Add seasonal material/prop variants, weather particles and fog, day/night lighting, indoor lighting transitions, window glows, court crowd reactions, animated flora/fauna, shoreline/tide meshes, water caustics, vertex-color variation, and distance-based effect reduction.
+Add seasonal material/prop variants, weather particles and fog, day/night lighting, indoor lighting transitions, window glows, festival crowd reactions, animated flora/fauna, shoreline/tide meshes, water caustics, vertex-color variation, and distance-based effect reduction.
 
 Acceptance criteria:
 
@@ -1049,7 +1044,7 @@ Acceptance criteria:
 
 ### Prompt 039 - Narrative act structure
 
-Implement the main story in three acts: Arrival and Repair, Trust and Rivalry, Storm Archive and Skyserve Cup. Add act gates, optional routes, moral choices, and post-credits year-two content.
+Implement the main story in three acts: Arrival and Repair, Trust and Old Wounds, and the Storm Archive and Founders Harvest Fair. Add act gates, optional routes, moral choices, and post-credits year-two content.
 
 Acceptance criteria:
 
@@ -1059,7 +1054,7 @@ Acceptance criteria:
 
 ### Prompt 040 - Secrets and long-tail goals
 
-Add hidden rooms, rare weather events, secret crops, legendary fish, court trick titles, animal personalities, map fragments, archive mysteries, and multi-year scenes.
+Add hidden rooms, rare weather events, secret crops, legendary fish, deep-cavern relics, animal personalities, map fragments, archive mysteries, and multi-year scenes.
 
 Acceptance criteria:
 
@@ -1104,13 +1099,13 @@ Add final accessibility settings for motion, flashing, timing assists, contrast,
 
 Acceptance criteria:
 
-- Volleyball and fishing can be completed with assist settings.
+- Fishing and combat-light encounters can be completed with assist settings.
 - Important information is not color-only.
 - Settings are available before gameplay starts.
 
 ### Prompt 045 - Automated test suite
 
-Create tests for crop growth, inventory, shops, relationships, quests, festivals, saves, machines, animals, court scoring, scene smoke loads, GLB validation, animation clip availability, interaction anchors, collision proxies, navigation links, and visual canvas output.
+Create tests for crop growth, inventory, shops, relationships, quests, festivals, saves, machines, animals, mine-floor generation and combat resolution, scene smoke loads, GLB validation, animation clip availability, interaction anchors, collision proxies, navigation links, and visual canvas output.
 
 Acceptance criteria:
 
@@ -1121,7 +1116,7 @@ Acceptance criteria:
 
 ### Prompt 046 - Balancing tools
 
-Build debug dashboards for economy, crop profits, XP pacing, gift discovery, quest rewards, festival rewards, machine throughput, and match difficulty.
+Build debug dashboards for economy, crop profits, XP pacing, gift discovery, quest rewards, festival rewards, machine throughput, and mine/combat difficulty.
 
 Acceptance criteria:
 
@@ -1131,7 +1126,7 @@ Acceptance criteria:
 
 ### Prompt 047 - Content authoring guide
 
-Write documentation for adding NPCs, crops, items, recipes, quests, festivals, modular 3D maps, dialogue, cutscenes, animals, and volleyball drills. Include Blender scene setup, model budgets, rig reuse, clip naming, interaction anchors, collision, navigation, LOD, texture compression, `.glb` export, icon rendering, and browser validation.
+Write documentation for adding NPCs, crops, items, recipes, quests, festivals, modular 3D maps, dialogue, cutscenes, animals, and mine floors and creatures. Include Blender scene setup, model budgets, rig reuse, clip naming, interaction anchors, collision, navigation, LOD, texture compression, `.glb` export, icon rendering, and browser validation.
 
 Acceptance criteria:
 
@@ -1142,7 +1137,7 @@ Acceptance criteria:
 
 ### Prompt 048 - Alpha vertical slice
 
-Assemble an alpha slice covering the first 7 in-game days: 3D farm basics, town intro, 4 fully rigged NPCs with posture profiles, 2 animated animals, fishing, one mine room, one volleyball drill, one story quest, one civic project, one mini festival teaser, and a representative validated item library.
+Assemble an alpha slice covering the first 7 in-game days: 3D farm basics, town intro, 4 fully rigged NPCs with posture profiles, 2 animated animals, fishing, one mine room with a combat-light encounter, one story quest, one civic project, one mini festival teaser, and a representative validated item library.
 
 Acceptance criteria:
 
@@ -1152,7 +1147,7 @@ Acceptance criteria:
 
 ### Prompt 049 - Beta content expansion
 
-Expand to one full in-game year with all seasons, all major modular 3D maps, 24 rigged NPCs, the complete documented crop/item/prop library, 40 recipes, 30 quests, 8 festivals, 4 farm variants, and complete court league progression.
+Expand to one full in-game year with all seasons, all major modular 3D maps, 24 rigged NPCs, the complete documented crop/item/prop library, 40 recipes, 30 quests, 8 festivals, 4 farm variants, and complete mine-depth and skill-mastery progression.
 
 Acceptance criteria:
 
@@ -1179,39 +1174,39 @@ Acceptance criteria:
 
 - Day 1: arrival, farm cleanup, meet Aunt Nessa by mail.
 - Day 3: first rain tutorial.
-- Day 5: Mara introduces court repair.
+- Day 5: Mara introduces the lighthouse beacon repair.
 - Day 7: Market Lane reopening request.
-- Day 10: first pickup game.
-- Day 13: Spring Netraising festival.
+- Day 10: first quarry mining run with Elder Rell.
+- Day 13: Spring Seed Blessing festival.
 - Day 16: reef low-tide tutorial.
-- Day 20: quarry access.
+- Day 20: deeper quarry access.
 - Day 24: Marsh Chorus.
 - Day 28: storm memory scene.
 
 ### Summer
 
 - Heat and longer beach schedules.
-- Glowball Night.
+- Glowtide Night.
 - Turtle nesting protection.
-- First doubles bracket.
+- First summer fishing contest.
 - Reef Nursery project.
 - Niko wind-glider shortcut.
 
 ### Fall
 
-- Harvest Rally.
-- Rival Brine Club arrives.
+- Harvest Fair.
+- The Brine Club's tall-tale season begins on the docks.
 - Orchard and artisan economy opens.
 - Storm Archive clues.
-- Quarry Lift project.
+- Quarry Lift project and the mid-game boss chamber.
 
 ### Winter
 
-- Icecourt Classic.
+- Frostlight Festival.
 - Snow crops and indoor crafting.
 - Deep Rainhall Caverns.
 - Relationship-heavy indoor scenes.
-- Skyserve Cup qualifiers.
+- Founders Harvest Fair preparations.
 - Year-end town review.
 
 ---
@@ -1222,14 +1217,14 @@ Acceptance criteria:
 
 - One modular low-poly 3D farm map.
 - One modular low-poly 3D town map.
-- One production-ready player model with shared humanoid rig and complete MVP locomotion/tool/volleyball clips.
+- One production-ready player model with shared humanoid rig and complete MVP locomotion/tool/combat clips.
 - Four rigged NPCs with unique proportions, materials, posture profiles, and reusable animation coverage.
 - Two rigged animals with complete daily behavior loops.
 - Twelve crops.
 - A validated starter library of tools, machines, furniture, forage, food, quest props, and inventory icon renders.
 - Fishing.
 - Basic crafting.
-- One court drill and one match.
+- One mine room with a combat-light encounter.
 - One civic project.
 - One festival.
 - Save/load.
@@ -1243,11 +1238,11 @@ Acceptance criteria:
 - Twenty-four fully modeled NPCs using compatible shared rig families.
 - Eight animals plus pets.
 - Complete documented model/item library with icons, pivots, sockets, materials, LODs, collision, and production status.
-- Complete locomotion, work, social, emotional, volleyball, creature, and flora motion libraries.
+- Complete locomotion, work, social, emotional, combat, creature, and flora motion libraries.
 - Four seasons.
 - Eight festivals.
 - Full relationship arcs.
-- Full volleyball league.
+- Full mine-depth and skill-mastery progression.
 - Mines, reef, marsh, ridge, and islets.
 - Home customization.
 - PWA offline play.
@@ -1256,8 +1251,8 @@ Acceptance criteria:
 
 - Online co-op.
 - Mod/content-pack support.
-- Advanced court editor.
-- Player-made tournaments.
+- Advanced farm and home layout editor.
+- Player-shared farm and decor blueprints.
 - New island chain.
 - Expanded marriage/partnership life.
 - Seasonal story DLC.
@@ -1271,7 +1266,7 @@ Before calling any build complete, verify:
 - The player always knows at least three attractive next goals.
 - Every system creates stories, not just resources.
 - NPCs feel like they live in town when the player is absent.
-- Volleyball is a relationship and progression system, not a pasted-on minigame.
+- Community restoration is woven through farming, crafting, relationships, and festivals rather than tracked as a checklist.
 - Mobile play is first-class.
 - Theme 3 is consistent across models, animation, materials, lighting, environments, items, icons, and UI.
 - Every visible hero asset has an approved turnaround, wireframe/topology view, material/UV reference, scale reference, and movement/posture reference where applicable.
