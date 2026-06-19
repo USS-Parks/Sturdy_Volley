@@ -1,29 +1,42 @@
-import Phaser from 'phaser';
+import type { Engine, Scene } from '@babylonjs/core';
+import type { UIOverlay } from '../ui/overlay';
+import type { SceneManager } from './SceneManager';
 
-/** Fade-out RGB (matches the app background) used for transitions. */
-const FADE_RGB = [6, 12, 24] as const;
+export interface SceneContext {
+  engine: Engine;
+  manager: SceneManager;
+  overlay: UIOverlay;
+}
 
 /**
- * Base scene with smooth, interrupt-safe camera fade transitions. A scene can
- * only start one transition at a time; subsequent fadeTo() calls are ignored
- * until the next scene resets the guard in fadeIn().
+ * Base class for a game "screen" backed by its own Babylon Scene. The
+ * SceneManager owns the render loop and calls update()/getScene() each frame
+ * and dispose() on transition.
  */
-export class GameScene extends Phaser.Scene {
-  private transitioning = false;
-  protected readonly fadeDuration = 320;
+export abstract class GameScene {
+  protected scene!: Scene;
 
-  protected fadeIn(): void {
-    this.transitioning = false;
-    this.cameras.main.fadeIn(this.fadeDuration, ...FADE_RGB);
+  constructor(protected readonly ctx: SceneContext) {}
+
+  /** Build the Babylon scene (camera, lights, meshes), assign this.scene, return it. */
+  abstract build(): Scene;
+
+  /** Called once after build, with optional transition data (e.g. DOM overlay setup). */
+  enter(_data?: unknown): void {}
+
+  /** Per-frame update (seconds since last frame). */
+  update(_dt: number): void {}
+
+  getScene(): Scene {
+    return this.scene;
   }
 
-  protected fadeTo(target: string, data?: Record<string, unknown>): void {
-    if (this.transitioning) return;
-    this.transitioning = true;
-    const cam = this.cameras.main;
-    cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      this.scene.start(target, data);
-    });
-    cam.fadeOut(this.fadeDuration, ...FADE_RGB);
+  dispose(): void {
+    this.ctx.overlay.clear();
+    this.scene?.dispose();
+  }
+
+  protected goTo(key: string, data?: unknown, fade = true): void {
+    void this.ctx.manager.goTo(key, data, fade);
   }
 }

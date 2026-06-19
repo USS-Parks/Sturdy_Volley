@@ -6,13 +6,13 @@ export default defineConfig({
   base: './',
   // Pre-bundle heavy deps at dev-server start so the first page load doesn't
   // trigger an on-the-fly re-optimization + full reload.
-  optimizeDeps: { include: ['phaser', 'zod'] },
+  optimizeDeps: { include: ['@babylonjs/core', 'zod'] },
   server: { port: 5173, strictPort: true },
   preview: { port: 4173, strictPort: true },
   build: {
     target: 'es2022',
     outDir: 'dist',
     sourcemap: true,
-    chunkSizeWarningLimit: 1600,
+    chunkSizeWarningLimit: 4000,
   },
 });

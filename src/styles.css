@@ -36,8 +36,23 @@ body {
   inset: 0;
 }
 
-#game-root canvas {
+#game-root canvas,
+#game-canvas {
   display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  touch-action: none;
+}
+
+/* Scene-transition fade layer (above canvas + overlay). */
+#fade {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: #050f18;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Overlay layer sits above the canvas; only interactive panels capture input. */

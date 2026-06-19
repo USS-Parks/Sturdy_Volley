@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Save bootstrap', () => {
-  test('new game creates a save, navigates, and Continue restores after reload', async ({ page }) => {
+  test('new game creates a save, navigates 3D scenes, and Continue restores it', async ({ page }) => {
     await page.goto('/');
 
     // Start -> New Game form
@@ -10,20 +10,21 @@ test.describe('Save bootstrap', () => {
     await page.getByTestId('field-farmName').fill('Saltbreak');
     await page.getByTestId('form-submit').click();
 
-    // Lands on the Farm: canvas renders and the HUD shows the player's status.
-    await expect(page.locator('#game-root canvas')).toBeVisible();
+    // Farm: canvas renders + HUD shows the location and the player's status.
+    await expect(page.locator('#game-canvas')).toBeVisible();
+    await expect(page.getByText('Breakpoint Farm', { exact: false })).toBeVisible();
     await expect(page.getByText('Wren', { exact: false })).toBeVisible();
 
-    // A save now exists.
     const saved = await page.evaluate(() => localStorage.getItem('sturdy-volley:save:v1'));
     expect(saved).toBeTruthy();
 
-    // Pause menu navigation: Farm -> Town -> Farm.
+    // Pause-menu navigation: Farm -> Town -> Farm.
     await page.getByTestId('hud-menu').click();
     await page.getByTestId('nav-town').click();
-    await expect(page.getByRole('heading', { name: 'Ballast Bay' })).toBeVisible();
+    await expect(page.getByText('Ballast Bay', { exact: false })).toBeVisible();
+    await page.getByTestId('hud-menu').click();
     await page.getByTestId('nav-farm').click();
-    await expect(page.getByText('Wren', { exact: false })).toBeVisible();
+    await expect(page.getByText('Breakpoint Farm', { exact: false })).toBeVisible();
 
     // Reload: Continue is enabled and restores the save into the Farm.
     await page.reload();

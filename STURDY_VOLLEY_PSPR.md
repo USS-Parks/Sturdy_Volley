@@ -5,6 +5,8 @@ Target: browser-first, mobile-ready, controller-friendly cozy life sim
 Format: P-SPR, meaning Plan-Sequential Prompt Roster  
 Core promise: a long-life cozy adventure about restoring a storm-worn coastal town through farming, friendships, animal care, exploration, crafting, festivals, and expressive volleyball play.
 
+Revision status: Theme 3 approved. Babylon.js is the required 3D engine. Production direction is original N64-era low-poly 3D with model turnarounds, wireframes, reusable rigs, authored movement/posture libraries, and a complete validated item catalog.
+
 ---
 
 ## 1. Research Capsule
@@ -79,7 +81,7 @@ Make the identity new:
    Long-tail secrets, character arcs, community projects, collections, new farm layouts, and seasonal events should keep a player curious after many in-game years.
 
 5. Browser-native delight  
-   Fast load, responsive mobile controls, offline saves, smooth 2D animation, cozy audio, haptics where available, and no install friction.
+   Fast load, responsive mobile controls, offline saves, expressive low-poly 3D animation, cozy audio, haptics where available, and no install friction.
 
 ---
 
@@ -167,7 +169,7 @@ Morning:
 
 Day:
 
-- Spend stamina and time on tile actions, movement, dialogue, crafting, court play, and exploration.
+- Spend stamina and time on contextual world actions, movement, dialogue, crafting, court play, and exploration.
 - Tides reshape beaches and reefs twice per day.
 - NPCs follow schedules influenced by season, weather, relationship, festivals, and town repairs.
 
@@ -465,11 +467,17 @@ Weather must alter:
 
 ### Visual style
 
-- 2D pixel-art or high-resolution pixel-inspired tile art.
-- Four-direction characters with idle, walk, run, tool, carry, emote, serve, set, spike, block, dive, swim/snorkel, sit, sleep, and festival variants.
-- Layered environmental animation: grass sway, shoreline foam, tide lines, window lights, moths, drifting pollen, flags, hanging nets, water caustics.
-- Smooth camera with zoom bands for desktop and mobile.
-- Day/night lighting using tinted overlays and localized light sprites.
+- Approved direction: Theme 3, an original late-1990s N64-era low-poly 3D adventure aesthetic. It should evoke the technical charm of that era without copying Zelda characters, symbols, costumes, locations, props, UI, or compositions.
+- Chunky low-polygon geometry, strong silhouettes, hand-painted low-resolution textures, restrained texture filtering, vertex-color accents, baked ambient shading, atmospheric distance fog, and jewel-toned environmental lighting.
+- Characters use expressive simplified anatomy, reusable humanoid rigs, readable hands and feet, face texture swaps or lightweight facial joints, and personality-specific posture layers.
+- Every character, animal, plant, building, tool, machine, crop, and collectible receives a model reference set: hero render, orthographic turnaround, wireframe/topology view, UV/material sheet, scale comparison, and movement/posture sheet where applicable.
+- Character motion library includes idle, walk, jog, sprint, pivot, stop, slope, stair, carry, tool, gift, converse, emote, serve, set, spike, block, dive, swim/snorkel, sit, sleep, and festival variants.
+- Creature motion includes breathing, looking, locomotion, feeding, grazing, playing, resting, weather reaction, affection, product behavior, and species-specific personality loops.
+- Flora motion uses lightweight wind phases, growth stages, harvest reactions, seasonal transitions, shoreline movement, and distance-based animation reduction.
+- Environmental animation includes grass sway, shoreline foam, tide lines, window lights, moths, drifting pollen, flags, hanging nets, water caustics, fog volumes, and lantern flicker.
+- Camera uses a three-quarter third-person adventure view with smooth orbit constraints, context-sensitive framing, occlusion handling, indoor camera volumes, and mobile-safe zoom bands.
+- Day/night rendering combines directional light, ambient/hemisphere light, baked lightmaps where useful, vertex color, localized lights, fog, and restrained post-processing.
+- Approved reference images live under `art-production/style-themes/theme-03-n64-low-poly-adventure/` and are the visual source of truth.
 
 ---
 
@@ -477,24 +485,46 @@ Weather must alter:
 
 Recommended stack:
 
-- Engine: Phaser 3 or PixiJS plus a custom ECS-like system. Phaser is preferred for tilemaps, input, animation, arcade physics, cameras, mobile support, and fast prototyping.
+- Engine/rendering: Babylon.js with a small game-layer architecture built around Babylon scenes, `AssetContainer` lifecycle, animation groups, cameras, lighting, materials, particles, and interaction systems.
 - Language: TypeScript.
 - Build: Vite.
 - Data: JSON or YAML converted to typed JSON at build time.
-- Maps: Tiled `.tmx` or JSON exports.
+- 3D authoring: Blender using shared unit scale, naming, rig, origin, transform, UV, and export conventions.
+- Runtime assets: glTF 2.0 binary `.glb`, Draco or Meshopt geometry compression, KTX2/Basis texture compression, and split animation libraries where beneficial.
+- Physics/collision: Rapier for character, trigger, ball, and lightweight rigid-body collision. Keep farming interactions grid-aware while rendering the world freely in 3D.
+- Navigation: baked navigation meshes with schedule waypoints, local avoidance, doors, off-mesh links, and recovery behavior.
+- Maps: modular 3D scene chunks assembled from authored terrain, buildings, props, collision proxies, navigation data, spawn points, camera volumes, and interaction anchors.
 - Saves: IndexedDB with localStorage fallback and export/import save files.
-- Audio: WebAudio with sprites and layered music stems.
-- UI: HTML/CSS overlay for menus, or Phaser UI if visual consistency is easier.
+- Audio: WebAudio with layered music stems, ambience zones, positional emitters, and pooled one-shots.
+- UI: responsive HTML/CSS overlay with Babylon.js world-space indicators only where spatial context is necessary.
 - Tests: Vitest for pure logic; Playwright for smoke, layout, save/load, and mobile viewport checks.
+
+3D production rules:
+
+- Use meters consistently: a standard adult character is approximately 1.7 to 1.8 world units tall.
+- Freeze transforms before export and use predictable origins, pivots, sockets, and forward axes.
+- Share rigs across compatible humanoids and animals; do not create a unique skeleton for every cosmetic variant.
+- Favor one material per simple prop and tightly controlled materials per character or building kit.
+- Use small hand-painted texture atlases, vertex colors, and reusable trim sheets instead of high-resolution unique textures everywhere.
+- Separate collision meshes from visible meshes. Collision must remain simple, stable, and invisible.
+- Author explicit animation clip names and loop rules. Root motion is reserved for controlled cutscenes or special sports moves.
+- Preserve topology around shoulders, elbows, hips, knees, neck, wrists, ankles, jaws, tails, wings, and plant bend points.
+- Build level-of-detail variants for large scenery and expensive repeated assets. Use impostors or billboards only when their transition is visually acceptable.
 
 Performance targets:
 
 - First playable load under 5 seconds on average broadband after caching.
 - 60 FPS target on desktop, 30-60 FPS on midrange mobile.
-- Asset atlas packing.
+- Stable frame pacing is more important than maximum effects quality.
+- Initial interactive download target under 35 MB, with later regions streamed on demand.
+- Typical visible scene target: under 250 draw calls on desktop and under 140 on target mobile after batching/instancing.
+- Typical active triangle target: under 500,000 on desktop and under 220,000 on target mobile, measured after culling and LOD.
+- Limit simultaneously active skinned characters; distance-throttle animation and schedule updates.
+- Use texture atlases, compressed textures, instancing, occlusion/frustum culling, pooled effects, and lazy-loaded region bundles.
 - Lazy-load late-game maps.
-- Avoid more than 150 active pathfinding NPC agents per scene.
+- Simulate distant NPC schedules abstractly instead of pathfinding every offscreen character.
 - Deterministic simulation for save/load and replayable testing.
+- Add automated canvas-pixel checks to detect blank, misframed, or failed 3D scenes.
 
 Accessibility:
 
@@ -511,17 +541,18 @@ Accessibility:
 
 ## 8. Sequential Prompt Roster
 
-Use the following prompts in order with a coding agent. Each prompt assumes the previous prompt has been completed, tested, and committed or checkpointed. For every prompt: keep assets original, use placeholder art only when needed, and keep data-driven systems extensible.
+Use the following prompts in order with a coding agent. Each prompt assumes the previous prompt has been completed, tested, and committed or checkpointed. For every prompt: keep assets original, use placeholder art only when needed, keep data-driven systems extensible, and follow the approved Theme 3 low-poly 3D art bible. Execute the mandatory Theme 3 Production Track after Prompt 003 and before Prompt 004.
 
 ### Prompt 001 - Project scaffold and quality bar
 
-Build the initial browser game project for Sturdy Volley using TypeScript, Vite, Phaser 3, Vitest, and Playwright. Create a clean folder structure for engine systems, game data, maps, scenes, UI, assets, tests, and design docs. Add scripts for dev, build, test, lint, and preview. Add a title screen that loads without console errors on desktop and mobile viewports.
+Build the initial browser game project for Sturdy Volley using TypeScript, Vite, Babylon.js, Vitest, and Playwright. Create a clean folder structure for rendering, simulation, animation, physics, navigation, game data, modular 3D scenes, UI, compressed assets, tests, and design docs. Add scripts for dev, build, test, lint, asset validation, and preview. Add a title screen with a lightweight animated 3D Ballast Bay diorama that loads without console errors on desktop and mobile viewports.
 
 Acceptance criteria:
 
 - `npm run dev`, `npm run build`, and `npm test` succeed.
 - Playwright opens the title screen at desktop and mobile sizes.
 - The title screen has Start, Continue disabled, Settings, and Credits.
+- Canvas-pixel checks confirm that the 3D title scene is visible and correctly framed.
 - No Stardew Valley assets, code, names, or extracted data are present.
 
 ### Prompt 002 - Game design constants and typed data pipeline
@@ -545,20 +576,127 @@ Acceptance criteria:
 - Save export/import works through a settings menu.
 - Scene transition fades are smooth and interrupt-safe.
 
-### Prompt 004 - Tilemap renderer and collision
+## Mandatory Theme 3 Production Track
 
-Create the first playable Breakpoint Farm tilemap using original placeholder tiles. Add collision layers, object layers, depth sorting, animated water, grass, and camera bounds.
+Execute this track after Prompt 003 and before Prompt 004. These prompts lock the visual production system before large-scale world or content implementation.
+
+### Theme 3 Prompt A01 - Final 3D art bible
+
+Convert the approved images in `art-production/style-themes/theme-03-n64-low-poly-adventure/` into a production art bible. Define model proportions, polygon density, silhouette rules, texture resolution tiers, palette families, vertex-color use, fog ranges, lighting recipes, camera framing, animation exaggeration, and UI integration. Include explicit originality rules that exclude copied Zelda characters, symbols, locations, costumes, creatures, props, or UI.
+
+Acceptance criteria:
+
+- Player, NPC, animal, prop, building, plant, and environment examples share one recognizable visual language.
+- The bible distinguishes deliberate N64-era constraints from accidental low quality.
+- Desktop and mobile reference captures remain readable at gameplay scale.
+
+### Theme 3 Prompt A02 - Model specification and budget matrix
+
+Create a model specification matrix for every asset class. Define approximate triangle ranges, materials, texture dimensions, LOD count, skeleton limits, collision type, animation needs, attachment sockets, shadow behavior, and expected screen size.
+
+Acceptance criteria:
+
+- Budgets exist for hero characters, background NPCs, large animals, small animals, crops, trees, tools, machines, buildings, modular terrain, court props, and collectibles.
+- Repeated assets have stricter draw-call and instancing requirements.
+- Every item in the art roster can be assigned to a documented class.
+
+### Theme 3 Prompt A03 - Shared humanoid rigs and character topology
+
+Design a shared humanoid skeleton family for player and adult NPCs, plus compatible variants for children, broad bodies, tall bodies, and older posture profiles. Create topology references for deformation at shoulders, elbows, wrists, fingers, spine, hips, knees, ankles, neck, jaw, and face texture regions.
+
+Acceptance criteria:
+
+- At least 80 percent of humanoid clips can be reused across compatible characters.
+- Character individuality comes from proportions, posture, timing, accessories, materials, and additive poses rather than incompatible skeletons.
+- Wireframes remain economical and deformation-safe.
+
+### Theme 3 Prompt A04 - Character locomotion and posture library
+
+Build the base humanoid movement library: neutral idle, personality idle overlays, walk, brisk walk, jog, sprint, start, stop, 45/90/180-degree pivots, strafe, slope ascent/descent, stairs, balance recovery, crouch, kneel, sit, stand, sleep, wake, swim, snorkel, ladder, and carry locomotion. Define posture profiles for confident, guarded, tired, elderly, injured, shy, exuberant, and precise characters.
+
+Acceptance criteria:
+
+- Clips have named loop, transition, contact, and event frames.
+- Foot contacts and root movement are documented.
+- Player controls feel immediate while NPC locomotion retains personality.
+- Reduced-motion alternatives exist for exaggerated camera or body movement.
+
+### Theme 3 Prompt A05 - Work, social, and emotional animation library
+
+Build reusable actions for hoeing, watering, chopping, mining, harvesting, planting, brushing animals, feeding, milking, shearing, fishing, cooking, crafting, reading, writing, shopping, repairing, lifting, pushing, pulling, opening, picking up, giving, receiving, hugging, waving, pointing, listening, arguing, apologizing, laughing, crying, celebrating, worrying, and resting.
+
+Acceptance criteria:
+
+- Each action includes anticipation, contact, follow-through, and interrupt rules.
+- Hand props attach through named sockets and align through authored interaction anchors.
+- Social clips can be mirrored or lightly retargeted without obvious errors.
+
+### Theme 3 Prompt A06 - Volleyball animation and ball-contact library
+
+Create the full volleyball motion set for serve types, ready stance, shuffle, bump, overhead set, jump set, approach, spike, soft tip, block, dive, roll recovery, emergency save, landing, fatigue, celebration, disappointment, teammate high-five, and injury-safe recovery. Define exact ball-contact frames and hand/forearm contact zones.
+
+Acceptance criteria:
+
+- Gameplay owns ball physics while animation supplies readable timing and contact events.
+- Each technique has beginner, skilled, and personality variants where valuable.
+- Transitions remain responsive on keyboard, touch, and controller.
+
+### Theme 3 Prompt A07 - Animal rigs, behavior, and posture library
+
+Create rig families and movement sheets for mooncalf hens, chicks, bluff goats, sand ducks, kelp sheep, shellback pigs, tide turtles, cats, dogs, frogs, crabs, reef fish, cave moths, quarry geckos, and seasonal birds. Cover idle, locomotion, feeding, social behavior, sleep, affection, fear, weather response, product behavior, play, and species-specific actions.
+
+Acceptance criteria:
+
+- Related species reuse skeletons or animation patterns when anatomy permits.
+- Each species has at least three personality-rich idle behaviors.
+- Small fauna can use vertex animation, texture animation, or simple joint chains instead of expensive full rigs.
+
+### Theme 3 Prompt A08 - Flora and environmental motion library
+
+Define growth models and motion for every crop, tree, flower, mushroom, reed, kelp, seaweed, and environmental effect. Include growth stages, wind tiers, rain weight, harvest reaction, regrowth, seasonal death, snow load, tide movement, underwater sway, and distance-throttled animation.
+
+Acceptance criteria:
+
+- Motion originates from plausible bend points.
+- Shared shaders or animation phases prevent every plant from moving in sync.
+- Far vegetation becomes cheaper without obvious popping.
+
+### Theme 3 Prompt A09 - Complete item and prop library
+
+Build a master inventory of all tools, seeds, crops, forage, fish, ore, wood, stone, shells, food, recipes, gifts, quest objects, court equipment, machines, furniture, clothing, books, letters, trophies, building parts, and festival props. For each item define world model, inventory icon render, held orientation, collision, scale, material, quality variants, animation needs, and destruction/placement rules.
+
+Acceptance criteria:
+
+- No gameplay item exists only as an undocumented name.
+- Held and placed items use consistent sockets, pivots, and scale.
+- Inventory icons are rendered from approved models with controlled lighting and backgrounds.
+- The library includes production status, dependencies, and validation checks.
+
+### Theme 3 Prompt A10 - Blender-to-browser validation pipeline
+
+Create automated and manual validation for `.blend` source conventions and exported `.glb` files. Check transforms, scale, pivots, naming, missing textures, material count, texture sizes, triangle budgets, skeleton size, clip names, loop flags, bounding volumes, collision proxies, LODs, sockets, and compression.
+
+Acceptance criteria:
+
+- Invalid assets fail with actionable messages before entering a release build.
+- A browser model viewer previews animation clips, wireframe, normals, UV/material assignments, collision, LODs, and mobile lighting.
+- Every approved model has a thumbnail and searchable metadata entry.
+
+### Prompt 004 - 3D world renderer, terrain, and collision
+
+Create the first playable Breakpoint Farm as a modular low-poly 3D scene using original placeholder models that obey the Theme 3 scale and material rules. Add terrain chunks, grid-aware farming cells, simple collision proxies, interaction anchors, animated water, instanced grass, doors, camera volumes, occlusion handling, and world bounds.
 
 Acceptance criteria:
 
 - Player can walk around the farm with keyboard and touch.
-- Collision is correct for fences, water, rocks, trees, house, and cliffs.
-- Camera follows without jitter.
+- Collision is correct for fences, water, rocks, trees, buildings, props, slopes, stairs, and cliffs.
+- Camera follows without jitter, avoids clipping, and reframes indoors.
+- Farm cells remain deterministic and addressable even though the world renders freely in 3D.
 - Mobile viewport keeps the player and UI readable.
 
 ### Prompt 005 - Player controller and interaction model
 
-Implement player movement, facing, sprinting, stamina drain, contextual interact button, tool slot selection, and action targeting. Add an interaction resolver for tile, object, NPC, animal, machine, door, and pickup interactions.
+Implement third-person player movement, facing, jogging, sprinting, acceleration, braking, pivots, slope/stair handling, stamina drain, contextual interact button, tool slot selection, and 3D action targeting. Add an interaction resolver for farm cell, prop, NPC, animal, machine, door, pickup, court zone, water entry, and climb link interactions. Drive movement through a reusable humanoid rig and animation state machine.
 
 Acceptance criteria:
 
@@ -566,6 +704,8 @@ Acceptance criteria:
 - Touch controls support virtual stick and tap-to-move mode.
 - Keyboard/controller controls are remappable.
 - Interaction prompts never overlap the hotbar.
+- Locomotion blends cleanly between idle, walk, jog, sprint, pivot, stop, slope, and stair clips.
+- Foot placement, facing, and interaction alignment remain believable without requiring expensive full-body inverse kinematics on mobile.
 
 ### Prompt 006 - Time, calendar, and day resolution
 
@@ -601,13 +741,14 @@ Acceptance criteria:
 
 ### Prompt 009 - Tools and upgrades
 
-Add hoe, watering can, axe, pick, sickle, fishing rod, net wrench, and training ball. Add tool levels and charge actions with area previews.
+Add low-poly hoe, watering can, axe, pick, sickle, fishing rod, net wrench, and training ball models. Add hand sockets, carried/stowed states, tool levels, charge actions, 3D area previews projected onto terrain, contact events, and upgrade-specific materials.
 
 Acceptance criteria:
 
 - Tools consume stamina according to skill and upgrade level.
 - Upgraded tools affect wider areas or tougher objects.
 - Tool animations have anticipation, impact, and recovery frames.
+- Each tool aligns to the shared rig without hand sliding or incorrect pivots.
 
 ### Prompt 010 - Foraging, debris, trees, and regrowth
 
@@ -621,13 +762,14 @@ Acceptance criteria:
 
 ### Prompt 011 - NPC schedule engine
 
-Implement NPC schedule data with daily, seasonal, weather, festival, relationship, and event overrides. Add pathfinding, door transitions, idle behavior, facing, and conversation availability.
+Implement NPC schedule data with daily, seasonal, weather, festival, relationship, and event overrides. Add navigation-mesh pathfinding, off-mesh links, door transitions, local avoidance, posture profiles, personality idles, facing, interaction alignment, animation throttling, and conversation availability.
 
 Acceptance criteria:
 
 - At least 4 NPCs follow schedules across farm, town, interiors, and beach.
 - NPCs avoid obstacles and recover if blocked.
 - Debug overlay can show current schedule target.
+- Offscreen NPCs advance through abstract schedules without consuming full navigation or animation cost.
 
 ### Prompt 012 - Dialogue engine
 
@@ -652,23 +794,25 @@ Acceptance criteria:
 
 ### Prompt 014 - Cutscene and event scripting
 
-Build a cutscene runner for camera moves, character movement, dialogue, emotes, item changes, sound cues, screen shakes, fades, and choices.
+Build a 3D cutscene runner for authored cameras, camera splines, character blocking, look targets, animation clips, additive postures, dialogue, emotes, held props, item changes, sound cues, restrained screen shakes, fades, lighting cues, and choices.
 
 Acceptance criteria:
 
 - At least 2 relationship scenes and 1 town project scene are implemented.
 - Cutscenes are skippable after first viewing.
 - Events cannot soft-lock the player.
+- Cutscene blocking remains readable at desktop, tablet, and phone aspect ratios.
 
 ### Prompt 015 - Ballast Bay town map
 
-Create the main town map with market lane, bakery, clinic, library, gear shop, community hall, schoolhouse, blacksmith, apartments, and beach access.
+Create the main town as streamed modular low-poly 3D scene chunks with market lane, bakery, clinic, library, gear shop, community hall, schoolhouse, blacksmith, apartments, harbor, and beach access. Use shared building kits, trim textures, prop families, navigation meshes, collision proxies, camera volumes, LODs, and baked lighting data where appropriate.
 
 Acceptance criteria:
 
 - Buildings have working doors and open/closed schedules.
 - Map feels navigable on mobile.
 - Ambient animations include flags, water, birds, windows, and market details.
+- Scene streaming and culling stay within the documented mobile budgets.
 
 ### Prompt 016 - Shops and economy
 
@@ -762,13 +906,14 @@ Acceptance criteria:
 
 ### Prompt 025 - Volleyball physics prototype
 
-Build the volleyball court scene with ball physics, serve, receive, set, spike, block, scoring, court bounds, net collision, shadows, and timing windows.
+Build the 3D volleyball court scene with deterministic ball physics, serve, receive, set, spike, block, scoring, court bounds, net collision, ball shadow/landing marker, animation contact events, character facing, camera framing, and timing windows.
 
 Acceptance criteria:
 
 - Player can complete a rally against a simple AI.
 - Ball arc and shadow make height clear.
 - Mobile controls feel playable with one thumb plus action button.
+- Ball contact is controlled by gameplay events and never depends on unreliable visual mesh collision alone.
 
 ### Prompt 026 - Volleyball AI and team play
 
@@ -872,23 +1017,25 @@ Acceptance criteria:
 
 ### Prompt 036 - Visual polish pass one
 
-Replace placeholders for farm, player, core tools, first 4 NPCs, first animals, crops, and UI with original polished assets. Add squash/stretch, impact particles, water ripples, footstep puffs, and harvest effects.
+Replace placeholders for farm, player, core tools, first 4 NPCs, first animals, crops, and UI with validated Theme 3 `.glb` models and compressed textures. Integrate approved topology, shared rigs, posture profiles, held-item sockets, animation state machines, LODs, collision proxies, icon renders, squash/stretch where appropriate, impact particles, water ripples, footstep puffs, and harvest effects.
 
 Acceptance criteria:
 
 - The first 15 minutes look cohesive.
 - Animations have anticipation and follow-through.
 - UI remains legible over bright and dark maps.
+- Wireframe, texture, rig, scale, and movement references exist for every integrated hero asset.
 
 ### Prompt 037 - Visual polish pass two
 
-Add seasonal map variants, weather overlays, day/night lighting, indoor lighting transitions, window glows, court crowd reactions, animated flora/fauna, and tide visuals.
+Add seasonal material/prop variants, weather particles and fog, day/night lighting, indoor lighting transitions, window glows, court crowd reactions, animated flora/fauna, shoreline/tide meshes, water caustics, vertex-color variation, and distance-based effect reduction.
 
 Acceptance criteria:
 
 - Each season feels distinct within 5 seconds of looking.
 - Weather affects both mood and gameplay readability.
 - Performance remains within target.
+- Lighting preserves the approved N64-era character while remaining clear and comfortable on modern screens.
 
 ### Prompt 038 - NPC content expansion
 
@@ -932,13 +1079,14 @@ Acceptance criteria:
 
 ### Prompt 042 - Mobile optimization
 
-Polish mobile UI, touch targets, safe areas, virtual controls, battery-aware effects, asset loading, orientation handling, and PWA install.
+Polish mobile UI, touch targets, safe areas, virtual controls, camera distance, occlusion, dynamic resolution, shadow tiers, fog range, LOD bias, animation update rate, texture residency, battery-aware effects, streamed asset loading, orientation handling, and PWA install.
 
 Acceptance criteria:
 
 - Works on 360x740 and tablet viewports.
 - No required button is under 44x44 CSS pixels.
 - PWA can launch offline after first load.
+- Target mobile scenes remain within triangle, draw-call, texture-memory, and active-rig budgets.
 
 ### Prompt 043 - Controller and console-style feel
 
@@ -962,13 +1110,14 @@ Acceptance criteria:
 
 ### Prompt 045 - Automated test suite
 
-Create tests for crop growth, inventory, shops, relationships, quests, festivals, saves, machines, animals, court scoring, and scene smoke loads.
+Create tests for crop growth, inventory, shops, relationships, quests, festivals, saves, machines, animals, court scoring, scene smoke loads, GLB validation, animation clip availability, interaction anchors, collision proxies, navigation links, and visual canvas output.
 
 Acceptance criteria:
 
 - Core logic has deterministic tests.
 - Playwright smoke covers desktop and mobile.
 - CI-ready scripts run without manual browser interaction.
+- Screenshot and canvas-pixel checks detect blank scenes, broken cameras, missing models, failed materials, and major framing regressions.
 
 ### Prompt 046 - Balancing tools
 
@@ -982,17 +1131,18 @@ Acceptance criteria:
 
 ### Prompt 047 - Content authoring guide
 
-Write documentation for adding NPCs, crops, items, recipes, quests, festivals, maps, dialogue, cutscenes, animals, and volleyball drills.
+Write documentation for adding NPCs, crops, items, recipes, quests, festivals, modular 3D maps, dialogue, cutscenes, animals, and volleyball drills. Include Blender scene setup, model budgets, rig reuse, clip naming, interaction anchors, collision, navigation, LOD, texture compression, `.glb` export, icon rendering, and browser validation.
 
 Acceptance criteria:
 
 - A new contributor can add a simple NPC without touching engine code.
 - Docs include examples and validation rules.
 - Data naming conventions are clear.
+- A new contributor can export and validate a simple prop without hand-editing runtime files.
 
 ### Prompt 048 - Alpha vertical slice
 
-Assemble an alpha slice covering the first 7 in-game days: farm basics, town intro, 4 NPCs, 2 animals, fishing, one mine room, one volleyball drill, one story quest, one civic project, and one mini festival teaser.
+Assemble an alpha slice covering the first 7 in-game days: 3D farm basics, town intro, 4 fully rigged NPCs with posture profiles, 2 animated animals, fishing, one mine room, one volleyball drill, one story quest, one civic project, one mini festival teaser, and a representative validated item library.
 
 Acceptance criteria:
 
@@ -1002,7 +1152,7 @@ Acceptance criteria:
 
 ### Prompt 049 - Beta content expansion
 
-Expand to one full in-game year with all seasons, all major maps, 24 NPCs, 50 crops/items, 40 recipes, 30 quests, 8 festivals, 4 farm variants, and complete court league progression.
+Expand to one full in-game year with all seasons, all major modular 3D maps, 24 rigged NPCs, the complete documented crop/item/prop library, 40 recipes, 30 quests, 8 festivals, 4 farm variants, and complete court league progression.
 
 Acceptance criteria:
 
@@ -1012,7 +1162,7 @@ Acceptance criteria:
 
 ### Prompt 050 - Release candidate polish
 
-Finish asset replacement, audio, localization hooks, bug fixing, performance, save stability, credits, analytics-free privacy-first telemetry option, and final QA.
+Finish Theme 3 asset replacement, model/rig/animation validation, lighting, audio, localization hooks, bug fixing, performance, save stability, credits, analytics-free privacy-first telemetry option, and final QA.
 
 Acceptance criteria:
 
@@ -1070,11 +1220,13 @@ Acceptance criteria:
 
 ### MVP vertical slice
 
-- One farm map.
-- One town map.
-- Four NPCs.
-- Two animals.
+- One modular low-poly 3D farm map.
+- One modular low-poly 3D town map.
+- One production-ready player model with shared humanoid rig and complete MVP locomotion/tool/volleyball clips.
+- Four rigged NPCs with unique proportions, materials, posture profiles, and reusable animation coverage.
+- Two rigged animals with complete daily behavior loops.
 - Twelve crops.
+- A validated starter library of tools, machines, furniture, forage, food, quest props, and inventory icon renders.
 - Fishing.
 - Basic crafting.
 - One court drill and one match.
@@ -1082,13 +1234,16 @@ Acceptance criteria:
 - One festival.
 - Save/load.
 - Mobile controls.
+- Desktop and mobile 3D performance validation.
 
 ### Launch scope
 
 - Eight farm maps.
 - Ten regions.
-- Twenty-four NPCs.
+- Twenty-four fully modeled NPCs using compatible shared rig families.
 - Eight animals plus pets.
+- Complete documented model/item library with icons, pivots, sockets, materials, LODs, collision, and production status.
+- Complete locomotion, work, social, emotional, volleyball, creature, and flora motion libraries.
 - Four seasons.
 - Eight festivals.
 - Full relationship arcs.
@@ -1118,6 +1273,13 @@ Before calling any build complete, verify:
 - NPCs feel like they live in town when the player is absent.
 - Volleyball is a relationship and progression system, not a pasted-on minigame.
 - Mobile play is first-class.
+- Theme 3 is consistent across models, animation, materials, lighting, environments, items, icons, and UI.
+- Every visible hero asset has an approved turnaround, wireframe/topology view, material/UV reference, scale reference, and movement/posture reference where applicable.
+- Every gameplay item has a documented world model or deliberate icon-only exception, inventory render, scale, pivot, material, and interaction behavior.
+- Characters and creatures communicate personality through posture, timing, and movement rather than dialogue alone.
+- Reused rigs and clips still preserve each character's identity.
+- No scene exceeds agreed mobile draw-call, triangle, texture-memory, or active-rig budgets without an approved exception.
+- 3D scenes are tested for blank canvas output, camera framing, clipping, occlusion, collision, navigation, and missing assets.
 - The game remains original in names, assets, data, maps, dialogue, and code.
 - The first hour is gentle, but the hundredth hour still contains mystery.
 
@@ -1135,4 +1297,3 @@ Before calling any build complete, verify:
 - Stardew Valley Wiki, Farm Maps: https://stardewvalleywiki.com/Farm_Maps
 - Stardew Valley Wiki, Modder Guide/Get Started: https://stardewvalleywiki.com/Modding:Modder_Guide/Get_Started
 - SMAPI GitHub repository: https://github.com/Pathoschild/SMAPI
-

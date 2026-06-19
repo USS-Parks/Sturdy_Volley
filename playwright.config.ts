@@ -12,10 +12,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  // Phaser runs on software WebGL (SwiftShader) in headless Chromium, which is
-  // CPU-heavy. Too many parallel game instances saturate the CPU and stall
-  // in-page actionability checks, so keep worker count low.
-  workers: process.env.CI ? 1 : 2,
+  // Babylon runs on software WebGL (SwiftShader) in headless Chromium, which is
+  // CPU-heavy. Parallel game instances saturate the CPU and stall in-page
+  // actionability checks, so run e2e serially for deterministic results.
+  workers: 1,
   reporter: 'list',
   use: {
     baseURL: BASE_URL,

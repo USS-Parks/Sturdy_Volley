@@ -159,3 +159,54 @@ Replaced the Farm placeholder card with the first real playable tilemap scene.
 heavier Farm scene under software WebGL (SwiftShader) saturated the CPU at 8
 parallel instances, stalling in-page actionability checks. Serial/low-worker
 runs are deterministic.
+
+---
+
+## Phase M — Pivot to Babylon.js 3D (Theme 3) (2026-06-18)
+
+**Direction change.** The revised P-SPR retargets Sturdy Volley as an original
+**N64-era low-poly 3D** game. Per user direction the engine is **Babylon.js**
+(the doc's "Three.js" is superseded), the foundation is **migrated in place**,
+and the **Theme 3 art track (A01–A10) is owned by the user / Codex** — so this
+codebase builds only the renderer + renderer-agnostic systems and uses code-drawn
+placeholder primitives until real `.glb` assets land. (Codex builds art from
+`STURDY_VOLLEY_IMAGE_PROMPT_ROSTER.md`; Claude builds the game from
+`STURDY_VOLLEY_PSPR.md`.)
+
+**Migrated (Phaser → Babylon):**
+- Dependency swap: `phaser` removed, `@babylonjs/core` added. `vite.config`
+  pre-bundles Babylon; `chunkSizeWarningLimit` raised (Babylon barrel ≈ 5.1 MB /
+  1.14 MB gzip — within the 35 MB target; path-import/code-split is a later task).
+- `src/render/`: `scene-helpers.ts` (Theme-3 `PALETTE`, flat vertex-lit-look
+  material, fog, three-quarter camera, warm/cool lights) + `fade.ts` (DOM fade).
+- `src/scenes/`: `SceneManager` (render loop + interrupt-safe fade transitions),
+  `GameScene` base, and Babylon Boot → Preload → Title → NewGame →
+  Farm/Town/Interior/Court/Mine. Title is an animated low-poly **Ballast Bay
+  diorama** (sea, cliff island, the Old Netlight lighthouse, cottages, beach
+  court, sea stacks) behind the DOM menu. Gameplay scenes are placeholder 3D
+  (ground + player capsule + props) with the HUD + pause-menu navigation + save.
+- **Preserved unchanged** (renderer-agnostic): `src/data/` content pipeline,
+  `src/engine/` save model/store/transfer + gameState + format + movement, and
+  the whole `src/ui/` DOM overlay (menus/forms/HUD/report).
+- `index.html` gains `<canvas id="game-canvas">`; `#fade` styles added.
+- `scripts/validate-assets.mjs` + `npm run validate:assets` (stub gate until the
+  art pipeline's A10 `.glb` validation).
+- Retired: Phaser scenes, `engine/textures.ts`, `maps/*` (2D tilemap),
+  `config/gameConfig.ts`, the Phaser farm-movement e2e + map unit test.
+
+**Bug fixed during migration:** `SceneManager.goTo` held its transition guard
+through the cosmetic fade-in, so a user click landing in the ~260 ms fade-in
+window was dropped (New Game "Begin" silently no-op'd on faster machines). The
+guard now releases as soon as the next scene is interactive.
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest `43/43`
+(7 files) · `validate:assets` `exit 0` · build `dist/` (Babylon bundle) ·
+Playwright `8/8` (desktop + mobile) including a **canvas-pixel check** confirming
+the 3D title scene actually renders (Babylon boots under headless SwiftShader).
+Playwright workers set to 1 (Babylon software-WebGL is CPU-heavy).
+
+**Prompt status under Babylon:** P-001 (3D scaffold + title diorama +
+canvas-pixel checks) ✓ · P-002 (data pipeline) ✓ unchanged · P-003 (scene
+manager + saves) ✓ on Babylon. Prompt 004+ (3D world renderer onward) are
+**paused pending the art track**; meantime work is the renderer-agnostic
+simulation core.

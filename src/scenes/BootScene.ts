@@ -1,15 +1,18 @@
-import Phaser from 'phaser';
+import type { Scene } from '@babylonjs/core';
+import { GameScene } from './GameScene';
+import { makeScene, addThreeQuarterCamera } from '../render/scene-helpers';
 
-/**
- * First scene. Reserved for early engine setup (scale, input, global registry)
- * before any assets are queued. Currently it just hands off to Preload.
- */
-export class BootScene extends Phaser.Scene {
-  constructor() {
-    super('Boot');
+/** First state. Reserved for early engine setup; hands off to Preload. */
+export class BootScene extends GameScene {
+  build(): Scene {
+    const scene = makeScene(this.ctx.engine);
+    addThreeQuarterCamera(scene);
+    this.scene = scene;
+    return scene;
   }
 
-  create(): void {
-    this.scene.start('Preload');
+  override enter(): void {
+    // Defer so the in-flight transition finishes before the next starts.
+    queueMicrotask(() => this.goTo('Preload', undefined, false));
   }
 }
