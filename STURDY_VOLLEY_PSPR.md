@@ -9,6 +9,77 @@ Title note: the title "Sturdy Volley" is provisional and under review. The origi
 
 Revision status: Revised 2026-06-18 to remove volleyball (an erroneous editing-pass drift); the game has nothing to do with volleyball or any sport. It is a cozy life sim modeled after Stardew Valley, rendered in 3D with Babylon.js in the Theme 3 original N64-era low-poly adventure style. Theme 3 approved. Babylon.js is the required 3D engine (with Havok physics and glTF/.glb assets). Production direction is original N64-era low-poly 3D with model turnarounds, wireframes, reusable rigs, authored movement/posture libraries, and a complete validated item catalog.
 
+Revision status: Revised 2026-06-19 to add §0 Execution Rules — the per-prompt verify gate, DEVLOG entry, commit discipline, push policy, and originality + Theme 3 rules are now strict and load-bearing, not inherited convention. Section 8's "committed or checkpointed" language is superseded by §0.4.
+
+---
+
+## 0. Execution Rules
+
+These rules are strict and load-bearing. They govern how every prompt in §8 is executed and shipped. When the rules conflict with anything later in the document, the rules win and the later section is updated to match.
+
+### 0.1 Canonical shorthand
+
+- **P-SPR = Plan - Sequential Prompt Roster.** This file is the P-SPR. Pasted or drafted text becomes a P-SPR only after it is saved as a `PLANNING/` or root-level `*.md` file.
+- **STS = Stem to Stern.** After explicit user approval, execute the roster in order from the first incomplete prompt through phase wrap, verifying / logging / committing each prompt as specified below. Do not skip prompts, batch prompts, push early, or reopen plan decisions unless blocked by new facts. A plan's own "STS authorization" wording is not approval by itself.
+- **Acceptance criteria** are the bulleted checks under each §8 prompt. They are the contract for that prompt.
+
+### 0.2 Verify gate (per prompt)
+
+Every prompt must pass all of the following before it can be marked complete and committed:
+
+1. `npx tsc --noEmit` exits 0
+2. `npm run lint` exits 0
+3. `npm test` (Vitest) passes — every test, no skips beyond pre-existing skip-list
+4. `npm run validate:assets` exits 0
+5. `npm run build` produces `dist/` without errors
+6. `npm run test:e2e` passes for every prompt that touches behavior the Playwright suite covers (title, save flow, farm walk, time/sleep/collapse, future suites added by §8 prompts)
+
+A prompt that fails any gate stays open. Diagnose the root cause; do not bypass with `--no-verify`, skip flags, or sandbox-disable shortcuts.
+
+### 0.3 DEVLOG.md entry (per prompt)
+
+Each completed prompt gets a new `## Prompt NNN — <title> (YYYY-MM-DD)` section at the top of `DEVLOG.md`, above the most recent prior entry. Each entry contains:
+
+1. One short paragraph naming what shipped.
+2. A bulleted list of the modules, scenes, data files, or tests touched. Reference paths and key APIs.
+3. An **Acceptance criteria** subheading with a checked `- [x]` line per criterion from the §8 prompt. If a criterion is partially met, mark it `- [ ]` and explicitly enumerate the remainder under a "Remaining for a later pass" sub-bullet.
+4. A **Verify gate** line summarizing the green results: typecheck · lint · Vitest count · Playwright count · build status.
+5. Notes on any non-obvious infrastructure choice the prompt made (test infra, headless WebGL, CI flake, etc.).
+
+DEVLOG entries are append-only. Older entries are not edited after they ship except for typo / link fixes.
+
+### 0.4 Commit discipline
+
+- **One commit per prompt.** The commit lands only after the verify gate (§0.2) is green and the DEVLOG entry (§0.3) is written.
+- Commit message subject: `Prompt NNN: <short summary>` (or `Theme 3 Prompt AXX: ...` for the A01–A10 track). Body cites the verify-gate result.
+- Mid-prompt safety commits are allowed if a prompt spans many files; they must be on a working branch and squashed before the prompt's final commit lands on `main`.
+- Never amend an already-pushed commit. If a fix is needed, land a new commit.
+- Never skip git hooks (`--no-verify`) or bypass signing (`--no-gpg-sign`).
+- Stage files explicitly by path. Avoid `git add -A` / `git add .`.
+- The §8 preamble's "committed or checkpointed" phrasing at line 539 is superseded by this section: prompts are **committed**, not checkpointed.
+
+### 0.5 Push policy
+
+- The user is the reviewer and the pusher. Push only when the user explicitly says to ("push", "ship it", "to the repo", "I need to see commits", etc.). One explicit ask covers the work in scope at that moment.
+- Never volunteer a push the user did not ask for.
+- Never `git push --force` to `main` unless the user explicitly says to force-push. Prefer a new commit over a force-push.
+- If a push from this environment fails for infrastructure reasons, surface the failure clearly and stop. Do not retry with destructive flags.
+
+### 0.6 Plan before non-trivial work
+
+For any change that spans multiple prompts, multiple subsystems, or introduces a new architectural decision: draft a tightened plan (inline or as a new `PLANNING/*.md`) and wait for explicit user approval before writing code. Trivial one-offs (single edits, questions, memory saves, explicit single-command asks) are exempt.
+
+### 0.7 Originality
+
+- Never copy Stardew Valley code, sprites, audio, dialogue, maps, character names, Pelican Town, Joja, Junimos, bundles, heart-event scripts, exact crop economics, exact item names, or exact layouts. Borrow only the genre-level ideas listed in §1.
+- Theme 3 visuals must evoke N64-era constraints without copying Zelda characters, symbols, locations, costumes, creatures, props, or UI.
+- All NPC names, place names, crop names, animal names, item names, and lore are original to Ballast Bay.
+
+### 0.8 Mandatory tracks
+
+- Execute the Theme 3 Production Track (Theme 3 Prompts A01–A10) after Prompt 003 and before Prompt 004, as stated in §8.
+- The A-track and the numbered P-track each follow §0.2 – §0.5 independently. An A-track prompt is shipped under its own commit with its own DEVLOG entry.
+
 ---
 
 ## 1. Research Capsule
@@ -536,7 +607,7 @@ Accessibility:
 
 ## 8. Sequential Prompt Roster
 
-Use the following prompts in order with a coding agent. Each prompt assumes the previous prompt has been completed, tested, and committed or checkpointed. For every prompt: keep assets original, use placeholder art only when needed, keep data-driven systems extensible, and follow the approved Theme 3 low-poly 3D art bible. Execute the mandatory Theme 3 Production Track after Prompt 003 and before Prompt 004.
+Use the following prompts in order with a coding agent. Each prompt assumes the previous prompt has been completed, passed §0.2's verify gate, received a §0.3 DEVLOG entry, and been committed per §0.4. For every prompt: keep assets original (§0.7), use placeholder art only when needed, keep data-driven systems extensible, and follow the approved Theme 3 low-poly 3D art bible. Execute the mandatory Theme 3 Production Track after Prompt 003 and before Prompt 004 (§0.8).
 
 ### Prompt 001 - Project scaffold and quality bar
 
