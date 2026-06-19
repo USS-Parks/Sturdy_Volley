@@ -74,3 +74,47 @@ Added a **typed, validated, data-driven content pipeline** (zod 3.25).
 **Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest `19/19`
 (3 files) · build `dist/` (bundle ~1.55 MB / 358 KB gzip) · Playwright `8/8`
 (desktop + mobile, incl. the dev data screen).
+
+---
+
+## Prompt 003 — Scene manager and save bootstrap (2026-06-18)
+
+Added the scene graph, fade transitions, and a full save lifecycle.
+
+- **Scenes**: `NewGame`, `Farm`, `Town`, `Interior`, `Court`, `Mine` added to
+  the Boot → Preload → Title chain. Gameplay scenes are placeholder "place
+  cards" (`PlaceScene`) wiring navigation + persistence until the real tilemap
+  scenes arrive (Farm tilemap = Prompt 004). Navigation graph:
+  Farm↔Town↔Interior, Farm↔Court↔(Town), Farm↔Mine.
+- **Fade transitions**: `GameScene` base class — `fadeIn()` / `fadeTo()` using
+  camera fades, with a per-scene `transitioning` guard so transitions are
+  interrupt-safe (double-taps ignored).
+- **Save model** (`saveModel.ts`): versioned, zod-validated — player identity,
+  calendar (year/season/day/time), location, inventory, relationships, skills,
+  flags, mapState. `createNewSave`, `serializeSave`, `parseSave` (readable
+  errors). Store (`save.ts`): read/write/delete/has on localStorage, corrupt
+  saves ignored. In-memory active save (`gameState.ts`).
+- **New Game** flow collects name + farm name via an accessible overlay form,
+  creates + persists a save, enters the Farm. **Continue** loads + resumes the
+  saved scene. **Settings** menu now does Export (download .json) / Import (file
+  picker, validated) / Delete.
+
+**Acceptance criteria**
+
+- [x] New Game creates a save
+- [x] Continue loads the save after refresh
+- [x] Save export/import works through a settings menu (round-trip + parse
+  validation unit-tested; settings UI e2e-verified; file picker is manual)
+- [x] Scene transition fades are smooth and interrupt-safe
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest `36/36`
+(6 files) · build `dist/` (bundle ~1.56 MB / 361 KB gzip) · Playwright `10/10`
+(desktop + mobile).
+
+**Note (e2e infra):** moved Playwright from the Vite **dev** server to the
+**preview (production build)** server. Under 8 parallel workers the dev server's
+on-the-fly dep re-optimization issued full-reloads mid-test (clicks/locators
+detached → timeouts). Preview is static + deterministic and tests the shipped
+artifact. The dev-only data-validation screen isn't in the prod build, so its UI
+moved to jsdom unit tests (`UIOverlay.showReport`). Added `optimizeDeps.include`
+for a smoother `npm run dev` too.

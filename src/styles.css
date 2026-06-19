@@ -117,6 +117,54 @@ body {
   color: var(--sv-muted);
 }
 
+.menu-button-secondary {
+  background: transparent;
+}
+
+/* Forms */
+.menu-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-label {
+  font-size: 13px;
+  color: var(--sv-muted);
+}
+
+.form-input {
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 16px;
+  font-family: inherit;
+  border-radius: 10px;
+  border: 1px solid var(--sv-panel-border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--sv-text);
+}
+
+.form-input:focus-visible {
+  outline: 3px solid var(--sv-accent);
+  outline-offset: 1px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.form-actions .menu-button {
+  flex: 1;
+}
+
 /* Developer data-validation report */
 .report-panel {
   width: min(520px, 92vw);

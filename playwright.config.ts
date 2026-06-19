@@ -1,6 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 5173;
+// e2e runs against the production preview build (static, deterministic) rather
+// than the dev server, which avoids Vite HMR / dep re-optimization reload races
+// under parallel workers and tests the actual shipped artifact.
+const PORT = 4173;
 const BASE_URL = `http://localhost:${PORT}`;
 
 // Smoke + layout coverage on desktop and mobile viewports (P-SPR Prompt 001).
@@ -22,10 +25,10 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: 'npm run dev',
+    command: 'npm run build && npm run preview',
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 180_000,
   },
   projects: [
     { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'] } },

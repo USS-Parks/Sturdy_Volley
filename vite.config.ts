@@ -4,6 +4,9 @@ import { defineConfig } from 'vite';
 // and the future PWA/offline target (P-SPR Prompt 042).
 export default defineConfig({
   base: './',
+  // Pre-bundle heavy deps at dev-server start so the first page load doesn't
+  // trigger an on-the-fly re-optimization + full reload.
+  optimizeDeps: { include: ['phaser', 'zod'] },
   server: { port: 5173, strictPort: true },
   preview: { port: 4173, strictPort: true },
   build: {

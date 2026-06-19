@@ -68,6 +68,73 @@ export class UIOverlay {
     this.focusFirstEnabled(panel);
   }
 
+  /** A simple form panel with text fields, a submit button, and Cancel. */
+  showForm(
+    title: string,
+    fields: Array<{ id: string; label: string; value?: string; placeholder?: string; maxLength?: number }>,
+    submitLabel: string,
+    onSubmit: (values: Record<string, string>) => void,
+    onCancel: () => void,
+  ): void {
+    this.clear();
+    const panel = this.createPanel(title);
+
+    const form = document.createElement('form');
+    form.className = 'menu-form';
+    const inputs = new Map<string, HTMLInputElement>();
+
+    for (const field of fields) {
+      const label = document.createElement('label');
+      label.className = 'form-field';
+
+      const caption = document.createElement('span');
+      caption.className = 'form-label';
+      caption.textContent = field.label;
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'form-input';
+      input.value = field.value ?? '';
+      if (field.placeholder) input.placeholder = field.placeholder;
+      if (field.maxLength) input.maxLength = field.maxLength;
+      input.dataset.testid = `field-${field.id}`;
+
+      label.append(caption, input);
+      form.appendChild(label);
+      inputs.set(field.id, input);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'form-actions';
+
+    const submit = document.createElement('button');
+    submit.type = 'submit';
+    submit.className = 'menu-button';
+    submit.textContent = submitLabel;
+    submit.dataset.testid = 'form-submit';
+
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'menu-button menu-button-secondary';
+    cancel.textContent = 'Cancel';
+    cancel.dataset.testid = 'form-cancel';
+    cancel.addEventListener('click', onCancel);
+
+    actions.append(submit, cancel);
+    form.appendChild(actions);
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const values: Record<string, string> = {};
+      for (const [id, input] of inputs) values[id] = input.value;
+      onSubmit(values);
+    });
+
+    panel.appendChild(form);
+    this.root.appendChild(panel);
+    inputs.values().next().value?.focus();
+  }
+
   /** Developer report panel: a scrollable list of pass/fail rows. */
   showReport(
     title: string,

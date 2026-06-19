@@ -1,14 +1,20 @@
 import Phaser from 'phaser';
+import { GameScene } from './GameScene';
 import { buildTitleMenu } from '../ui/menuModel';
 import { UIOverlay } from '../ui/overlay';
-import { hasSaveGame } from '../engine/save';
+import { hasSaveGame, readSave, deleteSave } from '../engine/save';
+import { setActiveSave, clearActiveSave } from '../engine/gameState';
+import { downloadSave, pickAndImportSave } from '../engine/saveTransfer';
 import { getContentReport } from '../data/content';
+import type { SaveData } from '../engine/saveModel';
+
+const RESUMABLE_SCENES = new Set(['Farm', 'Town', 'Interior', 'Court', 'Mine']);
 
 /**
  * Title screen. Draws an original placeholder coastal backdrop on the canvas
  * and renders the main menu through the accessible HTML overlay.
  */
-export class TitleScene extends Phaser.Scene {
+export class TitleScene extends GameScene {
   private overlay!: UIOverlay;
 
   constructor() {
@@ -17,6 +23,7 @@ export class TitleScene extends Phaser.Scene {
 
   create(): void {
     this.drawBackdrop();
+    this.fadeIn();
     this.overlay = new UIOverlay();
     this.showMenu();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.overlay.clear());
@@ -59,33 +66,21 @@ export class TitleScene extends Phaser.Scene {
     );
   }
 
-  private showDataReport(): void {
-    const rows = getContentReport().map((summary) => ({
-      label: `${summary.name} (${summary.count})`,
-      ok: summary.ok,
-      detail: summary.ok ? undefined : summary.issues.slice(0, 3).join('; '),
-    }));
-    this.overlay.showReport('Data validation', rows, () => this.showMenu(), 'dev-data-report');
-  }
-
   private onSelect(id: string): void {
     switch (id) {
       case 'start':
-        // New Game flow (scene manager + save bootstrap) lands in Prompt 003.
-        console.info('[Sturdy Volley] New Game flow arrives in Prompt 003.');
+        this.fadeTo('NewGame');
         break;
-      case 'continue':
-        // Enabled only once a save exists.
+      case 'continue': {
+        const save = readSave();
+        if (save) {
+          setActiveSave(save);
+          this.fadeTo(resumeSceneKey(save));
+        }
         break;
-      case 'dev-data':
-        this.showDataReport();
-        break;
+      }
       case 'settings':
-        this.overlay.showPanel(
-          'Settings',
-          'Audio, controls, and accessibility settings arrive in later prompts. This panel confirms overlay navigation works.',
-          () => this.showMenu(),
-        );
+        this.showSettings();
         break;
       case 'credits':
         this.overlay.showPanel(
@@ -94,6 +89,58 @@ export class TitleScene extends Phaser.Scene {
           () => this.showMenu(),
         );
         break;
+      case 'dev-data':
+        this.showDataReport();
+        break;
     }
   }
+
+  private showSettings(status?: string): void {
+    const has = hasSaveGame();
+    this.overlay.showMenu(
+      'Settings',
+      [
+        { id: 'export', label: 'Export save', enabled: has, testId: 'settings-export' },
+        { id: 'import', label: 'Import save', enabled: true, testId: 'settings-import' },
+        { id: 'delete', label: 'Delete save', enabled: has, testId: 'settings-delete' },
+        { id: 'back', label: 'Back', enabled: true, testId: 'settings-back' },
+      ],
+      (id) => this.onSettings(id),
+      status ?? 'Manage your save data',
+    );
+  }
+
+  private onSettings(id: string): void {
+    switch (id) {
+      case 'export':
+        this.showSettings(downloadSave() ? 'Save exported.' : 'No save to export.');
+        break;
+      case 'import':
+        void pickAndImportSave().then((result) =>
+          this.showSettings(result.ok ? 'Save imported.' : `Import failed: ${result.error}`),
+        );
+        break;
+      case 'delete':
+        deleteSave();
+        clearActiveSave();
+        this.showSettings('Save deleted.');
+        break;
+      case 'back':
+        this.showMenu();
+        break;
+    }
+  }
+
+  private showDataReport(): void {
+    const rows = getContentReport().map((summary) => ({
+      label: `${summary.name} (${summary.count})`,
+      ok: summary.ok,
+      detail: summary.ok ? undefined : summary.issues.slice(0, 3).join('; '),
+    }));
+    this.overlay.showReport('Data validation', rows, () => this.showMenu(), 'dev-data-report');
+  }
+}
+
+function resumeSceneKey(save: SaveData): string {
+  return RESUMABLE_SCENES.has(save.location.sceneKey) ? save.location.sceneKey : 'Farm';
 }

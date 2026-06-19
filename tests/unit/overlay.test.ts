@@ -51,4 +51,55 @@ describe('UIOverlay', () => {
     document.querySelector<HTMLButtonElement>('[data-testid="panel-back"]')?.click();
     expect(backed).toBe(true);
   });
+
+  it('showForm renders fields and submits their values', () => {
+    const overlay = new UIOverlay();
+    let submitted: Record<string, string> | null = null;
+    overlay.showForm(
+      'New Game',
+      [{ id: 'name', label: 'Your name', value: 'Wren' }],
+      'Begin',
+      (values) => {
+        submitted = values;
+      },
+      () => {},
+    );
+    const input = document.querySelector<HTMLInputElement>('[data-testid="field-name"]');
+    expect(input?.value).toBe('Wren');
+    document
+      .querySelector('form')
+      ?.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    expect(submitted).toEqual({ name: 'Wren' });
+  });
+
+  it('showForm Cancel invokes the cancel handler', () => {
+    const overlay = new UIOverlay();
+    let cancelled = false;
+    overlay.showForm('t', [{ id: 'a', label: 'A' }], 'Go', () => {}, () => {
+      cancelled = true;
+    });
+    document.querySelector<HTMLButtonElement>('[data-testid="form-cancel"]')?.click();
+    expect(cancelled).toBe(true);
+  });
+
+  it('showReport renders pass/fail rows and a Back button', () => {
+    const overlay = new UIOverlay();
+    let backed = false;
+    overlay.showReport(
+      'Data validation',
+      [
+        { label: 'items (14)', ok: true },
+        { label: 'crops (0)', ok: false, detail: 'broken reference' },
+      ],
+      () => {
+        backed = true;
+      },
+      'dev-data-report',
+    );
+    expect(document.querySelector('[data-testid="dev-data-report"]')).toBeTruthy();
+    expect(document.querySelectorAll('.report-ok')).toHaveLength(1);
+    expect(document.querySelectorAll('.report-fail')).toHaveLength(1);
+    document.querySelector<HTMLButtonElement>('[data-testid="panel-back"]')?.click();
+    expect(backed).toBe(true);
+  });
 });

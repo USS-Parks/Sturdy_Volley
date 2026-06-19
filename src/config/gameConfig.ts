@@ -2,6 +2,12 @@ import Phaser from 'phaser';
 import { BootScene } from '../scenes/BootScene';
 import { PreloadScene } from '../scenes/PreloadScene';
 import { TitleScene } from '../scenes/TitleScene';
+import { NewGameScene } from '../scenes/NewGameScene';
+import { FarmScene } from '../scenes/FarmScene';
+import { TownScene } from '../scenes/TownScene';
+import { InteriorScene } from '../scenes/InteriorScene';
+import { CourtScene } from '../scenes/CourtScene';
+import { MineScene } from '../scenes/MineScene';
 
 /** Design resolution. The Scale.FIT mode letterboxes to fit any viewport. */
 export const GAME_WIDTH = 1280;
@@ -25,6 +31,16 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
       default: 'arcade',
       arcade: { gravity: { x: 0, y: 0 }, debug: false },
     },
-    scene: [BootScene, PreloadScene, TitleScene],
+    scene: [
+      BootScene,
+      PreloadScene,
+      TitleScene,
+      NewGameScene,
+      FarmScene,
+      TownScene,
+      InteriorScene,
+      CourtScene,
+      MineScene,
+    ],
   };
 }
