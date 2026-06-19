@@ -7,8 +7,9 @@ import {
   type GameTime,
   type DaySummary,
 } from './timeSystem';
-import type { Festival, Npc } from '../data/schemas';
+import type { Festival, Item, Npc } from '../data/schemas';
 import type { DayLedger } from './gameState';
+import { buildItemCatalog, containerSellValue } from './itemCatalog';
 
 /** Sync from the save's flat `calendar` into the timeSystem's `GameTime`. */
 export function getGameTime(save: SaveData): GameTime {
@@ -61,6 +62,7 @@ export interface ResolveDayInput {
   collapsed: boolean;
   festivals: readonly Festival[];
   npcs: readonly Npc[];
+  items: readonly Item[];
   penalty?: CollapsePenalty;
 }
 
@@ -68,16 +70,22 @@ export interface ResolveDayResult {
   summary: DaySummary;
   nextTime: GameTime;
   collapse: CollapseOutcome | null;
+  shipmentEarnings: number;
 }
 
 /**
- * Pure day-resolution: apply income, collapse penalty (if any), roll the
- * calendar to the next day, and assemble the bedtime summary. Mutates the save
- * in-place; callers are responsible for persisting it.
+ * Pure day-resolution: drain the shipping bin into income, apply ledger income,
+ * apply collapse penalty (if any), roll the calendar, and assemble the bedtime
+ * summary. Mutates the save in-place; callers are responsible for persisting it.
  */
 export function resolveDay(input: ResolveDayInput): ResolveDayResult {
-  const { save, ledger, collapsed, festivals, npcs } = input;
-  save.wallet.gold += ledger.income;
+  const { save, ledger, collapsed, festivals, npcs, items } = input;
+  const catalog = buildItemCatalog(items, npcs);
+  const shipmentEarnings = containerSellValue(save.shippingBin, catalog);
+  save.shippingBin = { slots: new Array(save.shippingBin.capacity).fill(null), capacity: save.shippingBin.capacity };
+
+  const totalIncome = ledger.income + shipmentEarnings;
+  save.wallet.gold += totalIncome;
 
   const collapse = collapsed ? applyCollapsePenalty(save, input.penalty) : null;
 
@@ -90,13 +98,16 @@ export function resolveDay(input: ResolveDayInput): ResolveDayResult {
 
   const summary = buildDaySummary({
     endingTime,
-    income: ledger.income,
+    income: totalIncome,
     skillXp: ledger.skillXp,
     relationshipChanges: ledger.relationshipChanges,
     collapsed,
     tomorrowFestival: tomorrowFestival?.name ?? null,
     tomorrowBirthdays,
   });
+  if (shipmentEarnings > 0) {
+    summary.notices.unshift(`Yesterday's shipment earned ${shipmentEarnings} g.`);
+  }
 
-  return { summary, nextTime, collapse };
+  return { summary, nextTime, collapse, shipmentEarnings };
 }

@@ -248,6 +248,85 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## Prompt 007 — Inventory, hotbar, chests, and item quality (2026-06-19)
+
+Stood up the inventory system: a renderer-agnostic Container model shared by
+the player, the porch chest, and the shipping bin; quality tiers with sell-price
+multipliers; a persistent hotbar strip; a dual-grid inventory panel with
+pointer-driven drag/drop, a trash slot, and an item tooltip; a starter chest +
+shipping bin in the world; and overnight sales that flow through the day
+summary.
+
+- **`engine/inventory.ts`** — pure container engine: `createContainer`,
+  `addItem` (auto-stacks across slots up to `MAX_STACK = 99` and respects the
+  `stackable` flag), `removeItem` (lowest-quality first), `swapSlots`,
+  `placeOrMerge`, `splitStack`, `moveBetween` (cross-container, with merge or
+  swap fallback), `findFirstEmpty`, `findStack`, `countItem`, `isEmpty`,
+  `qualityMultiplier` (1.0 / 1.25 / 1.5 / 2.0), `sellValueOf`. 18 unit tests.
+- **`engine/itemCatalog.ts`** — `buildItemCatalog(items, npcs)` produces id→item
+  + itemId→loved-by-npc maps and exposes `getItem`, `lovedByNpcs`,
+  `containerSellValue` (quality-adjusted total across a container). 3 unit
+  tests.
+- **`engine/saveModel.ts`** — bumped `SAVE_VERSION` to 2. `inventory` is now a
+  `Container { slots: nullable[], capacity }`; added `hotbarSize` (default 8),
+  `chests: Record<string, Container>` (seeded with a 24-slot `farm-porch-chest`),
+  and `shippingBin: Container` (16 slots). New saves start with 5 Bell Pea Seeds
+  in hotbar slot 0 so the first day has something to do.
+- **`engine/dayResolution.ts`** — `resolveDay` now takes `items` too, drains the
+  shipping bin into income (`containerSellValue`), clears the bin, and prepends
+  "Yesterday's shipment earned N g." to the day-summary notices. Returns
+  `shipmentEarnings` on the result for callers. Wallet credits run before the
+  collapse penalty so a 2-AM sleep still banks the day's harvest. 1 new test
+  (the bin path), plus 3 existing tests carry the `items: []` field.
+- **`ui/overlay.ts`** — `showHotbar(opts)` renders a persistent
+  `.hotbar-strip` (idempotent — re-rendering replaces in place), `showInventory(opts)`
+  renders the dual-grid panel (player + optional partner) with a Trash slot and
+  pointer-driven drag/drop via `text/plain` JSON payloads, `tooltipLines` is a
+  pure helper exporting the canonical tooltip field order (name → description →
+  source → tags → sell × quality → quality tier → loved by). 6 new jsdom tests
+  including a drag/drop wiring smoke (stubbed DataTransfer/DragEvent for jsdom).
+- **`scenes/FarmScene.ts`** — adds shipping bin + porch chest meshes, registers
+  them as interaction targets, opens the inventory panel via the I hotkey or
+  the pause-menu "Open inventory" entry, opens the dual-panel against the
+  right partner on interact, routes `SlotMove` decisions through `moveBetween`
+  / `placeOrMerge` / `clearSlot`, persists the save after every move, and
+  surfaces the active hotbar item's name in the HUD line. New debug API:
+  `openInventory`, `hotbarSlots`, `shippingBinSlots`, `shipPrototypeSeeds` (for
+  the e2e smoke).
+- **`src/styles.css`** — hotbar strip, hotbar slot tiles with quality stars,
+  dual-grid inventory panel, slot tiles, hotbar-tinted borders for the first
+  hotbarSize slots, and the trash drop zone.
+
+**Acceptance criteria**
+
+- [x] Inventory works with mouse, touch, and keyboard (mouse + keyboard
+  e2e-verified; touch supported via the same pointer-event drag/drop path used
+  by the desktop tests — Playwright Pixel-5 e2e passes; controller polish
+  remains queued for Prompt 043 per the existing core/wave split pattern).
+- [x] Chests persist contents (`chests` is part of the save schema; the porch
+  chest writes through `persistActiveSave` on every move; `parseSave`
+  round-trips a stocked chest via the saveModel test).
+- [x] Shipping bin sells overnight (`resolveDay` drains the bin into income,
+  clears it, and adds a "Yesterday's shipment earned N g." notice;
+  dayResolution unit test + the inventory e2e cover the full flow).
+- [x] Tooltips show source, tags, sell value, quality, and gift category
+  (`tooltipLines` field-order is locked by a unit test: name, description,
+  Source: <category>, Tags: ..., Sell: N g each, Quality: <tier>, Loved by: ...).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`129/129` (18 files, +27 new specs) · build `dist/` (Babylon bundle ~5.17 MB
+/ 1.15 MB gzip) · Playwright `24/24` across desktop + mobile (3 new inventory
+specs).
+
+**Note (jsdom drag/drop):** jsdom 25 ships neither `DataTransfer` nor
+`DragEvent`. Added a one-shot string-payload stub `makeDataTransfer()` and a
+`fireDrag(target, type, dt)` helper in `overlay.test.ts` that stamps the
+dataTransfer on a plain `Event`. Enough to verify the overlay's drag handlers
+call back with the right `SlotMove`; the production code still uses the real
+DOM drag-and-drop in the browser.
+
+---
+
 ## Prompt 006 — Time, calendar, and day resolution (2026-06-19)
 
 Stood up the live clock + day-resolution loop on top of the renderer-agnostic

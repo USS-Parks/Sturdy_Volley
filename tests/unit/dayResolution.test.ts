@@ -8,11 +8,16 @@ import {
   DEFAULT_COLLAPSE_PENALTY,
 } from '../../src/engine/dayResolution';
 import { DAY_END_MIN, DAY_START_MIN } from '../../src/engine/timeSystem';
-import type { Festival, Npc } from '../../src/data/schemas';
+import type { Festival, Item, Npc } from '../../src/data/schemas';
+import { addItem } from '../../src/engine/inventory';
 
 const FESTIVALS: Festival[] = [
   { id: 'seed-blessing', name: 'Seed Blessing', season: 'spring', day: 2, description: 'x' },
 ];
+const ITEMS: Item[] = [
+  { id: 'bell-peas', name: 'Bell Peas', description: 'x', category: 'crop', sellPrice: 24, stackable: true, tags: ['spring'] },
+];
+
 const NPCS: Npc[] = [
   {
     id: 'mara-vale',
@@ -82,6 +87,7 @@ describe('resolveDay', () => {
       collapsed: false,
       festivals: FESTIVALS,
       npcs: NPCS,
+      items: [],
     });
     expect(save.wallet.gold).toBe(before + 150);
     expect(save.calendar.day).toBe(2);
@@ -103,11 +109,34 @@ describe('resolveDay', () => {
       collapsed: true,
       festivals: [],
       npcs: [],
+      items: [],
     });
     expect(result.collapse).not.toBeNull();
     expect(result.collapse!.goldLost).toBe(100);
     expect(save.wallet.gold).toBe(900);
     expect(result.summary.notices).toContain('You collapsed and were carried home.');
+  });
+
+  it('drains the shipping bin overnight and credits the wallet', () => {
+    const save = freshSave();
+    const startingGold = save.wallet.gold;
+    save.shippingBin = addItem(save.shippingBin, 'bell-peas', 4, 0, { stackable: true }).container;
+    save.shippingBin = addItem(save.shippingBin, 'bell-peas', 2, 2, { stackable: true }).container;
+    applyGameTime(save, { year: 1, season: 'spring', day: 1, minutes: DAY_END_MIN });
+    const result = resolveDay({
+      save,
+      ledger: { income: 50, skillXp: {}, relationshipChanges: 0 },
+      collapsed: false,
+      festivals: [],
+      npcs: NPCS,
+      items: ITEMS,
+    });
+    // 4 * 24 + 2 * round(24*1.5) = 96 + 72 = 168 (shipment)
+    expect(result.shipmentEarnings).toBe(168);
+    expect(save.wallet.gold).toBe(startingGold + 50 + 168);
+    expect(save.shippingBin.slots.every((s) => s === null)).toBe(true);
+    expect(result.summary.notices[0]).toBe("Yesterday's shipment earned 168 g.");
+    expect(result.summary.income).toBe(50 + 168);
   });
 
   it('wraps to summer 1 after spring 28', () => {
@@ -119,6 +148,7 @@ describe('resolveDay', () => {
       collapsed: false,
       festivals: [],
       npcs: [],
+      items: [],
     });
     expect(save.calendar).toEqual({ year: 1, season: 'summer', day: 1, timeMinutes: DAY_START_MIN });
     expect(result.nextTime.season).toBe('summer');

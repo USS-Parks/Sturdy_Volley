@@ -1,5 +1,34 @@
 import type { MenuItem } from './menuModel';
 import type { DaySummary } from '../engine/timeSystem';
+import type { Container, InventoryStack } from '../engine/saveModel';
+import type { Item, Npc } from '../data/schemas';
+import { QUALITY_LABEL, qualityMultiplier } from '../engine/inventory';
+import type { ItemCatalog } from '../engine/itemCatalog';
+import { getItem, lovedByNpcs } from '../engine/itemCatalog';
+
+export interface SlotMove {
+  fromContainer: 'player' | 'partner';
+  fromIndex: number;
+  toContainer: 'player' | 'partner' | 'trash';
+  toIndex: number | null;
+}
+
+export interface InventoryPanelOptions {
+  title: string;
+  player: Container;
+  hotbarSize: number;
+  partner?: { id: string; title: string; container: Container };
+  catalog: ItemCatalog;
+  onMove: (move: SlotMove) => void;
+  onClose: () => void;
+}
+
+export interface HotbarOptions {
+  slots: readonly (InventoryStack | null)[];
+  selectedIndex: number;
+  catalog: ItemCatalog;
+  onSelect: (index: number) => void;
+}
 
 /**
  * Manages the HTML overlay layer (#ui-root) rendered above the Phaser canvas.
@@ -213,6 +242,210 @@ export class UIOverlay {
     this.focusFirstEnabled(panel);
   }
 
+  /**
+   * Persistent hotbar strip at the bottom of the screen. Rendered as its own
+   * element so it can coexist with the HUD bar and pause menu. Idempotent —
+   * subsequent calls replace the strip in place without disturbing other UI.
+   */
+  showHotbar(opts: HotbarOptions): void {
+    const existing = this.root.querySelector<HTMLDivElement>('.hotbar-strip');
+    const strip = existing ?? document.createElement('div');
+    strip.className = 'hotbar-strip';
+    strip.dataset.testid = 'hotbar';
+    strip.replaceChildren();
+
+    opts.slots.forEach((stack, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'hotbar-slot';
+      if (i === opts.selectedIndex) btn.classList.add('hotbar-slot-active');
+      btn.dataset.testid = `hotbar-slot-${i}`;
+      btn.title = stack
+        ? `${getItem(opts.catalog, stack.itemId)?.name ?? stack.itemId} ×${stack.qty}`
+        : `Slot ${i + 1}`;
+
+      const number = document.createElement('span');
+      number.className = 'hotbar-number';
+      number.textContent = `${i + 1}`;
+      btn.appendChild(number);
+
+      if (stack) {
+        const item = getItem(opts.catalog, stack.itemId);
+        const label = document.createElement('span');
+        label.className = 'hotbar-item';
+        label.textContent = item?.name ?? stack.itemId;
+        const qty = document.createElement('span');
+        qty.className = 'hotbar-qty';
+        qty.textContent = `×${stack.qty}`;
+        btn.append(label, qty);
+        if (stack.quality > 0) {
+          const star = document.createElement('span');
+          star.className = `hotbar-quality quality-${stack.quality}`;
+          star.textContent = '★'.repeat(stack.quality);
+          btn.appendChild(star);
+        }
+      }
+
+      btn.addEventListener('click', () => opts.onSelect(i));
+      strip.appendChild(btn);
+    });
+
+    if (!existing) this.root.appendChild(strip);
+  }
+
+  clearHotbar(): void {
+    this.root.querySelector('.hotbar-strip')?.remove();
+  }
+
+  /**
+   * Dual-container inventory panel (player + optional partner — chest or
+   * shipping bin) with a Trash slot and pointer-driven drag/drop. The
+   * `onMove` callback receives a structured SlotMove the caller routes through
+   * the pure inventory engine; the renderer just renders.
+   */
+  showInventory(opts: InventoryPanelOptions): void {
+    this.clear();
+    const panel = this.createPanel(opts.title, opts.partner?.title);
+    panel.classList.add('inventory-panel');
+    panel.dataset.testid = 'inventory-panel';
+
+    const grids = document.createElement('div');
+    grids.className = 'inventory-grids';
+
+    const playerGrid = this.renderContainerGrid(
+      opts.player,
+      'player',
+      opts.hotbarSize,
+      opts.catalog,
+      opts,
+    );
+    playerGrid.dataset.testid = 'inventory-player';
+    grids.appendChild(playerGrid);
+
+    if (opts.partner) {
+      const partnerGrid = this.renderContainerGrid(
+        opts.partner.container,
+        'partner',
+        opts.partner.container.capacity, // no hotbar split on partners
+        opts.catalog,
+        opts,
+      );
+      partnerGrid.dataset.testid = `inventory-partner-${opts.partner.id}`;
+      grids.appendChild(partnerGrid);
+    }
+
+    panel.appendChild(grids);
+
+    const trash = document.createElement('button');
+    trash.type = 'button';
+    trash.className = 'inventory-trash';
+    trash.textContent = 'Trash';
+    trash.dataset.testid = 'inventory-trash';
+    trash.addEventListener('dragover', (e) => e.preventDefault());
+    trash.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const data = this.readDragData(e.dataTransfer);
+      if (!data) return;
+      opts.onMove({
+        fromContainer: data.fromContainer,
+        fromIndex: data.fromIndex,
+        toContainer: 'trash',
+        toIndex: null,
+      });
+    });
+    panel.appendChild(trash);
+
+    const close = document.createElement('button');
+    close.className = 'menu-button';
+    close.type = 'button';
+    close.textContent = 'Close';
+    close.dataset.testid = 'inventory-close';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  private renderContainerGrid(
+    container: Container,
+    role: 'player' | 'partner',
+    hotbarSize: number,
+    catalog: ItemCatalog,
+    opts: InventoryPanelOptions,
+  ): HTMLDivElement {
+    const grid = document.createElement('div');
+    grid.className = 'inventory-grid';
+
+    container.slots.forEach((stack, i) => {
+      const cell = document.createElement('div');
+      cell.className = 'inventory-slot';
+      if (role === 'player' && i < hotbarSize) cell.classList.add('inventory-slot-hotbar');
+      cell.dataset.testid = `slot-${role}-${i}`;
+      cell.draggable = stack !== null;
+
+      if (stack) {
+        const item = getItem(catalog, stack.itemId);
+        const label = document.createElement('span');
+        label.className = 'inventory-item';
+        label.textContent = item?.name ?? stack.itemId;
+        const qty = document.createElement('span');
+        qty.className = 'inventory-qty';
+        qty.textContent = `×${stack.qty}`;
+        cell.append(label, qty);
+        if (stack.quality > 0) {
+          const star = document.createElement('span');
+          star.className = `inventory-quality quality-${stack.quality}`;
+          star.textContent = '★'.repeat(stack.quality);
+          cell.appendChild(star);
+        }
+        cell.title = this.tooltipText(stack, catalog);
+      }
+
+      cell.addEventListener('dragstart', (e) => {
+        e.dataTransfer?.setData('text/plain', JSON.stringify({ fromContainer: role, fromIndex: i }));
+      });
+      cell.addEventListener('dragover', (e) => e.preventDefault());
+      cell.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const data = this.readDragData(e.dataTransfer);
+        if (!data) return;
+        opts.onMove({
+          fromContainer: data.fromContainer,
+          fromIndex: data.fromIndex,
+          toContainer: role,
+          toIndex: i,
+        });
+      });
+      grid.appendChild(cell);
+    });
+    return grid;
+  }
+
+  private readDragData(dt: DataTransfer | null): { fromContainer: 'player' | 'partner'; fromIndex: number } | null {
+    if (!dt) return null;
+    const raw = dt.getData('text/plain');
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as { fromContainer: 'player' | 'partner'; fromIndex: number };
+      if (
+        (parsed.fromContainer === 'player' || parsed.fromContainer === 'partner') &&
+        Number.isInteger(parsed.fromIndex)
+      ) {
+        return parsed;
+      }
+    } catch {
+      /* drop bad payloads */
+    }
+    return null;
+  }
+
+  private tooltipText(stack: InventoryStack, catalog: ItemCatalog): string {
+    const item = getItem(catalog, stack.itemId);
+    if (!item) return stack.itemId;
+    return tooltipLines(stack, item, lovedByNpcs(catalog, stack.itemId)).join('\n');
+  }
+
   /** Bedtime / collapse summary panel — income, skill XP, relationship deltas, notices. */
   showDaySummary(summary: DaySummary, onContinue: () => void): void {
     this.clear();
@@ -297,4 +530,27 @@ export class UIOverlay {
     const first = panel.querySelector<HTMLButtonElement>('button:not(:disabled)');
     first?.focus();
   }
+}
+
+/**
+ * Pure tooltip-line builder. Exported so unit tests can lock the field order
+ * + format without spinning up jsdom + the full overlay.
+ */
+export function tooltipLines(
+  stack: InventoryStack,
+  item: Item,
+  loved: readonly Npc[],
+): string[] {
+  const lines: string[] = [];
+  lines.push(item.name);
+  lines.push(item.description);
+  lines.push(`Source: ${item.category}`);
+  if (item.tags.length > 0) lines.push(`Tags: ${item.tags.join(', ')}`);
+  const sellEach = Math.max(0, Math.round(item.sellPrice * qualityMultiplier(stack.quality)));
+  lines.push(`Sell: ${sellEach} g each (${sellEach * stack.qty} g for ${stack.qty})`);
+  lines.push(`Quality: ${QUALITY_LABEL[Math.max(0, Math.min(3, stack.quality))]}`);
+  if (loved.length > 0) {
+    lines.push(`Loved by: ${loved.map((n) => n.name).join(', ')}`);
+  }
+  return lines;
 }

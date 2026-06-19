@@ -5,8 +5,12 @@ import { seasonSchema } from '../data/schemas';
  * The save model. Versioned for future migrations (Prompt 041). Validated with
  * zod so corrupt or hand-edited saves fail with a readable message instead of
  * crashing mid-game.
+ *
+ * v2 (Prompt 007): inventory becomes a Container { slots, capacity } shared by
+ * the player, chests, and the shipping bin. The hotbar is the first
+ * hotbarSize slots of the player inventory.
  */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export const inventoryStackSchema = z
   .object({
@@ -16,6 +20,17 @@ export const inventoryStackSchema = z
   })
   .strict();
 export type InventoryStack = z.infer<typeof inventoryStackSchema>;
+
+export const containerSchema = z
+  .object({
+    slots: z.array(inventoryStackSchema.nullable()),
+    capacity: z.number().int().positive(),
+  })
+  .strict()
+  .refine((c) => c.slots.length === c.capacity, {
+    message: 'container slots length must equal capacity',
+  });
+export type Container = z.infer<typeof containerSchema>;
 
 export const saveSchema = z
   .object({
@@ -40,7 +55,10 @@ export const saveSchema = z
       .strict(),
     location: z.object({ sceneKey: z.string().min(1) }).strict(),
     wallet: z.object({ gold: z.number().int().nonnegative() }).strict(),
-    inventory: z.array(inventoryStackSchema),
+    inventory: containerSchema,
+    hotbarSize: z.number().int().positive(),
+    chests: z.record(z.string(), containerSchema),
+    shippingBin: containerSchema,
     relationships: z.record(z.string(), z.number()),
     skills: z.record(z.string(), z.number()),
     flags: z.record(z.string(), z.union([z.boolean(), z.number(), z.string()])),
@@ -55,7 +73,20 @@ export interface NewSaveOptions {
   farmType?: string;
 }
 
+export const DEFAULT_INVENTORY_CAPACITY = 24;
+export const DEFAULT_HOTBAR_SIZE = 8;
+export const DEFAULT_SHIPPING_BIN_CAPACITY = 16;
+export const DEFAULT_STARTER_CHEST_CAPACITY = 24;
+
+function emptyContainer(capacity: number): Container {
+  return { slots: new Array(capacity).fill(null), capacity };
+}
+
 export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): SaveData {
+  const inventory = emptyContainer(DEFAULT_INVENTORY_CAPACITY);
+  // A friendly handful of starter seeds in the first hotbar slot — gives the
+  // first day of play something to do without forcing a shop visit.
+  inventory.slots[0] = { itemId: 'bell-pea-seeds', qty: 5, quality: 0 };
   return {
     version: SAVE_VERSION,
     createdAt: now,
@@ -68,7 +99,12 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
     calendar: { year: 1, season: 'spring', day: 1, timeMinutes: 6 * 60 },
     location: { sceneKey: 'Farm' },
     wallet: { gold: 500 },
-    inventory: [],
+    inventory,
+    hotbarSize: DEFAULT_HOTBAR_SIZE,
+    chests: {
+      'farm-porch-chest': emptyContainer(DEFAULT_STARTER_CHEST_CAPACITY),
+    },
+    shippingBin: emptyContainer(DEFAULT_SHIPPING_BIN_CAPACITY),
     relationships: {},
     skills: {},
     flags: {},

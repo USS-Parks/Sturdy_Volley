@@ -8,6 +8,10 @@ declare global {
       time: () => { minutes: number; paused: boolean; scale: number; clock: string };
       setTimeScale: (scale: number) => void;
       sleep: () => void;
+      openInventory: () => void;
+      shippingBinSlots: () => Array<{ itemId: string; qty: number; quality: number } | null>;
+      hotbarSlots: () => Array<{ itemId: string; qty: number; quality: number } | null>;
+      shipPrototypeSeeds: () => void;
     };
   }
 }

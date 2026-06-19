@@ -310,6 +310,165 @@ body {
   font-size: 12px;
 }
 
+/* Persistent hotbar strip — always-on row of slot tiles at the bottom. */
+.hotbar-strip {
+  position: absolute;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  pointer-events: auto;
+  background: linear-gradient(180deg, #284058 0%, #1d3144 100%);
+  border: 2px solid var(--sv-wood);
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 2px var(--sv-rope);
+}
+
+.hotbar-slot {
+  position: relative;
+  min-width: 56px;
+  min-height: 56px;
+  padding: 4px 6px;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--sv-ink);
+  background: linear-gradient(180deg, var(--sv-parchment) 0%, var(--sv-parchment-2) 100%);
+  border: 2px solid var(--sv-wood);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.hotbar-slot:focus-visible {
+  outline: 2px solid var(--sv-accent);
+  outline-offset: 2px;
+}
+
+.hotbar-slot-active {
+  box-shadow: 0 0 0 3px var(--sv-accent);
+}
+
+.hotbar-number {
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.65;
+}
+
+.hotbar-item {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hotbar-qty {
+  font-size: 11px;
+  font-weight: 700;
+  align-self: flex-end;
+}
+
+.hotbar-quality,
+.inventory-quality {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 10px;
+  color: var(--sv-brass);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+}
+
+.quality-2 {
+  color: #d6c168;
+}
+
+.quality-3 {
+  color: #c6a3ff;
+}
+
+/* Inventory panel — dual grid + trash slot. */
+.inventory-panel {
+  width: min(640px, 96vw);
+}
+
+.inventory-grids {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.inventory-panel:has([data-testid^="inventory-partner"]) .inventory-grids {
+  grid-template-columns: 1fr 1fr;
+}
+
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px dashed var(--sv-rope);
+  border-radius: 10px;
+}
+
+.inventory-slot {
+  position: relative;
+  min-height: 52px;
+  padding: 4px 6px;
+  font-size: 11px;
+  color: var(--sv-ink);
+  background: linear-gradient(180deg, var(--sv-parchment) 0%, var(--sv-parchment-2) 100%);
+  border: 1px solid var(--sv-wood);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: grab;
+}
+
+.inventory-slot:empty {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed var(--sv-rope);
+  cursor: default;
+}
+
+.inventory-slot-hotbar {
+  border-color: var(--sv-brass);
+}
+
+.inventory-item {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inventory-qty {
+  align-self: flex-end;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.inventory-trash {
+  pointer-events: auto;
+  padding: 10px 14px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--sv-text);
+  background: linear-gradient(180deg, #4a2b2b 0%, #2f1f1f 100%);
+  border: 2px dashed #ff9d9d;
+  border-radius: 10px;
+  text-align: center;
+  cursor: pointer;
+}
+
 /* Bedtime / collapse summary — parchment card list + notice band. */
 .day-summary-panel {
   width: min(440px, 92vw);

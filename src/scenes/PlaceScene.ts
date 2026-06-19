@@ -180,6 +180,7 @@ export abstract class PlaceScene extends GameScene {
       collapsed: true,
       festivals: content.festivals,
       npcs: content.npcs,
+      items: content.items,
     });
     resetDayLedger();
     applyGameTime(this.save, result.nextTime);

@@ -20,7 +20,7 @@ import { computeMoveVector, type MoveInput } from '../engine/movement';
 import { FarmGrid, FARM_CELL_SIZE } from '../engine/farmGrid';
 import { createControllerState, stepController, type ControllerState } from '../engine/controller';
 import { resolveInteraction, type InteractTarget } from '../engine/interaction';
-import type { SaveData } from '../engine/saveModel';
+import type { Container, SaveData } from '../engine/saveModel';
 import { loadGameContent } from '../data/content';
 import { forecastFor } from '../engine/weather';
 import { tideStateAt, type TideState } from '../engine/tide';
@@ -35,6 +35,9 @@ import {
 } from '../engine/timeClock';
 import { formatClock as formatGameClock } from '../engine/timeSystem';
 import type { Weather } from '../data/schemas';
+import { moveBetween, placeOrMerge, clearSlot } from '../engine/inventory';
+import { buildItemCatalog, getItem, type ItemCatalog } from '../engine/itemCatalog';
+import type { SlotMove } from '../ui/overlay';
 
 const FARM_HALF = 20;
 const TOOLS = ['Hoe', 'Watering Can', 'Axe', 'Pick', 'Sickle'] as const;
@@ -45,14 +48,22 @@ interface DebugApi {
   time: () => { minutes: number; paused: boolean; scale: number; clock: string };
   setTimeScale: (scale: number) => void;
   sleep: () => void;
+  openInventory: () => void;
+  shippingBinSlots: () => readonly (import('../engine/saveModel').InventoryStack | null)[];
+  hotbarSlots: () => readonly (import('../engine/saveModel').InventoryStack | null)[];
+  shipPrototypeSeeds: () => void;
 }
 
+type PartnerKind = 'chest' | 'shipping-bin' | null;
+
 /**
- * Breakpoint Farm — playable 3D scene (Prompts 004–006). Placeholder low-poly
+ * Breakpoint Farm — playable 3D scene (Prompts 004–007). Placeholder low-poly
  * terrain/props + a grid-aware tilled plot; a third-person player driven by the
- * renderer-agnostic controller + interaction resolver. Prompt 006 adds the live
- * time clock (paused with menus, debug-only acceleration), bedtime/collapse,
- * and a Sleep prompt at the farmhouse door that resolves the day.
+ * renderer-agnostic controller + interaction resolver. Prompt 006 added the
+ * live time clock + bedtime/collapse + Sleep prompt. Prompt 007 adds the
+ * persistent hotbar strip, the inventory panel (player + chest/shipping-bin
+ * partner + trash) with pointer-driven drag/drop, an inventory hotkey (I or
+ * Tab), a starter chest on the porch, and a shipping bin that sells overnight.
  */
 export class FarmScene extends GameScene {
   private camera!: ArcRotateCamera;
@@ -63,15 +74,21 @@ export class FarmScene extends GameScene {
   private targets: InteractTarget[] = [];
   private nearest: InteractTarget | null = null;
   private selectedTool = 0;
+  private selectedHotbar = 0;
   private actionTimer = 0;
   private actionLabel = '';
   private hudTimer = 0;
   private ePrev = false;
+  private iPrev = false;
   private menuOpen = false;
+  private inventoryOpen = false;
   private clock!: TimeClockState;
   private weather: Weather | null = null;
   private tide: TideState = 'low';
   private dayResolving = false;
+  private partnerKind: PartnerKind = null;
+  private partnerId: string | null = null;
+  private catalog!: ItemCatalog;
   private readonly homePosition = new Vector3(-8, 0.9, -5.4);
 
   private readonly pressed = new Set<string>();
@@ -152,6 +169,24 @@ export class FarmScene extends GameScene {
     pondWall.position.set(10, 1, -2);
     pondWall.checkCollisions = true;
     pondWall.isVisible = false;
+
+    // Shipping bin — a chunky wooden crate next to the farmhouse porch.
+    const bin = MeshBuilder.CreateBox('shipping-bin', { width: 1.6, depth: 1.2, height: 1.2 }, scene);
+    bin.position.set(-6.2, 0.6, -7.6);
+    bin.material = flatMaterial(scene, 'shipping-bin', PALETTE.wood, 0.22);
+    bin.checkCollisions = true;
+    const binLid = MeshBuilder.CreateBox('shipping-bin-lid', { width: 1.7, depth: 1.3, height: 0.1 }, scene);
+    binLid.position.set(-6.2, 1.25, -7.6);
+    binLid.material = flatMaterial(scene, 'shipping-bin-lid', PALETTE.roof, 0.22);
+
+    // Porch chest — a smaller chest next to the door.
+    const chest = MeshBuilder.CreateBox('porch-chest', { width: 1.1, depth: 0.75, height: 0.75 }, scene);
+    chest.position.set(-12, 0.38, -6);
+    chest.material = flatMaterial(scene, 'porch-chest', PALETTE.wood, 0.22);
+    chest.checkCollisions = true;
+    const chestLid = MeshBuilder.CreateBox('porch-chest-lid', { width: 1.2, depth: 0.85, height: 0.12 }, scene);
+    chestLid.position.set(-12, 0.82, -6);
+    chestLid.material = flatMaterial(scene, 'porch-chest-lid', PALETTE.roof, 0.22);
   }
 
   private buildBounds(scene: Scene): void {
@@ -180,11 +215,16 @@ export class FarmScene extends GameScene {
     save.location.sceneKey = 'Farm';
     writeSave(save);
 
+    const content = loadGameContent();
+    this.catalog = buildItemCatalog(content.items, content.npcs);
+
     this.controller = createControllerState();
     this.clock = createTimeClock(getGameTime(save));
     this.refreshWorldState();
     this.targets = [
       { id: 'farmhouse-door', kind: 'door', label: 'Sleep at the farmhouse', x: -10, z: -5.6, radius: 2.6, priority: 5 },
+      { id: 'shipping-bin', kind: 'prop', label: 'Open the shipping bin', x: -6.2, z: -7.6, radius: 2.2, priority: 4 },
+      { id: 'porch-chest', kind: 'prop', label: 'Open the porch chest', x: -12, z: -6, radius: 2.2, priority: 4 },
       { id: 'tilled-plot', kind: 'farm-cell', label: 'Tend the soil', x: -6, z: -4, radius: 4, priority: 3 },
       { id: 'tide-pond', kind: 'water-entry', label: 'Check the tide pond', x: 10, z: -2, radius: 4.4, priority: 2 },
       { id: 'tree-1', kind: 'prop', label: 'Inspect the tree', x: 8, z: -6, radius: 2, priority: 1 },
@@ -195,8 +235,12 @@ export class FarmScene extends GameScene {
     window.addEventListener('keyup', this.onKeyUp);
     this.attachTouch();
     this.menuOpen = false;
+    this.inventoryOpen = false;
     this.dayResolving = false;
+    this.partnerKind = null;
+    this.partnerId = null;
     this.refreshHud();
+    this.refreshHotbar();
 
     (window as unknown as { sturdyVolleyDebug?: DebugApi }).sturdyVolleyDebug = {
       player: () => ({ x: this.player.position.x, z: this.player.position.z }),
@@ -216,12 +260,25 @@ export class FarmScene extends GameScene {
         this.clock = setClockScale(this.clock, scale);
       },
       sleep: () => this.triggerSleep(false),
+      openInventory: () => this.openInventory(null),
+      shippingBinSlots: () => this.save.shippingBin.slots,
+      hotbarSlots: () =>
+        this.save.inventory.slots.slice(0, this.save.hotbarSize),
+      shipPrototypeSeeds: () => {
+        // Debug shortcut for e2e: move the starter Bell Pea Seeds stack
+        // from hotbar slot 0 to the first open shipping-bin slot.
+        const result = moveBetween(this.save.inventory, this.save.shippingBin, 0);
+        this.save.inventory = result.from;
+        this.save.shippingBin = result.to;
+        persistActiveSave();
+        this.refreshHotbar();
+      },
     };
   }
 
   override update(dt: number): void {
     if (!this.player) return;
-    if (this.menuOpen || this.dayResolving) {
+    if (this.menuOpen || this.inventoryOpen || this.dayResolving) {
       this.clock = pauseClock(this.clock, true);
       this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
       return;
@@ -229,6 +286,7 @@ export class FarmScene extends GameScene {
     if (this.clock.paused) this.clock = pauseClock(this.clock, false);
 
     this.updateToolSelection();
+    this.updateHotbarSelection();
 
     const dir = this.cameraRelativeDir(computeMoveVector(this.readInput()));
     const sprint = this.pressed.has('shift');
@@ -243,12 +301,21 @@ export class FarmScene extends GameScene {
     if (interact && !this.ePrev && this.nearest) {
       if (this.nearest.id === 'farmhouse-door') {
         this.triggerSleep(false);
+      } else if (this.nearest.id === 'shipping-bin') {
+        this.openInventory({ kind: 'shipping-bin', id: 'shipping-bin' });
+      } else if (this.nearest.id === 'porch-chest') {
+        this.openInventory({ kind: 'chest', id: 'farm-porch-chest' });
       } else {
         this.actionLabel = this.nearest.label;
         this.actionTimer = 1.6;
       }
     }
     this.ePrev = interact;
+
+    const inventoryKey = this.pressed.has('i');
+    if (inventoryKey && !this.iPrev) this.openInventory(null);
+    this.iPrev = inventoryKey;
+
     if (this.actionTimer > 0) this.actionTimer -= dt;
 
     const tick = tickClock(this.clock, dt);
@@ -283,6 +350,17 @@ export class FarmScene extends GameScene {
   private updateToolSelection(): void {
     for (let i = 0; i < TOOLS.length; i++) {
       if (this.pressed.has(String(i + 1))) this.selectedTool = i;
+    }
+  }
+
+  private updateHotbarSelection(): void {
+    for (let i = 0; i < this.save.hotbarSize; i++) {
+      if (this.pressed.has(String(i + 1))) {
+        if (this.selectedHotbar !== i) {
+          this.selectedHotbar = i;
+          this.refreshHotbar();
+        }
+      }
     }
   }
 
@@ -324,6 +402,25 @@ export class FarmScene extends GameScene {
     this.tide = tideStateAt(this.clock.time);
   }
 
+  private refreshHotbar(): void {
+    const slots = this.save.inventory.slots.slice(0, this.save.hotbarSize);
+    this.ctx.overlay.showHotbar({
+      slots,
+      selectedIndex: this.selectedHotbar,
+      catalog: this.catalog,
+      onSelect: (i) => {
+        this.selectedHotbar = i;
+        this.refreshHotbar();
+      },
+    });
+  }
+
+  private activeSlotLabel(): string {
+    const stack = this.save.inventory.slots[this.selectedHotbar];
+    if (!stack) return TOOLS[this.selectedTool];
+    return getItem(this.catalog, stack.itemId)?.name ?? stack.itemId;
+  }
+
   private refreshHud(): void {
     const stamina = Math.round(this.controller.stamina);
     const status = formatWorldStatus(this.save, {
@@ -331,10 +428,11 @@ export class FarmScene extends GameScene {
       tide: this.tide,
       gold: this.save.wallet.gold,
     });
-    let line = `${status} · energy ${stamina}% · tool: ${TOOLS[this.selectedTool]}`;
+    let line = `${status} · energy ${stamina}% · active: ${this.activeSlotLabel()}`;
     if (this.actionTimer > 0) line += ` · ✔ ${this.actionLabel}`;
     else if (this.nearest) line += ` · [E] ${this.nearest.label}`;
     this.ctx.overlay.showHud('Breakpoint Farm', line, () => this.openMenu());
+    this.refreshHotbar();
   }
 
   private openMenu(): void {
@@ -343,6 +441,7 @@ export class FarmScene extends GameScene {
       'Paused',
       [
         { id: 'resume', label: 'Resume', enabled: true, testId: 'pause-resume' },
+        { id: 'inventory', label: 'Open inventory', enabled: true, testId: 'pause-inventory' },
         { id: 'sleep', label: 'Sleep until tomorrow', enabled: true, testId: 'pause-sleep' },
         { id: 'town', label: 'Walk to Ballast Bay', enabled: true, testId: 'nav-town' },
         { id: 'beach', label: 'Driftwood Beach', enabled: true, testId: 'nav-beach' },
@@ -363,6 +462,10 @@ export class FarmScene extends GameScene {
       case 'resume':
         this.menuOpen = false;
         this.refreshHud();
+        break;
+      case 'inventory':
+        this.menuOpen = false;
+        this.openInventory(null);
         break;
       case 'sleep':
         this.menuOpen = false;
@@ -385,6 +488,88 @@ export class FarmScene extends GameScene {
     }
   }
 
+  private openInventory(partner: { kind: 'chest' | 'shipping-bin'; id: string } | null): void {
+    this.inventoryOpen = true;
+    this.partnerKind = partner?.kind ?? null;
+    this.partnerId = partner?.id ?? null;
+    this.renderInventory();
+  }
+
+  private renderInventory(): void {
+    const partner = this.getPartnerContainer();
+    this.ctx.overlay.showInventory({
+      title: 'Inventory',
+      player: this.save.inventory,
+      hotbarSize: this.save.hotbarSize,
+      partner: partner
+        ? { id: partner.id, title: partner.title, container: partner.container }
+        : undefined,
+      catalog: this.catalog,
+      onMove: (move) => this.applyMove(move),
+      onClose: () => this.closeInventory(),
+    });
+  }
+
+  private getPartnerContainer(): { id: string; title: string; container: Container } | null {
+    if (this.partnerKind === 'chest' && this.partnerId) {
+      const c = this.save.chests[this.partnerId];
+      if (!c) return null;
+      return { id: this.partnerId, title: 'Porch Chest', container: c };
+    }
+    if (this.partnerKind === 'shipping-bin') {
+      return { id: 'shipping-bin', title: 'Shipping Bin', container: this.save.shippingBin };
+    }
+    return null;
+  }
+
+  private setPartnerContainer(container: Container): void {
+    if (this.partnerKind === 'chest' && this.partnerId) {
+      this.save.chests[this.partnerId] = container;
+    } else if (this.partnerKind === 'shipping-bin') {
+      this.save.shippingBin = container;
+    }
+  }
+
+  private applyMove(move: SlotMove): void {
+    const player = this.save.inventory;
+    const partner = this.getPartnerContainer()?.container ?? null;
+
+    if (move.toContainer === 'trash') {
+      const src = move.fromContainer === 'player' ? player : partner;
+      if (!src) return;
+      if (move.fromContainer === 'player') this.save.inventory = clearSlot(src, move.fromIndex);
+      else if (partner) this.setPartnerContainer(clearSlot(src, move.fromIndex));
+    } else if (move.fromContainer === move.toContainer) {
+      const src = move.fromContainer === 'player' ? player : partner;
+      if (!src || move.toIndex === null) return;
+      const next = placeOrMerge(src, move.fromIndex, move.toIndex);
+      if (move.fromContainer === 'player') this.save.inventory = next;
+      else this.setPartnerContainer(next);
+    } else if (partner) {
+      const from = move.fromContainer === 'player' ? player : partner;
+      const to = move.toContainer === 'player' ? player : partner;
+      const result = moveBetween(from, to, move.fromIndex, move.toIndex ?? undefined);
+      if (move.fromContainer === 'player') {
+        this.save.inventory = result.from;
+        this.setPartnerContainer(result.to);
+      } else {
+        this.setPartnerContainer(result.from);
+        this.save.inventory = result.to;
+      }
+    }
+
+    persistActiveSave();
+    this.renderInventory();
+    this.refreshHotbar();
+  }
+
+  private closeInventory(): void {
+    this.inventoryOpen = false;
+    this.partnerKind = null;
+    this.partnerId = null;
+    this.refreshHud();
+  }
+
   private triggerSleep(collapsed: boolean): void {
     if (this.dayResolving) return;
     this.dayResolving = true;
@@ -398,6 +583,7 @@ export class FarmScene extends GameScene {
       collapsed,
       festivals: content.festivals,
       npcs: content.npcs,
+      items: content.items,
     });
 
     resetDayLedger();

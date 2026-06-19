@@ -14,6 +14,13 @@ describe('save model', () => {
     expect(save.version).toBe(SAVE_VERSION);
     expect(save.calendar).toEqual({ year: 1, season: 'spring', day: 1, timeMinutes: 360 });
     expect(save.location.sceneKey).toBe('Farm');
+    expect(save.inventory.capacity).toBe(24);
+    expect(save.inventory.slots).toHaveLength(24);
+    expect(save.inventory.slots[0]).toEqual({ itemId: 'bell-pea-seeds', qty: 5, quality: 0 });
+    expect(save.hotbarSize).toBe(8);
+    expect(save.shippingBin.capacity).toBe(16);
+    expect(save.shippingBin.slots).toHaveLength(16);
+    expect(save.chests['farm-porch-chest']?.capacity).toBe(24);
   });
 
   it('falls back to defaults for blank names', () => {
