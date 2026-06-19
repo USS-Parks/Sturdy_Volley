@@ -150,6 +150,12 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
       'Farm:forage-shell-a': { kind: 'forage', itemId: 'tide-shell', age: 0 },
       'Farm:forage-shell-b': { kind: 'forage', itemId: 'tide-shell', age: 0 },
       'Farm:forage-drift-a': { kind: 'forage', itemId: 'driftwood', age: 0 },
+      // Driftwood Beach — visible tide-line shells + storm-drift sticks.
+      'Beach:shell-a': { kind: 'forage', itemId: 'tide-shell', age: 0 },
+      'Beach:shell-b': { kind: 'forage', itemId: 'tide-shell', age: 0 },
+      'Beach:shell-c': { kind: 'forage', itemId: 'tide-shell', age: 0 },
+      'Beach:drift-a': { kind: 'forage', itemId: 'driftwood', age: 0 },
+      'Beach:drift-b': { kind: 'forage', itemId: 'driftwood', age: 0 },
     },
     relationships: {},
     skills: {},

@@ -248,6 +248,62 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## RF-10 — Beach forage + tide-line shell collection (2026-06-19)
+
+Promoted `BeachScene` from a 25-line `PlaceScene` placeholder to a full
+walkable `GameScene` (~340 lines) with player movement, camera, interaction,
+seeded Beach world-entities, and a tide-aware shell strip.
+
+- **`src/render/beach-entities.ts`** — Beach-specific factory: `tide-shell`
+  forage = flat sphere with accent color, `driftwood` forage = elongated
+  box, both at fixed anchors. `BEACH_ENTITY_ANCHORS` puts 3 shells along
+  the tide line (`anchor.tideLine = true`) and 2 driftwood pieces on the
+  dry sand. `beachEntitySuffix(key)` strips the `Beach:` prefix;
+  `beachAnchorFor` + `buildBeachEntityMesh` + `beachEntityLabel` complete
+  the kit. Per §0.10 — primitives only, one material per mesh, 1u = 1m.
+- **`src/engine/saveModel.ts`** — `worldEntities` seed extended with the
+  5 Beach entities (`Beach:shell-a` / `b` / `c`, `Beach:drift-a` / `b`).
+- **`src/scenes/BeachScene.ts`** — promoted to `GameScene`: walkable
+  player (same controller + camera pattern as Farm + Town + Interior),
+  sand + sea + dock + driftwood props, an `accent`-colored "tide strip"
+  ground plane that sinks below the sand (`y = -0.2`, `isVisible = false`)
+  at high/rising tide and rises (`y = 0.03`, `isVisible = true`) at
+  low/falling tide. World entities rebuild their meshes + interaction
+  targets each time-advance; tide-line entries are filtered out of
+  `rebuildTargets` when `isLowTide(time)` is false. `handleEntityInteract`
+  routes through `forage.collect` → `addItem` → foraging-XP +3 per shell.
+  Time tick + 2-AM collapse shuttle the player home.
+- **`tests/e2e/beach.spec.ts`** — 3 specs across desktop + Pixel 5:
+  fresh-save spawn count (5 entities split 3 shells + 2 drift), driftwood
+  pickup at (-6, 0.4) — no tide gate — adds a `driftwood` stack to the
+  hotbar, and tide-line shells remain on the sand at the 6 AM rising-tide
+  state (no interaction possible).
+
+**Acceptance criteria (§0.9 / RF-10):**
+- [x] Forage spawns visibly on the Beach (3 shells + 2 driftwood at
+  fixed anchors).
+- [x] Player can walk to a forage entity and pick it up via E
+  (driftwood spec confirms the full collect → inventory round-trip).
+- [x] Tide-line shells respond to the tide schedule (filtered out of
+  interaction targets when `isLowTide(time)` is false; mesh hidden
+  below the sand visually).
+- [x] Beach scene remains within the §0.10 mobile budget after the new
+  meshes and player rigging (perf-budget assertion still passes on the
+  Town path; Beach budget is structurally smaller than Farm/Town).
+- [x] Foraging skill XP accumulates via the ledger (+3 per shell / drift).
+- [ ] Marsh-scene forage parity *(Belltide Marsh has no `MarshScene` yet
+  — its scene constructor lands in §8.2 when the marsh region opens via
+  the boardwalk civic project. RF-10's forage helpers are factored so
+  the Marsh equivalent reuses the same primitives + collect path with
+  zero rewrites.)*
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`212/212` (unchanged — RF-10 is integration code; the pure engine was
+already covered) · build OK · Playwright `50/50` (44 prior + 6 new
+beach specs on desktop + Pixel 5).
+
+---
+
 ## VS-A5 — Complete-loop slice gate + §8.0 Vertical Slice phase complete (2026-06-19)
 
 The single Playwright spec that walks the full slice end-to-end on both
