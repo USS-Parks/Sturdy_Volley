@@ -245,3 +245,38 @@ satisfied on Babylon; built the core of P-004 — the first walkable 3D scene.
 **Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest `51/51`
 (8 files) · build `dist/` · Playwright `10/10` (desktop + mobile, incl. the 3D
 farm walk test + canvas-pixel check).
+
+---
+
+## Prompt 005 — Player controller + interaction model (core) (2026-06-18)
+
+Added the controller depth + interaction model as renderer-agnostic logic,
+wired into the Farm.
+
+- **`engine/controller.ts`** — `ControllerState` / `stepController`: desired move
+  direction + sprint intent → speed with acceleration/braking, gait
+  (idle/walk/jog/sprint), and **stamina** drain/recovery (+ exhausted-speed
+  throttle). Pure, 6 unit tests. The gait is ready to drive the animation state
+  machine once real rigs/clips land.
+- **`engine/interaction.ts`** — `resolveInteraction`: "one button handles
+  multiple nearby targets predictably" — picks the highest-priority in-range
+  target, ties broken by proximity. Pure, 5 unit tests.
+- **FarmScene** now drives movement through the controller (jog/sprint via
+  Shift, acceleration, stamina), resolves the nearest interaction target each
+  frame (farmhouse door / tilled plot / pond / trees) and shows an `[E] …`
+  prompt, handles **interact** (E/Space), and **tool-slot selection** (number
+  keys 1–5). Energy / tool / prompt surface in the HUD status line.
+
+**Acceptance criteria (core met):**
+- [x] One interaction button handles multiple nearby targets predictably
+  (resolver: priority then proximity; unit-tested)
+- [x] Stamina drain (sprint drains, idle recovers; e2e-verified)
+- [x] Tool-slot selection (number keys; reflected in HUD + debug)
+- [ ] *Remaining for a later P-005 pass:* dedicated hotbar UI + interaction
+  prompt element (non-overlapping), touch virtual-stick ↔ tap-to-move toggle,
+  remappable controls, and the locomotion-clip blending / foot placement (binds
+  to Codex's rigs/animations when they arrive).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest `62/62`
+(10 files) · build `dist/` · Playwright `12/12` (desktop + mobile, incl. farm
+walk + sprint-drains-energy).

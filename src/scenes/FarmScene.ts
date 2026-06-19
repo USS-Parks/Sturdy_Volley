@@ -6,46 +6,48 @@ import {
   type AbstractMesh,
 } from '@babylonjs/core';
 import { GameScene } from './GameScene';
-import {
-  makeScene,
-  addFog,
-  addLights,
-  flatMaterial,
-  PALETTE,
-} from '../render/scene-helpers';
+import { makeScene, addFog, addLights, flatMaterial, PALETTE } from '../render/scene-helpers';
 import { getActiveSave, persistActiveSave, clearActiveSave } from '../engine/gameState';
 import { writeSave } from '../engine/save';
 import { formatSaveStatus } from '../engine/format';
 import { computeMoveVector, type MoveInput } from '../engine/movement';
 import { FarmGrid, FARM_CELL_SIZE } from '../engine/farmGrid';
+import { createControllerState, stepController, type ControllerState } from '../engine/controller';
+import { resolveInteraction, type InteractTarget } from '../engine/interaction';
 import type { SaveData } from '../engine/saveModel';
 
-const WALK_SPEED = 6; // world units / second
-const FARM_HALF = 20; // half-extent of the farm ground (units)
+const FARM_HALF = 20;
+const TOOLS = ['Hoe', 'Watering Can', 'Axe', 'Pick', 'Sickle'] as const;
 
 interface DebugApi {
   player: () => { x: number; z: number };
+  controller: () => { stamina: number; gait: string; target: string | null; tool: string };
 }
 
 /**
- * Breakpoint Farm — the first playable 3D scene (Prompt 004). Placeholder
- * low-poly terrain + props, a grid-aware tilled plot (FarmGrid), a third-person
- * player walkable by keyboard + touch with Babylon ellipsoid collisions, a
- * follow camera, and Theme-3 fog/lighting. Real .glb models swap in at polish.
+ * Breakpoint Farm — playable 3D scene (Prompts 004–005). Placeholder low-poly
+ * terrain/props + a grid-aware tilled plot; a third-person player driven by the
+ * renderer-agnostic controller (jog/sprint, acceleration, stamina) and an
+ * interaction resolver (one button → nearest, highest-priority target). Tool
+ * slots cycle with the number keys. Real rigs/animations bind at the art pass.
  */
 export class FarmScene extends GameScene {
   private camera!: ArcRotateCamera;
   private player!: AbstractMesh;
+  private save!: SaveData;
   private readonly grid = new FarmGrid(8, 6, 'tilled');
-  private readonly pressed = new Set<string>();
+  private controller: ControllerState = createControllerState();
+  private targets: InteractTarget[] = [];
+  private nearest: InteractTarget | null = null;
+  private selectedTool = 0;
+  private actionTimer = 0;
+  private actionLabel = '';
+  private hudTimer = 0;
+  private ePrev = false;
   private menuOpen = false;
-  private touch: { active: boolean; dx: number; dy: number; ox: number; oy: number } = {
-    active: false,
-    dx: 0,
-    dy: 0,
-    ox: 0,
-    oy: 0,
-  };
+
+  private readonly pressed = new Set<string>();
+  private touch = { active: false, dx: 0, dy: 0, ox: 0, oy: 0 };
   private readonly onKeyDown = (e: KeyboardEvent) => this.pressed.add(e.key.toLowerCase());
   private readonly onKeyUp = (e: KeyboardEvent) => this.pressed.delete(e.key.toLowerCase());
 
@@ -58,7 +60,6 @@ export class FarmScene extends GameScene {
     this.camera = new ArcRotateCamera('farm-cam', -Math.PI / 2 + 0.6, Math.PI / 3.2, 14, Vector3.Zero(), scene);
     this.camera.fov = 0.8;
 
-    // Ground
     const ground = MeshBuilder.CreateGround('ground', { width: FARM_HALF * 2, height: FARM_HALF * 2 }, scene);
     ground.material = flatMaterial(scene, 'ground', PALETTE.grass, 0.25);
     ground.checkCollisions = true;
@@ -67,7 +68,6 @@ export class FarmScene extends GameScene {
     this.buildProps(scene);
     this.buildBounds(scene);
 
-    // Player
     const player = MeshBuilder.CreateCapsule('player', { height: 1.8, radius: 0.4 }, scene);
     player.position.set(0, 0.9, 6);
     player.material = flatMaterial(scene, 'player', PALETTE.player, 0.35);
@@ -81,7 +81,6 @@ export class FarmScene extends GameScene {
   }
 
   private buildTilledPlot(scene: Scene): void {
-    // Visualize the FarmGrid as a raised soil plot near the farmhouse.
     const origin = new Vector3(-6, 0, -4);
     const soil = flatMaterial(scene, 'soil', PALETTE.soil, 0.22);
     this.grid.forEach((cell) => {
@@ -117,7 +116,6 @@ export class FarmScene extends GameScene {
       canopy.material = flatMaterial(scene, `canopy${i}`, PALETTE.grassAlt, 0.22);
     });
 
-    // Tide-fed pond: a visible water disc + an invisible collider so the player can't walk in.
     const pond = MeshBuilder.CreateDisc('pond', { radius: 3, tessellation: 24 }, scene);
     pond.rotation.x = Math.PI / 2;
     pond.position.set(10, 0.05, -2);
@@ -150,32 +148,84 @@ export class FarmScene extends GameScene {
       this.goTo('Title', undefined, false);
       return;
     }
+    this.save = save;
     save.location.sceneKey = 'Farm';
     writeSave(save);
+
+    this.controller = createControllerState();
+    this.targets = [
+      { id: 'farmhouse-door', kind: 'door', label: 'Enter the farmhouse', x: -10, z: -5.6, radius: 2.6, priority: 5 },
+      { id: 'tilled-plot', kind: 'farm-cell', label: 'Tend the soil', x: -6, z: -4, radius: 4, priority: 3 },
+      { id: 'tide-pond', kind: 'water-entry', label: 'Check the tide pond', x: 10, z: -2, radius: 4.4, priority: 2 },
+      { id: 'tree-1', kind: 'prop', label: 'Inspect the tree', x: 8, z: -6, radius: 2, priority: 1 },
+      { id: 'tree-2', kind: 'prop', label: 'Inspect the tree', x: -2, z: 9, radius: 2, priority: 1 },
+    ];
 
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     this.attachTouch();
-    this.showHud(save);
+    this.menuOpen = false;
+    this.refreshHud();
 
     (window as unknown as { sturdyVolleyDebug?: DebugApi }).sturdyVolleyDebug = {
       player: () => ({ x: this.player.position.x, z: this.player.position.z }),
+      controller: () => ({
+        stamina: this.controller.stamina,
+        gait: this.controller.gait,
+        target: this.nearest?.id ?? null,
+        tool: TOOLS[this.selectedTool],
+      }),
     };
   }
 
   override update(dt: number): void {
-    if (!this.player || this.menuOpen) return;
-    const vec = computeMoveVector(this.readInput());
-    if (vec.x === 0 && vec.y === 0) return;
+    if (!this.player) return;
+    if (this.menuOpen) {
+      this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
+      return;
+    }
 
+    this.updateToolSelection();
+
+    const dir = this.cameraRelativeDir(computeMoveVector(this.readInput()));
+    const sprint = this.pressed.has('shift');
+    this.controller = stepController(this.controller, { dir, sprint }, dt);
+    if (this.controller.speed > 0.01 && (dir.x !== 0 || dir.z !== 0)) {
+      this.player.moveWithCollisions(new Vector3(dir.x, 0, dir.z).scale(this.controller.speed * dt));
+    }
+
+    this.nearest = resolveInteraction(this.targets, this.player.position.x, this.player.position.z);
+
+    const interact = this.pressed.has('e') || this.pressed.has(' ');
+    if (interact && !this.ePrev && this.nearest) {
+      this.actionLabel = this.nearest.label;
+      this.actionTimer = 1.6;
+    }
+    this.ePrev = interact;
+    if (this.actionTimer > 0) this.actionTimer -= dt;
+
+    this.hudTimer -= dt;
+    if (this.hudTimer <= 0) {
+      this.hudTimer = 0.2;
+      this.refreshHud();
+    }
+  }
+
+  private cameraRelativeDir(vec: { x: number; y: number }): { x: number; z: number } {
+    if (vec.x === 0 && vec.y === 0) return { x: 0, z: 0 };
     const forward = this.player.position.subtract(this.camera.position);
     forward.y = 0;
-    if (forward.lengthSquared() < 1e-4) return;
+    if (forward.lengthSquared() < 1e-4) return { x: 0, z: 0 };
     forward.normalize();
     const right = new Vector3(forward.z, 0, -forward.x);
     const move = right.scale(vec.x).add(forward.scale(-vec.y));
-    const disp = move.scale(WALK_SPEED * dt);
-    this.player.moveWithCollisions(new Vector3(disp.x, 0, disp.z));
+    return { x: move.x, z: move.z };
+  }
+
+  private updateToolSelection(): void {
+    for (let i = 0; i < TOOLS.length; i++) {
+      if (this.pressed.has(String(i + 1))) this.selectedTool = i;
+    }
   }
 
   private readInput(): MoveInput {
@@ -210,12 +260,15 @@ export class FarmScene extends GameScene {
     this.touch = { active: false, dx: 0, dy: 0, ox: 0, oy: 0 };
   };
 
-  private showHud(save: SaveData): void {
-    this.menuOpen = false;
-    this.ctx.overlay.showHud('Breakpoint Farm', formatSaveStatus(save), () => this.openMenu(save));
+  private refreshHud(): void {
+    const stamina = Math.round(this.controller.stamina);
+    let line = `${formatSaveStatus(this.save)} · energy ${stamina}% · tool: ${TOOLS[this.selectedTool]}`;
+    if (this.actionTimer > 0) line += ` · ✔ ${this.actionLabel}`;
+    else if (this.nearest) line += ` · [E] ${this.nearest.label}`;
+    this.ctx.overlay.showHud('Breakpoint Farm', line, () => this.openMenu());
   }
 
-  private openMenu(save: SaveData): void {
+  private openMenu(): void {
     this.menuOpen = true;
     this.ctx.overlay.showMenu(
       'Paused',
@@ -226,15 +279,16 @@ export class FarmScene extends GameScene {
         { id: 'mine', label: 'Ironroot Quarry', enabled: true, testId: 'nav-mine' },
         { id: 'save-quit', label: 'Save & quit to title', enabled: true, testId: 'nav-save-quit' },
       ],
-      (id) => this.onMenu(id, save),
-      formatSaveStatus(save),
+      (id) => this.onMenu(id),
+      formatSaveStatus(this.save),
     );
   }
 
-  private onMenu(id: string, save: SaveData): void {
+  private onMenu(id: string): void {
     switch (id) {
       case 'resume':
-        this.showHud(save);
+        this.menuOpen = false;
+        this.refreshHud();
         break;
       case 'town':
         this.goTo('Town');
