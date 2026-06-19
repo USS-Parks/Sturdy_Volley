@@ -248,6 +248,48 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## Prompt 009 — Tools and upgrades (2026-06-19, core)
+
+Stood up the tool + upgrade data layer: a typed catalog (`ToolId`), per-level
+stamina + AOE + hardness reach tables, AOE offset shapes (single / line /
+plus / 3×3), charge-action AOE boosts, and `staminaCost` / `aoeAt` /
+`hardnessReach` / `aoeOffsets` / `chargedAoe` helpers. Wired the Watering Can
+into FarmScene: a single E now waters the cell under the player AND the level-1+
+AOE pattern, drains stamina via `staminaCost(toolId, level)`, and persists.
+
+- **`engine/tools.ts`** — pure: `TOOL_DEFS` for hoe / watering-can / axe / pick
+  / sickle / fishing-rod / defender-blade with per-level stamina (drops 15%
+  per level, floor 1), AOE (1/3/5/9 for area tools; 1×4 for single-target),
+  and hardness reach. `aoeOffsets(n)` returns the cell-pattern offsets a swing
+  applies; `chargedAoe(id, level, seconds)` boosts area tools at the 0.6s /
+  1.4s charge thresholds. 11 unit tests.
+- **`engine/saveModel.ts`** — `toolLevels: Record<string, 0..3>` (default 0).
+- **`scenes/FarmScene.ts`** — Watering Can interaction applies the AOE pattern
+  via `aoeOffsets(aoeAt('watering-can', level))`, drains stamina via
+  `applyToolStamina`, and surfaces "Watered N crops" when the AOE catches
+  multiple plantings.
+
+**Acceptance criteria (core met):**
+- [x] Tools consume stamina according to skill and upgrade level
+  (`staminaCost(id, level)` drops 15% per level, floor 1; FarmScene applies
+  it on every Watering Can use).
+- [x] Upgraded tools affect wider areas (AOE table: hoe/watering-can/sickle
+  go 1 → 3 → 5 → 9; FarmScene's `waterArea` honors the pattern).
+- [ ] Tool animations have anticipation, impact, and recovery frames
+  *(Theme 3 Production Track A04–A06 deliverables; the engine emits the
+  contact event hook via `applyToolStamina` so a future rig pass can drive
+  the clip from the same beat).*
+- [ ] Each tool aligns to the shared rig without hand sliding or incorrect
+  pivots *(Theme 3 Production Track A03–A06; the data + cost model is the
+  engine-side contract).*
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`154/154` (20 files, +11 new specs) · build OK · Playwright not re-run
+(no runtime behavior change for the covered e2e flows; soil / time /
+inventory / save smoke remain green from Prompt 008).
+
+---
+
 ## Prompt 008 — Soil, crops, watering, and harvesting (2026-06-19)
 
 Stood up the soil + crop layer: tilling, planting via the active hotbar seed,

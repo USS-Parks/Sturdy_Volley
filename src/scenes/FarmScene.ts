@@ -46,11 +46,14 @@ import {
   plantingKey,
 } from '../engine/soil';
 import { recordIncome as _recordIncome, recordSkillXp } from '../engine/gameState';
+import { aoeAt, aoeOffsets, staminaCost, type ToolId } from '../engine/tools';
 import type { Crop } from '../data/schemas';
 import type { AbstractMesh as BabylonMesh } from '@babylonjs/core';
 
 const FARM_HALF = 20;
 const TOOLS = ['Hoe', 'Watering Can', 'Axe', 'Pick', 'Sickle'] as const;
+/** Parallel ToolId array matching the TOOLS display labels by index. */
+export const FARM_TOOL_IDS: readonly ToolId[] = ['hoe', 'watering-can', 'axe', 'pick', 'sickle'];
 
 interface DebugApi {
   player: () => { x: number; z: number };
@@ -607,13 +610,8 @@ export class FarmScene extends GameScene {
         return;
       }
       if (tool === 'Watering Can' && !planting.watered) {
-        this.save.plantings = {
-          ...this.save.plantings,
-          [key]: { ...planting, watered: true },
-        };
-        this.flashAction('Watered the crop');
-        this.refreshCropMeshes();
-        persistActiveSave();
+        this.applyToolStamina('watering-can');
+        this.waterArea(cell);
         return;
       }
       this.flashAction(`Growing: ${crop?.name ?? planting.cropId}`);
@@ -642,6 +640,37 @@ export class FarmScene extends GameScene {
     }
 
     this.flashAction('Select a seed in the hotbar to plant');
+  }
+
+  private toolLevel(id: ToolId): number {
+    return this.save.toolLevels[id] ?? 0;
+  }
+
+  private applyToolStamina(id: ToolId): void {
+    const cost = staminaCost(id, this.toolLevel(id));
+    this.controller = {
+      ...this.controller,
+      stamina: Math.max(0, this.controller.stamina - cost),
+    };
+  }
+
+  private waterArea(center: { col: number; row: number }): void {
+    const level = this.toolLevel('watering-can');
+    const offsets = aoeOffsets(aoeAt('watering-can', level));
+    const next = { ...this.save.plantings };
+    let touched = 0;
+    for (const o of offsets) {
+      const k = plantingKey(FarmScene.SCENE_KEY, center.col + o.dc, center.row + o.dr);
+      const p = next[k];
+      if (p && !p.watered) {
+        next[k] = { ...p, watered: true };
+        touched += 1;
+      }
+    }
+    this.save.plantings = next;
+    this.flashAction(touched === 1 ? 'Watered the crop' : `Watered ${touched} crops`);
+    this.refreshCropMeshes();
+    persistActiveSave();
   }
 
   private nearestPlotCell(): { col: number; row: number } | null {
