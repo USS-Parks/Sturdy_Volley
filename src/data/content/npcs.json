@@ -16,5 +16,23 @@
     "birthday": { "season": "fall", "day": 7 },
     "lovedGiftItemIds": ["garden-omelet", "blush-radish"],
     "romanceable": true
+  },
+  {
+    "id": "sol-aranda",
+    "name": "Sol Aranda",
+    "role": "Cliffside botanist and seed archivist",
+    "description": "Dreamy and rigorous, distracted by every plant. Tracking down extinct coastal crops in the storm-buried seed caches.",
+    "birthday": { "season": "spring", "day": 19 },
+    "lovedGiftItemIds": ["bell-peas", "blush-radish"],
+    "romanceable": true
+  },
+  {
+    "id": "lio-marin",
+    "name": "Lio Marin",
+    "role": "Fishmonger and reef diver",
+    "description": "Flamboyant and generous; conflict-avoidant. Quietly afraid of the deep water after the storm.",
+    "birthday": { "season": "summer", "day": 27 },
+    "lovedGiftItemIds": ["tide-shell", "driftwood"],
+    "romanceable": true
   }
 ]

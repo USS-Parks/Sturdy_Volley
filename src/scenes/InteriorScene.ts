@@ -14,6 +14,9 @@ import {
   getDayLedger,
   resetDayLedger,
 } from '../engine/gameState';
+import { buy, hoursFor, isShopOpen, restockShop } from '../engine/shops';
+import { addItem } from '../engine/inventory';
+import type { Item } from '../data/schemas';
 import { writeSave } from '../engine/save';
 import { formatWorldStatus } from '../engine/format';
 import { computeMoveVector, type MoveInput } from '../engine/movement';
@@ -82,6 +85,8 @@ export class InteriorScene extends GameScene {
   private readonly bedAnchor = new Vector3(-3, 0.9, -2);
   private returnTarget: 'Farm' | 'Town' = 'Farm';
   private title = 'Farmhouse';
+  private shopId: string | null = null;
+  private shopOpen = false;
 
   build(): Scene {
     const scene = makeScene(this.ctx.engine, PALETTE.sky);
@@ -209,11 +214,16 @@ export class InteriorScene extends GameScene {
     this.player.position.copyFrom(spawn);
     // RF-15: pick the title + return target based on shopId.
     if (entryData.shopId) {
-      this.title = SHOP_TITLES[entryData.shopId] ?? 'Shop';
+      // Prefer the content shop name when available; fall back to SHOP_TITLES.
+      const content = loadGameContent();
+      const shop = content.shops.find((s) => s.id === entryData.shopId);
+      this.title = shop?.name ?? SHOP_TITLES[entryData.shopId] ?? 'Shop';
       this.returnTarget = 'Town';
+      this.shopId = entryData.shopId;
     } else {
       this.title = 'Farmhouse';
       this.returnTarget = 'Farm';
+      this.shopId = null;
     }
 
     this.targets = [
@@ -223,6 +233,19 @@ export class InteriorScene extends GameScene {
       { id: 'hearth', kind: 'prop', label: 'Tend the hearth', x: 4.5, z: -5, radius: 1.6, priority: 2 },
       { id: 'interior-chest', kind: 'prop', label: 'Open the chest', x: -5.2, z: 3, radius: 1.6, priority: 3 },
     ];
+    if (this.shopId) {
+      // Place a shop counter target at the kitchen counter spot.
+      this.targets = this.targets.filter((t) => t.id !== 'kitchen');
+      this.targets.push({
+        id: 'shop-counter',
+        kind: 'prop',
+        label: `Browse ${this.title}`,
+        x: 4.8,
+        z: -1,
+        radius: 1.6,
+        priority: 4,
+      });
+    }
 
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
@@ -233,7 +256,7 @@ export class InteriorScene extends GameScene {
 
   override update(dt: number): void {
     if (!this.player || !this.save) return;
-    if (this.menuOpen || this.dayResolving) {
+    if (this.menuOpen || this.dayResolving || this.shopOpen) {
       this.clock = pauseClock(this.clock, true);
       this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
       return;
@@ -253,6 +276,7 @@ export class InteriorScene extends GameScene {
     if (interact && !this.ePrev && this.nearest) {
       if (this.nearest.id === 'inside-door') this.exitToFarm();
       else if (this.nearest.id === 'bed') this.triggerSleep(false);
+      else if (this.nearest.id === 'shop-counter') this.openShop();
       else {
         this.actionLabel = this.nearest.label;
         this.actionTimer = 1.6;
@@ -354,6 +378,70 @@ export class InteriorScene extends GameScene {
         this.goTo('Title');
         break;
     }
+  }
+
+  private openShop(): void {
+    if (!this.shopId) return;
+    const content = loadGameContent();
+    const shop = content.shops.find((s) => s.id === this.shopId);
+    if (!shop) return;
+    const hours = hoursFor(this.shopId);
+    const minutes = this.clock.time.minutes;
+    const open = hours ? isShopOpen(hours, minutes, false) : true;
+    if (!open) {
+      this.actionLabel = `${this.title} is closed right now.`;
+      this.actionTimer = 1.6;
+      return;
+    }
+    const itemsById = new Map<string, Item>();
+    for (const item of content.items) itemsById.set(item.id, item);
+    const stock = restockShop({
+      shop,
+      itemsById,
+      season: this.save.calendar.season,
+      flags: Object.fromEntries(
+        Object.entries(this.save.flags).filter(([, v]) => typeof v === 'boolean'),
+      ) as Record<string, boolean>,
+    });
+    this.shopOpen = true;
+    this.renderShop(stock.entries, content.items);
+  }
+
+  private renderShop(entries: ReturnType<typeof restockShop>['entries'], items: readonly Item[]): void {
+    const itemsById = new Map(items.map((i) => [i.id, i]));
+    this.ctx.overlay.showShopPanel({
+      shopName: this.title,
+      walletGold: this.save.wallet.gold,
+      entries: entries.map((e) => ({
+        itemId: e.itemId,
+        itemName: itemsById.get(e.itemId)?.name ?? e.itemId,
+        price: e.price,
+        remaining: e.remaining,
+      })),
+      onBuy: (itemId) => this.handleBuy(itemId, entries, items),
+      onClose: () => {
+        this.shopOpen = false;
+        this.refreshHud();
+      },
+    });
+  }
+
+  private handleBuy(
+    itemId: string,
+    entries: ReturnType<typeof restockShop>['entries'],
+    items: readonly Item[],
+  ): void {
+    const idx = entries.findIndex((e) => e.itemId === itemId);
+    if (idx < 0) return;
+    const entry = entries[idx]!;
+    const result = buy({ wallet: this.save.wallet.gold, qty: 1, entry });
+    if (!result.accepted) return;
+    this.save.wallet.gold -= result.cost;
+    entries[idx] = result.nextEntry;
+    const added = addItem(this.save.inventory, itemId, 1, 0);
+    this.save.inventory = added.container;
+    persistActiveSave();
+    this.renderShop(entries, items);
   }
 
   private exitToFarm(): void {

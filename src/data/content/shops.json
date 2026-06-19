@@ -10,5 +10,23 @@
     "name": "Driftwood Market",
     "npcId": null,
     "stockItemIds": ["driftwood", "tide-shell"]
+  },
+  {
+    "id": "market-bakery",
+    "name": "Sun Loaf Bakery",
+    "npcId": "jun-park",
+    "stockItemIds": ["garden-omelet", "goat-cheese"]
+  },
+  {
+    "id": "market-gear",
+    "name": "Coast Gear Shop",
+    "npcId": null,
+    "stockItemIds": ["bell-pea-seeds", "tide-turnip-seeds", "blush-radish-seeds", "sunmelon-seeds"]
+  },
+  {
+    "id": "fishmonger",
+    "name": "Tideway Fishmonger",
+    "npcId": "lio-marin",
+    "stockItemIds": ["tide-shell", "driftwood"]
   }
 ]

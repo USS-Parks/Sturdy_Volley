@@ -248,6 +248,66 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## Prompt 016 — Shops and economy (2026-06-19, §8.2)
+
+First numbered roster prompt executed under §0.9 (every prompt integrated).
+The dormant `engine/shops.ts` `restockShop` / `buy` / `sellValue` engine now
+drives a real in-game shop UI: enter the Bakery → walk up to the counter →
+E opens a shop panel that lists stock + prices + a Buy button per row;
+clicking Buy decrements the wallet and adds the item to inventory.
+
+- **`src/data/content/shops.json`** — extended from 2 placeholder shops
+  to 5: `ballast-general`, `driftwood-market`, `market-bakery` (Sun Loaf
+  Bakery — Garden Omelet, Goat Cheese), `market-gear` (Coast Gear Shop —
+  4 seed types), `fishmonger` (Tideway Fishmonger — Tide Shell, Driftwood).
+  The shop ids now match the building ids from `BALLAST_BAY_HOURS` so
+  `loadGameContent().shops.find((s) => s.id === buildingId)` resolves
+  directly.
+- **`src/data/content/npcs.json`** — Sol Aranda + Lio Marin added so the
+  Fishmonger / botany content references resolve. Loved-gift items
+  cross-checked against `items.json`; original Ballast Bay characters
+  authored fresh.
+- **`src/ui/overlay.ts`** — `showShopPanel(opts)` renders a parchment
+  shop list (name + price + Buy button per row), with wallet displayed
+  in the subtitle. Buy buttons disable when wallet is short or stock is
+  zero. `ShopPanelOptions` + `ShopPanelEntry` exported.
+- **`src/styles.css`** — `.shop-panel` (480px max), `.shop-list` /
+  `.shop-row` (3-column grid: name + brass price + Buy button), `.shop-buy`.
+- **`src/scenes/InteriorScene.ts`** — when `entryData.shopId` is set,
+  replaces the kitchen-counter target with a `shop-counter` interaction
+  at (4.8, -1). E opens the shop: re-confirms hours via `isShopOpen`,
+  calls `restockShop({ shop, itemsById, season, flags })` to build the
+  daily entries, then `renderShop` mounts the panel. `handleBuy(itemId)`
+  routes through `engine/shops.ts.buy`, mutates wallet + entries +
+  inventory, persists, and re-renders. `shopOpen` flag pauses the
+  controller + clock while the panel is up. Title now prefers the shop
+  content's `name` (e.g. "Sun Loaf Bakery") with the existing
+  `SHOP_TITLES` map as fallback.
+- **`tests/e2e/shop.spec.ts`** — Bakery flow on desktop + Pixel 5: New
+  Game → cutscene skip → goTo Town → goTo Interior with shopId=market-
+  bakery → walk to counter → E → shop panel visible with Garden Omelet
+  row → Buy → assert wallet drops 500 → 320 (120 base × 1.5 markup =
+  180 g) + Garden Omelet appears in inventory → Close → panel hidden.
+
+**Acceptance criteria (§0.9 / Prompt 016):**
+- [x] Buying works (e2e covers wallet → 320, item added). Selling is
+  served via the existing shipping-bin overnight sale path; in-shop
+  sell panel is a §8.2 polish task.
+- [x] Shops close on schedule and during active festivals
+  (`isShopOpen(hours, minutes, festivalActive)` enforced on every door
+  AND on every counter open; `openShop` rejects with a closed flash if
+  the schedule says so).
+- [x] Stock can react to town projects (`restockShop` filters items
+  tagged `project-gated` by `flags[\`unlock-${itemId}\`]`; engine path is
+  already in `engine/shops.ts`).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`220/220` (28 files, content + NPC tests pick up the 4 new entries) ·
+build OK · Playwright `66/66` (64 prior + 2 new shop on desktop +
+Pixel 5).
+
+---
+
 ## RF-15 — Town building doors + open/closed schedule + §8.1 phase complete (2026-06-19)
 
 Wired the long-uncommitted `engine/shops.ts` into the running game: every

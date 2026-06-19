@@ -23,6 +23,21 @@ export interface InventoryPanelOptions {
   onClose: () => void;
 }
 
+export interface ShopPanelEntry {
+  itemId: string;
+  itemName: string;
+  price: number;
+  remaining: number; // -1 = unlimited
+}
+
+export interface ShopPanelOptions {
+  shopName: string;
+  walletGold: number;
+  entries: ShopPanelEntry[];
+  onBuy: (itemId: string) => void;
+  onClose: () => void;
+}
+
 export interface HotbarOptions {
   slots: readonly (InventoryStack | null)[];
   selectedIndex: number;
@@ -598,6 +613,59 @@ export class UIOverlay {
     const item = getItem(catalog, stack.itemId);
     if (!item) return stack.itemId;
     return tooltipLines(stack, item, lovedByNpcs(catalog, stack.itemId)).join('\n');
+  }
+
+  /**
+   * Shop panel (Prompt 016). Shows the shop name + wallet + stock list with
+   * per-row Buy button. Idempotent — re-mounts replace prior panel cleanly.
+   */
+  showShopPanel(opts: ShopPanelOptions): void {
+    this.clear();
+    const panel = this.createPanel(opts.shopName, `${opts.walletGold} g in wallet`);
+    panel.classList.add('shop-panel');
+    panel.dataset.testid = 'shop-panel';
+
+    const list = document.createElement('ul');
+    list.className = 'shop-list';
+    list.dataset.testid = 'shop-list';
+    for (const entry of opts.entries) {
+      const li = document.createElement('li');
+      li.className = 'shop-row';
+      li.dataset.testid = `shop-row-${entry.itemId}`;
+
+      const name = document.createElement('span');
+      name.className = 'shop-item-name';
+      name.textContent = entry.itemName;
+
+      const price = document.createElement('span');
+      price.className = 'shop-item-price';
+      price.textContent = `${entry.price} g`;
+
+      const buyBtn = document.createElement('button');
+      buyBtn.type = 'button';
+      buyBtn.className = 'menu-button shop-buy';
+      buyBtn.dataset.testid = `shop-buy-${entry.itemId}`;
+      const stockNote = entry.remaining === -1 ? '' : ` (${entry.remaining} left)`;
+      buyBtn.textContent = `Buy${stockNote}`;
+      buyBtn.disabled =
+        opts.walletGold < entry.price || entry.remaining === 0;
+      buyBtn.addEventListener('click', () => opts.onBuy(entry.itemId));
+
+      li.append(name, price, buyBtn);
+      list.appendChild(li);
+    }
+    panel.appendChild(list);
+
+    const close = document.createElement('button');
+    close.className = 'menu-button';
+    close.type = 'button';
+    close.textContent = 'Close';
+    close.dataset.testid = 'shop-close';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
   }
 
   /** Bedtime / collapse summary panel — income, skill XP, relationship deltas, notices. */
