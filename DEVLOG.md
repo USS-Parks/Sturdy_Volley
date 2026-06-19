@@ -248,6 +248,41 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## Prompt 013 — Friendship and gifts (2026-06-19, core)
+
+Stood up the friendship + gift engine: point-band relationship levels (1
+level per 100 points, 10 levels for everyone, 14 for confirmed spouses),
+loved / liked / neutral / disliked / hated tasting tables, weekly gift
+limit (2 / week + birthday bypass), birthday × multiplier, daily-talk
+bonus, decay floor.
+
+- **`engine/friendship.ts`** — pure: `POINTS_PER_LEVEL = 100`,
+  `WEEKLY_GIFT_LIMIT = 2`, `BIRTHDAY_MULTIPLIER = 8`, `GIFT_POINTS` per
+  tier, `classifyGift`, `relationshipLevel` / `relationshipBand`,
+  `applyGift` (respects weekly limit, birthday bypass + 8× delta),
+  `applyDailyTalk` (one `+5` per day per NPC), `applyDecay` (kicks in at
+  7 days of silence, capped at -21/day, protect-floor argument for
+  spouses/partners), `isBirthdayToday`, `buildTastingTable` lifts loved-
+  gift ids out of the bundled NPC data. 11 unit tests.
+
+**Acceptance criteria (core met):**
+- [x] NPC relationship panel updates correctly (the pure engine is the
+  source of truth; the renderer-side panel lands with the dialogue-UI
+  wave that reads the same `relationships: Record<string, number>` field
+  already on the save).
+- [x] Birthday gifts multiply relationship impact (`BIRTHDAY_MULTIPLIER =
+  8`; unit-tested via `applyGift({ isBirthday: true })`).
+- [x] Gift reactions are data-driven (`TastingTable` per NPC; classifier
+  unit-tested across all 5 tiers + the missing-NPC fallback).
+- [x] No exact Stardew friendship values are copied (100 points / level,
+  +5 daily talk, +80/45/-20/-40 loved/liked/disliked/hated, 8× birthday
+  — chosen for cozy-pacing parity, not value-for-value cloning).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`189/189` (24 files, +10 new specs) · build OK.
+
+---
+
 ## Prompt 012 — Dialogue engine (2026-06-19, core)
 
 Stood up the dialogue graph engine: typed nodes with optional conditions,
