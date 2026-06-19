@@ -23,6 +23,9 @@ declare global {
       petAnimal: (id: string) => void;
       feedAnimal: (id: string) => void;
       openAnimalPanel: () => void;
+      pet: () => null | { name: string; kind: string; affection: number; pettedToday: boolean; bowlFilledToday: boolean; collar: 'red'|'kelp'|'shell'|null; x: number; z: number; perk: 'comfort'|'forage-sniff'|null };
+      openPetPanel: () => void;
+      setPetAffection: (value: number) => void;
     };
   }
 }

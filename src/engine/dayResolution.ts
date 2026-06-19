@@ -15,6 +15,7 @@ import { advanceWorld, type RegionForageTable } from './forage';
 import { absoluteDay } from './timeSystem';
 import { evaluateRecipeUnlocks, unlockRecipes } from './crafting';
 import { resolveAnimalsDay } from './animals';
+import { tickPetDay } from './pets';
 
 /** Sync from the save's flat `calendar` into the timeSystem's `GameTime`. */
 export function getGameTime(save: SaveData): GameTime {
@@ -188,6 +189,11 @@ export function resolveDay(input: ResolveDayInput): ResolveDayResult {
     summary.notices.push(
       `${sadCount} animal${sadCount === 1 ? '' : 's'} unhappy today — pet and feed them.`,
     );
+  }
+
+  // Prompt 020: tick the pet day (drains affection if bowl wasn't filled).
+  if (save.pet) {
+    save.pet = tickPetDay(save.pet);
   }
 
   // Prompt 017: re-check recipe unlock conditions at day end. Skills /

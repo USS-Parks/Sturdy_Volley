@@ -105,6 +105,23 @@ export const saveSchema = z
           .strict(),
       )
       .default({}),
+    pet: z
+      .object({
+        kind: z.enum(['tide-cat', 'bay-dog']),
+        name: z.string().min(1),
+        affection: z.number().int().min(0).max(1000),
+        pettedToday: z.boolean(),
+        bowlFilledToday: z.boolean(),
+        collar: z.enum(['red', 'kelp', 'shell']).nullable(),
+        x: z.number(),
+        z: z.number(),
+        targetX: z.number(),
+        targetZ: z.number(),
+        timeOnTarget: z.number().nonnegative(),
+      })
+      .strict()
+      .nullable()
+      .default(null),
     animals: z
       .record(
         z.string(),
@@ -211,6 +228,19 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
     mapState: {},
     machines: defaultFarmMachines(),
     animals: defaultFarmAnimals(),
+    pet: {
+      kind: 'tide-cat',
+      name: 'Pixel',
+      affection: 100,
+      pettedToday: false,
+      bowlFilledToday: true,
+      collar: null,
+      x: -8,
+      z: -4,
+      targetX: -8,
+      targetZ: -4,
+      timeOnTarget: 0,
+    },
   };
 }
 

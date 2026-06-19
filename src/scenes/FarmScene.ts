@@ -61,6 +61,16 @@ import {
 } from '../render/farm-entities';
 import { buildMachineMesh, paintMachineStatus, type MachineMesh } from '../render/farm-machines';
 import { bobAnimal, buildAnimalMesh, disposeAnimal, moveAnimal, type AnimalMesh } from '../render/farm-animals';
+import { buildPetMesh, disposePet, movePetMesh, refreshPetCollar, type PetMesh } from '../render/farm-pet';
+import {
+  PET_DEFS,
+  fillBowl,
+  petPet,
+  playFetch,
+  setCollar,
+  tickPetFollow,
+  unlockedPetPerk,
+} from '../engine/pets';
 import {
   ANIMAL_DEFS,
   feedAnimal,
@@ -114,6 +124,9 @@ interface DebugApi {
   petAnimal: (id: string) => void;
   feedAnimal: (id: string) => void;
   openAnimalPanel: () => void;
+  pet: () => null | { name: string; kind: string; affection: number; pettedToday: boolean; bowlFilledToday: boolean; collar: 'red'|'kelp'|'shell'|null; x: number; z: number; perk: 'comfort'|'forage-sniff'|null };
+  openPetPanel: () => void;
+  setPetAffection: (value: number) => void;
 }
 
 type PartnerKind = 'chest' | 'shipping-bin' | null;
@@ -167,6 +180,9 @@ export class FarmScene extends GameScene {
   private readonly animalMeshes = new Map<string, AnimalMesh>();
   private animalsPanelOpen = false;
   private animalBobSeconds = 0;
+  private petMesh: PetMesh | null = null;
+  private petPanelOpen = false;
+  private petSeed = 1;
   private readonly homePosition = new Vector3(-8, 0.9, -5.4);
   private readonly plotOrigin = new Vector3(-6, 0, -4);
   private static readonly SCENE_KEY = 'Farm';
@@ -304,6 +320,12 @@ export class FarmScene extends GameScene {
     fence('barn-fence-front', 8, 3.1, 5.2, 0.18);
     fence('barn-fence-left', 5.4, 4.05, 0.18, 1.9);
     fence('barn-fence-right', 10.6, 4.05, 0.18, 1.9);
+
+    // Prompt 020: water bowl on the porch — the pet drinks from this and
+    // the player tops it up each morning.
+    const bowl = MeshBuilder.CreateCylinder('pet-bowl', { height: 0.12, diameter: 0.36 }, scene);
+    bowl.position.set(-9.2, 0.06, -6.0);
+    bowl.material = flatMaterial(scene, 'pet-bowl', PALETTE.stone, 0.25);
   }
 
   private buildBounds(scene: Scene): void {
@@ -346,6 +368,7 @@ export class FarmScene extends GameScene {
     this.lastMachineCheckMinutes = this.absoluteMinutesNow();
     this.refreshAnimalMeshes();
     this.applyAnimalShelterState();
+    this.refreshPetMesh();
     this.rebuildInteractionTargets();
 
     // Honor cross-scene entry handoff. Coming back from the farmhouse interior
@@ -478,6 +501,27 @@ export class FarmScene extends GameScene {
         }
       },
       openAnimalPanel: () => this.openAnimalPanel(),
+      pet: () => {
+        const p = this.save.pet;
+        if (!p) return null;
+        return {
+          name: p.name,
+          kind: p.kind,
+          affection: p.affection,
+          pettedToday: p.pettedToday,
+          bowlFilledToday: p.bowlFilledToday,
+          collar: p.collar,
+          x: p.x,
+          z: p.z,
+          perk: unlockedPetPerk(p),
+        };
+      },
+      openPetPanel: () => this.openPetPanel(),
+      setPetAffection: (value: number) => {
+        if (!this.save.pet) return;
+        this.save.pet = { ...this.save.pet, affection: Math.max(0, Math.min(1000, value)) };
+        persistActiveSave();
+      },
     };
   }
 
@@ -494,7 +538,7 @@ export class FarmScene extends GameScene {
         return;
       }
     }
-    if (this.menuOpen || this.inventoryOpen || this.dayResolving || this.machinePanelOpen || this.animalsPanelOpen) {
+    if (this.menuOpen || this.inventoryOpen || this.dayResolving || this.machinePanelOpen || this.animalsPanelOpen || this.petPanelOpen) {
       this.clock = pauseClock(this.clock, true);
       this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
       return;
@@ -530,6 +574,10 @@ export class FarmScene extends GameScene {
       } else if (this.nearest.id.startsWith('animal:')) {
         this.handleAnimalInteract(this.nearest.id.slice('animal:'.length));
         this.rebuildInteractionTargets();
+      } else if (this.nearest.id === 'pet-bowl') {
+        this.handleFillBowl();
+      } else if (this.nearest.id === 'pet') {
+        this.handlePetPet();
       } else {
         this.actionLabel = this.nearest.label;
         this.actionTimer = 1.6;
@@ -558,6 +606,16 @@ export class FarmScene extends GameScene {
     let ai = 0;
     for (const mesh of this.animalMeshes.values()) {
       bobAnimal(mesh, this.animalBobSeconds, ai++);
+    }
+
+    // Pet follow / idle tick (Prompt 020).
+    this.tickPet(dt);
+    // Comfort perk: stamina regen +1/s when pet at max affection AND player still.
+    if (this.save.pet && unlockedPetPerk(this.save.pet) === 'comfort' && this.controller.speed < 0.05) {
+      this.controller = {
+        ...this.controller,
+        stamina: Math.min(100, this.controller.stamina + dt),
+      };
     }
     if (tick.collapsed) {
       this.triggerSleep(true);
@@ -678,6 +736,7 @@ export class FarmScene extends GameScene {
         { id: 'resume', label: 'Resume', enabled: true, testId: 'pause-resume' },
         { id: 'inventory', label: 'Open inventory', enabled: true, testId: 'pause-inventory' },
         { id: 'animals', label: 'Animals', enabled: true, testId: 'pause-animals' },
+        { id: 'pet', label: 'Pet', enabled: Boolean(this.save.pet), testId: 'pause-pet' },
         { id: 'sleep', label: 'Sleep until tomorrow', enabled: true, testId: 'pause-sleep' },
         { id: 'town', label: 'Walk to Ballast Bay', enabled: true, testId: 'nav-town' },
         { id: 'beach', label: 'Driftwood Beach', enabled: true, testId: 'nav-beach' },
@@ -706,6 +765,10 @@ export class FarmScene extends GameScene {
       case 'animals':
         this.menuOpen = false;
         this.openAnimalPanel();
+        break;
+      case 'pet':
+        this.menuOpen = false;
+        this.openPetPanel();
         break;
       case 'sleep':
         this.menuOpen = false;
@@ -1014,6 +1077,27 @@ export class FarmScene extends GameScene {
         priority: 3,
       });
     }
+    // Prompt 020: water bowl on the porch.
+    if (this.save.pet) {
+      base.push({
+        id: 'pet-bowl',
+        kind: 'prop',
+        label: this.save.pet.bowlFilledToday ? 'Bowl is full' : 'Fill the water bowl',
+        x: -9.2,
+        z: -6.0,
+        radius: 1.4,
+        priority: 2,
+      });
+      base.push({
+        id: 'pet',
+        kind: 'animal',
+        label: this.save.pet.pettedToday ? `${this.save.pet.name} purrs at you` : `Pet ${this.save.pet.name}`,
+        x: this.save.pet.x,
+        z: this.save.pet.z,
+        radius: 1.2,
+        priority: 3,
+      });
+    }
     // Prompt 019: animal interactables follow the animal's live position.
     let i = 0;
     for (const animal of Object.values(this.save.animals ?? {})) {
@@ -1103,6 +1187,125 @@ export class FarmScene extends GameScene {
     const toolId = FARM_TOOL_IDS[this.selectedTool];
     if (!toolId) return 1;
     return hardnessReach(toolId, this.save.toolLevels[toolId] ?? 0);
+  }
+
+  private refreshPetMesh(): void {
+    if (!this.scene) return;
+    if (this.petMesh) {
+      disposePet(this.petMesh);
+      this.petMesh = null;
+    }
+    if (this.save.pet) {
+      this.petMesh = buildPetMesh(this.scene, this.save.pet);
+    }
+  }
+
+  private tickPet(dt: number): void {
+    if (!this.save.pet || !this.petMesh) return;
+    const moving = this.controller.speed > 0.05;
+    this.petSeed += 1;
+    const result = tickPetFollow({
+      pet: this.save.pet,
+      playerX: this.player.position.x,
+      playerZ: this.player.position.z,
+      playerMoving: moving,
+      doors: [
+        { x: -10, z: -5.6, radius: 1.4 }, // farmhouse-door
+      ],
+      dt,
+      seed: this.petSeed,
+    });
+    this.save.pet = result.pet;
+    movePetMesh(this.petMesh, this.save.pet);
+  }
+
+  private handleFillBowl(): void {
+    if (!this.save.pet) return;
+    const next = fillBowl(this.save.pet);
+    if (next === this.save.pet) {
+      this.flashAction('The bowl is already full');
+      return;
+    }
+    this.save.pet = next;
+    persistActiveSave();
+    this.flashAction('Filled the water bowl');
+    this.rebuildInteractionTargets();
+  }
+
+  private handlePetPet(): void {
+    if (!this.save.pet) return;
+    const next = petPet(this.save.pet);
+    if (next === this.save.pet) {
+      this.flashAction(`${this.save.pet.name} already had attention today`);
+      return;
+    }
+    this.save.pet = next;
+    persistActiveSave();
+    this.flashAction(`Petted ${this.save.pet.name}`);
+    this.rebuildInteractionTargets();
+  }
+
+  private openPetPanel(): void {
+    if (!this.save.pet) return;
+    this.petPanelOpen = true;
+    this.renderPetPanel();
+  }
+
+  private renderPetPanel(): void {
+    const pet = this.save.pet;
+    if (!pet) return;
+    const def = PET_DEFS[pet.kind];
+    const perk = unlockedPetPerk(pet);
+    this.ctx.overlay.showPetPanel({
+      name: pet.name,
+      kindLabel: def.name,
+      affection: pet.affection,
+      bowlFilledToday: pet.bowlFilledToday,
+      pettedToday: pet.pettedToday,
+      collar: pet.collar,
+      perkLabel: perk === 'comfort'
+        ? 'Comfort: +stamina regen when still'
+        : perk === 'forage-sniff'
+        ? 'Forage Sniff: extra wild spawn each night'
+        : null,
+      onPet: () => {
+        if (!this.save.pet) return;
+        this.save.pet = petPet(this.save.pet);
+        persistActiveSave();
+        this.renderPetPanel();
+      },
+      onPlayFetch: () => {
+        if (!this.save.pet) return;
+        this.save.pet = playFetch(this.save.pet);
+        persistActiveSave();
+        this.renderPetPanel();
+      },
+      onFillBowl: () => {
+        if (!this.save.pet) return;
+        this.save.pet = fillBowl(this.save.pet);
+        persistActiveSave();
+        this.renderPetPanel();
+      },
+      onSwapKind: () => {
+        if (!this.save.pet) return;
+        const nextKind = this.save.pet.kind === 'tide-cat' ? 'bay-dog' : 'tide-cat';
+        this.save.pet = { ...this.save.pet, kind: nextKind, name: nextKind === 'tide-cat' ? 'Pixel' : 'Drift' };
+        persistActiveSave();
+        this.refreshPetMesh();
+        this.renderPetPanel();
+      },
+      onSetCollar: (c) => {
+        if (!this.save.pet) return;
+        this.save.pet = setCollar(this.save.pet, c);
+        persistActiveSave();
+        if (this.petMesh) refreshPetCollar(this.petMesh, this.save.pet);
+        this.renderPetPanel();
+      },
+      onClose: () => {
+        this.petPanelOpen = false;
+        this.refreshHud();
+      },
+    });
   }
 
   private animalInsidePos(id: string): { x: number; z: number } {

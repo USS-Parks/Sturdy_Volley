@@ -85,6 +85,22 @@ export interface AnimalPanelOptions {
   onClose: () => void;
 }
 
+export interface PetPanelOptions {
+  name: string;
+  kindLabel: string;
+  affection: number;
+  bowlFilledToday: boolean;
+  pettedToday: boolean;
+  collar: 'red' | 'kelp' | 'shell' | null;
+  perkLabel: string | null;
+  onPet: () => void;
+  onPlayFetch: () => void;
+  onFillBowl: () => void;
+  onSwapKind: () => void;
+  onSetCollar: (c: 'red' | 'kelp' | 'shell' | null) => void;
+  onClose: () => void;
+}
+
 export interface ShopPanelEntry {
   itemId: string;
   itemName: string;
@@ -740,6 +756,102 @@ export class UIOverlay {
     close.type = 'button';
     close.textContent = 'Close';
     close.dataset.testid = 'crafting-close';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /**
+   * Pet panel (Prompt 020). Shows the pet's stats, today's care, and
+   * buttons for petting, filling the bowl, playing fetch, swapping
+   * kind, and changing the collar.
+   */
+  showPetPanel(opts: PetPanelOptions): void {
+    this.clear();
+    const panel = this.createPanel(opts.name);
+    panel.classList.add('pet-panel');
+    panel.dataset.testid = 'pet-panel';
+
+    const stats = document.createElement('div');
+    stats.className = 'pet-stats';
+    const hearts = Math.floor(opts.affection / 200);
+    stats.textContent = `${opts.kindLabel} · ${'♥'.repeat(hearts)}${'♡'.repeat(5 - hearts)} (${opts.affection}/1000)`;
+    panel.appendChild(stats);
+
+    const care = document.createElement('div');
+    care.className = 'pet-care';
+    const careParts = [
+      `bowl: ${opts.bowlFilledToday ? 'full' : 'empty'}`,
+      `petted today: ${opts.pettedToday ? 'yes' : 'no'}`,
+      `collar: ${opts.collar ?? 'none'}`,
+    ];
+    if (opts.perkLabel) careParts.push(`perk unlocked: ${opts.perkLabel}`);
+    care.textContent = careParts.join(' · ');
+    panel.appendChild(care);
+
+    const actions = document.createElement('div');
+    actions.className = 'pet-actions';
+
+    const petBtn = document.createElement('button');
+    petBtn.type = 'button';
+    petBtn.className = 'menu-button';
+    petBtn.textContent = opts.pettedToday ? 'Already petted' : 'Pet';
+    petBtn.dataset.testid = 'pet-pet';
+    petBtn.disabled = opts.pettedToday;
+    petBtn.addEventListener('click', opts.onPet);
+    actions.appendChild(petBtn);
+
+    const fetchBtn = document.createElement('button');
+    fetchBtn.type = 'button';
+    fetchBtn.className = 'menu-button';
+    fetchBtn.textContent = 'Play fetch';
+    fetchBtn.dataset.testid = 'pet-fetch';
+    fetchBtn.addEventListener('click', opts.onPlayFetch);
+    actions.appendChild(fetchBtn);
+
+    const bowlBtn = document.createElement('button');
+    bowlBtn.type = 'button';
+    bowlBtn.className = 'menu-button';
+    bowlBtn.textContent = opts.bowlFilledToday ? 'Bowl full' : 'Fill water bowl';
+    bowlBtn.dataset.testid = 'pet-bowl';
+    bowlBtn.disabled = opts.bowlFilledToday;
+    bowlBtn.addEventListener('click', opts.onFillBowl);
+    actions.appendChild(bowlBtn);
+
+    const swapBtn = document.createElement('button');
+    swapBtn.type = 'button';
+    swapBtn.className = 'menu-button';
+    swapBtn.textContent = 'Swap kind';
+    swapBtn.dataset.testid = 'pet-swap';
+    swapBtn.addEventListener('click', opts.onSwapKind);
+    actions.appendChild(swapBtn);
+
+    panel.appendChild(actions);
+
+    const collarRow = document.createElement('div');
+    collarRow.className = 'pet-collars';
+    const labelEl = document.createElement('span');
+    labelEl.className = 'pet-collar-label';
+    labelEl.textContent = 'Collar:';
+    collarRow.appendChild(labelEl);
+    for (const c of ['none', 'red', 'kelp', 'shell'] as const) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'menu-button menu-button-secondary';
+      btn.textContent = c;
+      btn.dataset.testid = `pet-collar-${c}`;
+      btn.addEventListener('click', () => opts.onSetCollar(c === 'none' ? null : c));
+      collarRow.appendChild(btn);
+    }
+    panel.appendChild(collarRow);
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'menu-button';
+    close.textContent = 'Close';
+    close.dataset.testid = 'pet-close';
     close.addEventListener('click', opts.onClose);
     panel.appendChild(close);
 

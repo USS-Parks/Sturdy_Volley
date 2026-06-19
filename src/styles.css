@@ -740,6 +740,16 @@ body {
   opacity: 0.85;
 }
 
+/* Pet panel (Prompt 020). */
+.pet-panel { width: min(520px, 96vw); }
+.pet-stats { font-weight: 700; }
+.pet-care { font-size: 12px; opacity: 0.85; margin-bottom: 8px; }
+.pet-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.pet-actions .menu-button { flex: 1; min-width: 110px; }
+.pet-collars { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.pet-collar-label { font-size: 12px; opacity: 0.7; }
+.pet-collars .menu-button { padding: 4px 10px; min-height: 32px; }
+
 /* Shop panel (Prompt 016). */
 .shop-panel {
   width: min(480px, 94vw);

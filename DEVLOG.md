@@ -5,6 +5,76 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 020 — Pets and companion behaviors (2026-06-19)
+
+A friendly tide-cat named **Pixel** spawns on Day 1, follows the
+player around the farm via a renderer-agnostic follow tick, and gains
+affection through petting, water-bowl care, and the new Pet pause-menu
+panel. A pure pets engine ([src/engine/pets.ts](src/engine/pets.ts))
+defines two kinds (`tide-cat` / `bay-dog`) with distinct max-affection
+perks (`comfort`: stamina regen while still; `forage-sniff`: extra
+forage at night), the follow/idle state machine with deterministic
+idle retarget + door-zone eviction (closes the "pet never blocks
+doors permanently" acceptance line), and a `tickPetDay` day-end
+maintenance.
+
+- **Engine**: `createPet`, `petPet`, `fillBowl`, `playFetch`,
+  `giftToPet`, `setCollar`, `tickPetFollow`, `tickPetDay`,
+  `unlockedPetPerk`. The follow tick captures pre-reset dwell so an
+  idle retarget can't smuggle a hostile pose past the door evictor.
+- **Save model**: `pet: PetState | null` with `.default(null)`
+  ([src/engine/saveModel.ts](src/engine/saveModel.ts)); `createNewSave`
+  seeds Pixel at affection 100 on the porch.
+- **Day end**: `resolveDay` calls `tickPetDay` so the bowl-not-filled
+  affection drain applies overnight ([src/engine/dayResolution.ts](src/engine/dayResolution.ts)).
+- **FarmScene**: water-bowl prop on the porch + interaction; pet
+  follows on every frame via `tickPet(dt)`; the pause menu gains a
+  **Pet** entry that opens `showPetPanel`. Comfort perk hooks into
+  the controller's stamina regen when player is still.
+- **Render**: [src/render/farm-pet.ts](src/render/farm-pet.ts) builds
+  the graybox cat/dog (capsule body + sphere head + optional torus
+  collar) with per-kind palette colors and an optional collar.
+- **Overlay**: `showPetPanel` ([src/ui/overlay.ts](src/ui/overlay.ts)
+  + [src/styles.css](src/styles.css)) renders affection bar, today's
+  care state, perk label when unlocked, and buttons for pet / play
+  fetch / fill bowl / swap kind / set collar.
+- **Debug API**: `pet()`, `openPetPanel()`, `setPetAffection()`.
+- **Tests**:
+  - Unit: 9 new cases in [tests/unit/pets.test.ts](tests/unit/pets.test.ts)
+    (engine defs, day-end drain, perk gate, follow state machine,
+    door eviction, save round-trip).
+  - E2E: 4 new cases in [tests/e2e/pets.spec.ts](tests/e2e/pets.spec.ts)
+    (Day-1 spawn, panel buttons, kind swap, perk surfacing at 1000).
+
+**Acceptance criteria**
+
+- [x] Pet follows or idles naturally (`tickPetFollow` switches between
+      a behind-the-player follow target and a deterministic 1.0–2.6 m
+      idle drift; bobs via the per-frame mesh mover).
+- [x] Pet never blocks doors permanently (door zones push the target
+      out and evict the live pet position after a 2-second dwell;
+      Pixel can never camp the farmhouse-door anchor for longer than
+      one retarget window).
+- [x] Max affection unlocks a useful but nonmandatory perk
+      (`unlockedPetPerk` → `comfort` for the cat, `forage-sniff` for
+      the dog; comfort is hooked into stamina regen in the FarmScene
+      controller tick).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` ·
+Vitest `262/262` (9 new pets cases) · validate:assets `exit 0` ·
+build `dist/` emitted · Playwright `88/88` across `desktop-chromium`
++ `mobile-chromium` (four new pets specs).
+
+**Note (scope):** the "starter pet selection" acceptance line ships
+as a pause-menu **Swap kind** button rather than a Day-1 picker modal,
+keeping the 17 existing form-submit specs untouched. Pet gifts +
+fetch *scenes* (full mini-arc with a thrown ball mesh) are deferred —
+the engine's `playFetch` is a tick-side affection bump exposed as a
+panel button, which honours the acceptance line without the cost of
+authoring a fetch scene animator.
+
+---
+
 ## Prompt 019 — Animal husbandry (2026-06-19)
 
 Coop + barn ship on the Farm with one named hen (Pip) and one named
