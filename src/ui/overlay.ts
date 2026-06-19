@@ -68,6 +68,23 @@ export interface MachinePanelOptions {
   onClose: () => void;
 }
 
+export interface AnimalPanelRow {
+  id: string;
+  name: string;
+  kindLabel: string;
+  habitat: string;
+  hearts: number;
+  fedToday: boolean;
+  pettedToday: boolean;
+  mood: 'happy' | 'content' | 'lonely' | 'cold';
+  daysToProduce: number;
+}
+
+export interface AnimalPanelOptions {
+  rows: AnimalPanelRow[];
+  onClose: () => void;
+}
+
 export interface ShopPanelEntry {
   itemId: string;
   itemName: string;
@@ -723,6 +740,59 @@ export class UIOverlay {
     close.type = 'button';
     close.textContent = 'Close';
     close.dataset.testid = 'crafting-close';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /**
+   * Animal panel (Prompt 019). Lists every animal with mood, hearts,
+   * today's care state, and days-to-product. Read-only summary; petting
+   * + feeding happen in the world via E.
+   */
+  showAnimalPanel(opts: AnimalPanelOptions): void {
+    this.clear();
+    const panel = this.createPanel('Animals');
+    panel.classList.add('animal-panel');
+    panel.dataset.testid = 'animal-panel';
+
+    if (opts.rows.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'panel-body';
+      empty.textContent = 'No animals on the farm yet.';
+      panel.appendChild(empty);
+    } else {
+      const list = document.createElement('ul');
+      list.className = 'animal-list';
+      list.dataset.testid = 'animal-list';
+      for (const r of opts.rows) {
+        const li = document.createElement('li');
+        li.className = `animal-row mood-${r.mood}`;
+        li.dataset.testid = `animal-row-${r.id}`;
+        const title = document.createElement('div');
+        title.className = 'animal-title';
+        title.textContent = `${r.name} · ${r.kindLabel}`;
+        const meta = document.createElement('div');
+        meta.className = 'animal-meta';
+        const hearts = '♥'.repeat(r.hearts) + '♡'.repeat(Math.max(0, 5 - r.hearts));
+        const todo: string[] = [];
+        if (!r.fedToday) todo.push('feed');
+        if (!r.pettedToday) todo.push('pet');
+        const todoText = todo.length === 0 ? 'cared for today' : `needs: ${todo.join(', ')}`;
+        meta.textContent = `${hearts} · ${r.mood} · ${todoText} · produce in ${r.daysToProduce}d`;
+        li.append(title, meta);
+        list.appendChild(li);
+      }
+      panel.appendChild(list);
+    }
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'menu-button';
+    close.textContent = 'Close';
+    close.dataset.testid = 'animal-close';
     close.addEventListener('click', opts.onClose);
     panel.appendChild(close);
 

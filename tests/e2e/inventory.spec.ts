@@ -53,10 +53,14 @@ test.describe('Inventory + shipping bin', () => {
     await expect(page.getByTestId('day-summary-notices')).toContainText("shipment earned 80 g");
 
     await page.getByTestId('day-summary-continue').click();
-    // Bin is empty after the roll.
+    // Bin is drained of the seeds we shipped. Prompt 019 may have added
+    // overnight animal products to the bin (eggs / milk) — those are
+    // expected; we just want the bell-pea-seeds stack to be gone.
     const after = await page.evaluate(() =>
-      window.sturdyVolleyDebug!.shippingBinSlots().every((s) => s === null),
+      window.sturdyVolleyDebug!.shippingBinSlots().some(
+        (s) => s !== null && s.itemId === 'bell-pea-seeds',
+      ),
     );
-    expect(after).toBe(true);
+    expect(after).toBe(false);
   });
 });

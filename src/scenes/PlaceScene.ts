@@ -183,6 +183,7 @@ export abstract class PlaceScene extends GameScene {
       items: content.items,
       crops: content.crops,
       todayWeatherId: this.weather?.id ?? null,
+      todayWeather: this.weather ?? null,
     });
     resetDayLedger();
     applyGameTime(this.save, result.nextTime);

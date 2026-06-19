@@ -5,6 +5,80 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 019 — Animal husbandry (2026-06-19)
+
+Coop + barn ship on the Farm with one named hen (Pip) and one named
+goat (Clover) seeded on Day 1. A pure animal engine
+([src/engine/animals.ts](src/engine/animals.ts)) carries affection
+(0..1000), per-day pet/feed flags, days-since-produce counters, and a
+day-end tick that yields produce into the shipping bin when the animal
+is fed, sheltered, and at the kind's heart threshold. The FarmScene
+builds graybox enclosures (coop NW, barn NE, fenced pastures), spawns
+animal meshes via [src/render/farm-animals.ts](src/render/farm-animals.ts)
+with a small per-frame bob animation, and toggles inside/outside
+positions based on `shouldBeOutside(time, weather)`.
+
+- **Engine**: `createAnimal`, `petAnimal`, `feedAnimal`, `tickAnimalDay`,
+  `resolveAnimalsDay`, `moodOf` (cold → lonely → happy / content),
+  `heartsOf`, `shouldBeOutside`. Cold animals don't produce; unfed
+  animals lose 25 affection/day.
+- **Items**: new `hay` ([src/data/content/items.json](src/data/content/items.json)),
+  feed item for the husbandry loop. Starter inventory gets 8 hay in
+  slot 1.
+- **Save model**: `animals: Record<id, AnimalInstance>` with
+  `.default({})` ([src/engine/saveModel.ts](src/engine/saveModel.ts));
+  `createNewSave` seeds Pip + Clover with happy starting affection.
+- **Day end**: `resolveDay` now runs `resolveAnimalsDay` against the
+  shipping bin and pushes "N animal products collected" + "N animals
+  unhappy" notices onto the day summary. The `ResolveDayInput` interface
+  gained an optional `todayWeather: Weather | null` field; all three
+  callers (`FarmScene`, `InteriorScene`, `PlaceScene`) now pass it.
+- **FarmScene**: graybox coop/barn + fences; animal-mesh refresh on
+  enter/sleep; per-frame bob; interaction targets (E pets if not yet
+  petted, feeds with hay if not yet fed); the pause menu gains an
+  **Animals** entry that opens the new `showAnimalPanel`.
+- **Overlay**: `showAnimalPanel` renders one row per animal with
+  hearts, mood, today's todo list, and days-to-produce
+  ([src/ui/overlay.ts](src/ui/overlay.ts) + [src/styles.css](src/styles.css)).
+- **Debug API**: `animals()`, `petAnimal(id)`, `feedAnimal(id)`,
+  `openAnimalPanel()`.
+- **Tests**:
+  - Unit: 10 new cases in [tests/unit/animals.test.ts](tests/unit/animals.test.ts)
+    (engine + day tick + save round-trip).
+  - E2E: 3 new cases in [tests/e2e/animals.spec.ts](tests/e2e/animals.spec.ts)
+    (seeding, pet+feed surfacing, pause-menu open).
+  - Fixed: `tests/unit/dayResolution.test.ts` shipping-bin drain test
+    now clears default animals so the bin is empty after the roll;
+    `tests/e2e/inventory.spec.ts` "shipping bin sells overnight" asserts
+    only that the bell-pea-seeds stack is drained (animal products are
+    expected residue).
+
+**Acceptance criteria**
+
+- [x] Mooncalf hens and bluff goats are fully functional (both seeded
+      on Day 1; both can be petted, fed, mature, and produce eggs / milk
+      on the morning tick).
+- [x] Animals path outdoors and return indoors (`shouldBeOutside`
+      toggles by clock + weather every minute-tick; `applyAnimalShelterState`
+      moves the live meshes and updates interaction targets).
+- [x] Animal tab summarizes needs and mood (pause-menu **Animals**
+      opens `showAnimalPanel` with mood, hearts, todo list, and days
+      to next product per animal).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` ·
+Vitest `253/253` (10 new animals cases) · validate:assets `exit 0` ·
+build `dist/` emitted · Playwright `80/80` across `desktop-chromium` +
+`mobile-chromium` (three new animals specs).
+
+**Note (scope):** richer per-animal AI (path-finding between feeders,
+sleeping in stalls, breeding, named species variety) is deferred —
+Prompt 019 ships the husbandry loop with the minimum-viable
+outside/inside toggle and a static bob animation per kind. Acquiring
+more animals beyond Pip + Clover comes later (animal-shop / quest in
+Prompt 029).
+
+---
+
 ## Prompt 018 — Machines and artisan goods (2026-06-19)
 
 Five-machine artisan layer ships end-to-end on the Farm. A pure engine

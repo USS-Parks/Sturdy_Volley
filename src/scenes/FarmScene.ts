@@ -60,6 +60,15 @@ import {
   FARM_ENTITY_ANCHORS,
 } from '../render/farm-entities';
 import { buildMachineMesh, paintMachineStatus, type MachineMesh } from '../render/farm-machines';
+import { bobAnimal, buildAnimalMesh, disposeAnimal, moveAnimal, type AnimalMesh } from '../render/farm-animals';
+import {
+  ANIMAL_DEFS,
+  feedAnimal,
+  heartsOf,
+  moodOf,
+  petAnimal,
+  shouldBeOutside,
+} from '../engine/animals';
 import {
   MACHINE_CATALOG,
   collectMachine,
@@ -101,6 +110,10 @@ interface DebugApi {
   openMachine: (id: string) => void;
   grantItem: (itemId: string, qty: number) => void;
   fastForwardMinutes: (minutes: number) => void;
+  animals: () => Record<string, { name: string; kind: string; hearts: number; fedToday: boolean; pettedToday: boolean; outside: boolean }>;
+  petAnimal: (id: string) => void;
+  feedAnimal: (id: string) => void;
+  openAnimalPanel: () => void;
 }
 
 type PartnerKind = 'chest' | 'shipping-bin' | null;
@@ -150,6 +163,10 @@ export class FarmScene extends GameScene {
   private machinePanelOpen = false;
   private machinePanelId: string | null = null;
   private lastMachineCheckMinutes = 0;
+  /** Live animal meshes keyed by animal id; per Prompt 019. */
+  private readonly animalMeshes = new Map<string, AnimalMesh>();
+  private animalsPanelOpen = false;
+  private animalBobSeconds = 0;
   private readonly homePosition = new Vector3(-8, 0.9, -5.4);
   private readonly plotOrigin = new Vector3(-6, 0, -4);
   private static readonly SCENE_KEY = 'Farm';
@@ -252,6 +269,41 @@ export class FarmScene extends GameScene {
     const chestLid = MeshBuilder.CreateBox('porch-chest-lid', { width: 1.2, depth: 0.85, height: 0.12 }, scene);
     chestLid.position.set(-12, 0.82, -6);
     chestLid.material = flatMaterial(scene, 'porch-chest-lid', PALETTE.roof, 0.22);
+
+    // Prompt 019: coop (north-west) + barn (north-east). Each is a low
+    // open-front structure with a small fenced pasture in front. The
+    // animals graze in front when outside and shelter inside otherwise.
+    const coop = MeshBuilder.CreateBox('coop', { width: 4, depth: 3, height: 2.2 }, scene);
+    coop.position.set(-10, 1.1, 6);
+    coop.material = flatMaterial(scene, 'coop', PALETTE.wood, 0.22);
+    coop.checkCollisions = true;
+    const coopRoof = MeshBuilder.CreateCylinder('coop-roof', { height: 0.9, diameterTop: 0, diameterBottom: 4.6, tessellation: 4 }, scene);
+    coopRoof.position.set(-10, 2.6, 6);
+    coopRoof.rotation.y = Math.PI / 4;
+    coopRoof.material = flatMaterial(scene, 'coop-roof', PALETTE.roof, 0.22);
+
+    const barn = MeshBuilder.CreateBox('barn', { width: 5, depth: 4, height: 2.8 }, scene);
+    barn.position.set(8, 1.4, 6);
+    barn.material = flatMaterial(scene, 'barn', PALETTE.cliff, 0.22);
+    barn.checkCollisions = true;
+    const barnRoof = MeshBuilder.CreateCylinder('barn-roof', { height: 1.1, diameterTop: 0, diameterBottom: 5.6, tessellation: 4 }, scene);
+    barnRoof.position.set(8, 3.3, 6);
+    barnRoof.rotation.y = Math.PI / 4;
+    barnRoof.material = flatMaterial(scene, 'barn-roof', PALETTE.roof, 0.22);
+
+    // Pasture markers — short fence-cube strips so the player can see the
+    // outside grazing yards.
+    const fence = (n: string, x: number, z: number, w: number, d: number) => {
+      const f = MeshBuilder.CreateBox(n, { width: w, depth: d, height: 0.4 }, scene);
+      f.position.set(x, 0.2, z);
+      f.material = flatMaterial(scene, n, PALETTE.wood, 0.18);
+    };
+    fence('coop-fence-front', -10, 3.2, 4.2, 0.18);
+    fence('coop-fence-left', -12.1, 4.1, 0.18, 1.8);
+    fence('coop-fence-right', -7.9, 4.1, 0.18, 1.8);
+    fence('barn-fence-front', 8, 3.1, 5.2, 0.18);
+    fence('barn-fence-left', 5.4, 4.05, 0.18, 1.9);
+    fence('barn-fence-right', 10.6, 4.05, 0.18, 1.9);
   }
 
   private buildBounds(scene: Scene): void {
@@ -292,6 +344,8 @@ export class FarmScene extends GameScene {
     this.refreshWorldState();
     this.refreshMachineMeshes();
     this.lastMachineCheckMinutes = this.absoluteMinutesNow();
+    this.refreshAnimalMeshes();
+    this.applyAnimalShelterState();
     this.rebuildInteractionTargets();
 
     // Honor cross-scene entry handoff. Coming back from the farmhouse interior
@@ -386,8 +440,44 @@ export class FarmScene extends GameScene {
         applyGameTime(this.save, next);
         this.checkMachineReadyTransitions();
         this.paintAllMachines();
+        this.applyAnimalShelterState();
         persistActiveSave();
       },
+      animals: () => {
+        const out: Record<string, { name: string; kind: string; hearts: number; fedToday: boolean; pettedToday: boolean; outside: boolean }> = {};
+        for (const [k, a] of Object.entries(this.save.animals ?? {})) {
+          out[k] = {
+            name: a.name,
+            kind: a.kind,
+            hearts: heartsOf(a),
+            fedToday: a.fedToday,
+            pettedToday: a.pettedToday,
+            outside: a.outside,
+          };
+        }
+        return out;
+      },
+      petAnimal: (id: string) => {
+        const a = this.save.animals?.[id];
+        if (a) this.save.animals![id] = petAnimal(a);
+        persistActiveSave();
+        this.rebuildInteractionTargets();
+      },
+      feedAnimal: (id: string) => {
+        const a = this.save.animals?.[id];
+        if (!a) return;
+        // For e2e: force fedToday = false first so feed succeeds.
+        this.save.animals![id] = { ...a, fedToday: false };
+        const r = feedAnimal({ animal: this.save.animals![id]!, container: this.save.inventory });
+        if (r.accepted) {
+          this.save.animals![id] = r.animal;
+          this.save.inventory = r.container;
+          persistActiveSave();
+          this.refreshHotbar();
+          this.rebuildInteractionTargets();
+        }
+      },
+      openAnimalPanel: () => this.openAnimalPanel(),
     };
   }
 
@@ -404,7 +494,7 @@ export class FarmScene extends GameScene {
         return;
       }
     }
-    if (this.menuOpen || this.inventoryOpen || this.dayResolving || this.machinePanelOpen) {
+    if (this.menuOpen || this.inventoryOpen || this.dayResolving || this.machinePanelOpen || this.animalsPanelOpen) {
       this.clock = pauseClock(this.clock, true);
       this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
       return;
@@ -437,6 +527,9 @@ export class FarmScene extends GameScene {
         this.handleEntityInteract(this.nearest.id.slice('entity:'.length));
       } else if (this.nearest.id.startsWith('machine:')) {
         this.openMachine(this.nearest.id.slice('machine:'.length));
+      } else if (this.nearest.id.startsWith('animal:')) {
+        this.handleAnimalInteract(this.nearest.id.slice('animal:'.length));
+        this.rebuildInteractionTargets();
       } else {
         this.actionLabel = this.nearest.label;
         this.actionTimer = 1.6;
@@ -457,6 +550,14 @@ export class FarmScene extends GameScene {
       this.refreshWorldState();
       this.checkMachineReadyTransitions();
       this.paintAllMachines();
+      this.applyAnimalShelterState();
+    }
+
+    // Animal bob animation runs every frame.
+    this.animalBobSeconds += dt;
+    let ai = 0;
+    for (const mesh of this.animalMeshes.values()) {
+      bobAnimal(mesh, this.animalBobSeconds, ai++);
     }
     if (tick.collapsed) {
       this.triggerSleep(true);
@@ -576,6 +677,7 @@ export class FarmScene extends GameScene {
       [
         { id: 'resume', label: 'Resume', enabled: true, testId: 'pause-resume' },
         { id: 'inventory', label: 'Open inventory', enabled: true, testId: 'pause-inventory' },
+        { id: 'animals', label: 'Animals', enabled: true, testId: 'pause-animals' },
         { id: 'sleep', label: 'Sleep until tomorrow', enabled: true, testId: 'pause-sleep' },
         { id: 'town', label: 'Walk to Ballast Bay', enabled: true, testId: 'nav-town' },
         { id: 'beach', label: 'Driftwood Beach', enabled: true, testId: 'nav-beach' },
@@ -600,6 +702,10 @@ export class FarmScene extends GameScene {
       case 'inventory':
         this.menuOpen = false;
         this.openInventory(null);
+        break;
+      case 'animals':
+        this.menuOpen = false;
+        this.openAnimalPanel();
         break;
       case 'sleep':
         this.menuOpen = false;
@@ -908,6 +1014,26 @@ export class FarmScene extends GameScene {
         priority: 3,
       });
     }
+    // Prompt 019: animal interactables follow the animal's live position.
+    let i = 0;
+    for (const animal of Object.values(this.save.animals ?? {})) {
+      const pos = animal.outside ? this.animalOutsidePos(animal.id, i) : this.animalInsidePos(animal.id);
+      const label = !animal.pettedToday
+        ? `Pet ${animal.name}`
+        : !animal.fedToday
+        ? `Feed ${animal.name}`
+        : `${animal.name} is content`;
+      base.push({
+        id: `animal:${animal.id}`,
+        kind: 'animal',
+        label,
+        x: pos.x,
+        z: pos.z,
+        radius: 1.4,
+        priority: 3,
+      });
+      i++;
+    }
     this.targets = base;
   }
 
@@ -977,6 +1103,116 @@ export class FarmScene extends GameScene {
     const toolId = FARM_TOOL_IDS[this.selectedTool];
     if (!toolId) return 1;
     return hardnessReach(toolId, this.save.toolLevels[toolId] ?? 0);
+  }
+
+  private animalInsidePos(id: string): { x: number; z: number } {
+    // Hens go inside the coop, goats inside the barn.
+    const animal = this.save.animals?.[id];
+    if (!animal) return { x: 0, z: 0 };
+    if (animal.habitat === 'coop') return { x: -10, z: 6 };
+    return { x: 8, z: 6 };
+  }
+
+  private animalOutsidePos(id: string, index: number): { x: number; z: number } {
+    const animal = this.save.animals?.[id];
+    if (!animal) return { x: 0, z: 0 };
+    const offset = index * 0.7;
+    if (animal.habitat === 'coop') return { x: -10.5 + offset, z: 4.0 };
+    return { x: 7.0 + offset, z: 4.0 };
+  }
+
+  private refreshAnimalMeshes(): void {
+    if (!this.scene) return;
+    const live = this.save.animals ?? {};
+    for (const [id, mesh] of [...this.animalMeshes.entries()]) {
+      if (!live[id]) {
+        disposeAnimal(mesh);
+        this.animalMeshes.delete(id);
+      }
+    }
+    let i = 0;
+    for (const animal of Object.values(live)) {
+      if (this.animalMeshes.has(animal.id)) {
+        i++;
+        continue;
+      }
+      const pos = animal.outside ? this.animalOutsidePos(animal.id, i) : this.animalInsidePos(animal.id);
+      this.animalMeshes.set(animal.id, buildAnimalMesh(this.scene, animal.id, animal.kind, pos));
+      i++;
+    }
+  }
+
+  /** Reposition animals based on weather/time + outside flag. */
+  private applyAnimalShelterState(): void {
+    const minutes = this.clock.time.minutes;
+    const wantsOutside = shouldBeOutside(minutes, this.weather);
+    let i = 0;
+    for (const animal of Object.values(this.save.animals ?? {})) {
+      const next = wantsOutside;
+      if (animal.outside !== next) {
+        this.save.animals![animal.id] = { ...animal, outside: next };
+      }
+      const mesh = this.animalMeshes.get(animal.id);
+      if (mesh) {
+        moveAnimal(mesh, next ? this.animalOutsidePos(animal.id, i) : this.animalInsidePos(animal.id));
+      }
+      i++;
+    }
+    this.rebuildInteractionTargets();
+  }
+
+  private openAnimalPanel(): void {
+    this.animalsPanelOpen = true;
+    const rows: import('../ui/overlay').AnimalPanelRow[] = [];
+    for (const a of Object.values(this.save.animals ?? {})) {
+      const def = ANIMAL_DEFS[a.kind];
+      const sheltered = !a.outside;
+      const mood = moodOf({ animal: a, weather: this.weather, sheltered });
+      rows.push({
+        id: a.id,
+        name: a.name,
+        kindLabel: def.name,
+        habitat: a.habitat,
+        hearts: heartsOf(a),
+        fedToday: a.fedToday,
+        pettedToday: a.pettedToday,
+        mood,
+        daysToProduce: Math.max(0, def.daysToMature - a.daysSinceProduce),
+      });
+    }
+    this.ctx.overlay.showAnimalPanel({
+      rows,
+      onClose: () => {
+        this.animalsPanelOpen = false;
+        this.refreshHud();
+      },
+    });
+  }
+
+  private handleAnimalInteract(id: string): void {
+    const animal = this.save.animals?.[id];
+    if (!animal) return;
+    // First: try to pet (no inventory cost).
+    if (!animal.pettedToday) {
+      const next = petAnimal(animal);
+      this.save.animals![id] = next;
+      persistActiveSave();
+      this.flashAction(`Petted ${animal.name}`);
+      return;
+    }
+    // Second: try to feed (consumes 1 hay).
+    const result = feedAnimal({ animal, container: this.save.inventory });
+    if (!result.accepted) {
+      this.flashAction(
+        result.reason === 'no-feed' ? `${animal.name} needs hay` : `${animal.name} is fine`,
+      );
+      return;
+    }
+    this.save.animals![id] = result.animal;
+    this.save.inventory = result.container;
+    persistActiveSave();
+    this.refreshHotbar();
+    this.flashAction(`Fed ${animal.name}`);
   }
 
   private openMachine(id: string): void {
@@ -1223,6 +1459,7 @@ export class FarmScene extends GameScene {
       items: content.items,
       crops: content.crops,
       todayWeatherId: this.weather?.id ?? null,
+      todayWeather: this.weather ?? null,
     });
 
     resetDayLedger();
@@ -1246,6 +1483,8 @@ export class FarmScene extends GameScene {
       // Catch up overnight machine transitions before the next tick fires.
       this.checkMachineReadyTransitions();
       this.paintAllMachines();
+      this.refreshAnimalMeshes();
+      this.applyAnimalShelterState();
       this.rebuildInteractionTargets();
       this.refreshHud();
     });

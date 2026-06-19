@@ -706,6 +706,40 @@ body {
   margin-top: 4px;
 }
 
+/* Animal panel (Prompt 019). */
+.animal-panel {
+  width: min(520px, 96vw);
+}
+.animal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: min(50vh, 420px);
+  overflow-y: auto;
+}
+.animal-row {
+  padding: 8px 10px;
+  background: var(--sv-parchment);
+  border: 1px solid var(--sv-wood);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.animal-row.mood-cold { border-color: #88c; }
+.animal-row.mood-lonely { border-color: #c88; }
+.animal-row.mood-happy { border-color: #6c5; }
+.animal-title {
+  font-weight: 700;
+}
+.animal-meta {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
 /* Shop panel (Prompt 016). */
 .shop-panel {
   width: min(480px, 94vw);

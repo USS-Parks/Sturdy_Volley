@@ -121,6 +121,9 @@ describe('resolveDay', () => {
 
   it('drains the shipping bin overnight and credits the wallet', () => {
     const save = freshSave();
+    // Prompt 019: clear the default animals so they don't drop products
+    // into the bin and break the "bin is empty after sell" check.
+    save.animals = {};
     const startingGold = save.wallet.gold;
     save.shippingBin = addItem(save.shippingBin, 'bell-peas', 4, 0, { stackable: true }).container;
     save.shippingBin = addItem(save.shippingBin, 'bell-peas', 2, 2, { stackable: true }).container;

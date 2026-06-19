@@ -14,6 +14,7 @@ import { advanceCrops, buildCropIndex } from './soil';
 import { advanceWorld, type RegionForageTable } from './forage';
 import { absoluteDay } from './timeSystem';
 import { evaluateRecipeUnlocks, unlockRecipes } from './crafting';
+import { resolveAnimalsDay } from './animals';
 
 /** Sync from the save's flat `calendar` into the timeSystem's `GameTime`. */
 export function getGameTime(save: SaveData): GameTime {
@@ -70,6 +71,8 @@ export interface ResolveDayInput {
   crops: readonly Crop[];
   forageTables?: readonly RegionForageTable[];
   todayWeatherId?: string | null;
+  /** Prompt 019: full Weather object for animal shelter checks. */
+  todayWeather?: Weather | null;
   penalty?: CollapsePenalty;
 }
 
@@ -161,6 +164,29 @@ export function resolveDay(input: ResolveDayInput): ResolveDayResult {
   if (worldResult.spawned > 0) {
     summary.notices.push(
       `${worldResult.spawned} forage item${worldResult.spawned === 1 ? '' : 's'} appeared in the wild.`,
+    );
+  }
+
+  // Prompt 019: animals tick at day end. Sheltered = true by default
+  // (every Prompt 019 animal has a building). Products land in the
+  // shipping bin so they sell with the morning shipment.
+  const todayWeather = input.todayWeather ?? null;
+  const animalsResult = resolveAnimalsDay({
+    save,
+    weather: todayWeather,
+    shelteredById: {},
+    bin: save.shippingBin,
+  });
+  save.shippingBin = animalsResult.bin;
+  if (animalsResult.produced.length > 0) {
+    summary.notices.push(
+      `${animalsResult.produced.length} animal product${animalsResult.produced.length === 1 ? '' : 's'} collected.`,
+    );
+  }
+  const sadCount = animalsResult.moodCounts.lonely + animalsResult.moodCounts.cold;
+  if (sadCount > 0) {
+    summary.notices.push(
+      `${sadCount} animal${sadCount === 1 ? '' : 's'} unhappy today — pet and feed them.`,
     );
   }
 

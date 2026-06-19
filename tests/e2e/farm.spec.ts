@@ -19,6 +19,10 @@ declare global {
       openMachine: (id: string) => void;
       grantItem: (itemId: string, qty: number) => void;
       fastForwardMinutes: (minutes: number) => void;
+      animals: () => Record<string, { name: string; kind: string; hearts: number; fedToday: boolean; pettedToday: boolean; outside: boolean }>;
+      petAnimal: (id: string) => void;
+      feedAnimal: (id: string) => void;
+      openAnimalPanel: () => void;
     };
   }
 }

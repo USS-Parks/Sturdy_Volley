@@ -105,6 +105,25 @@ export const saveSchema = z
           .strict(),
       )
       .default({}),
+    animals: z
+      .record(
+        z.string(),
+        z
+          .object({
+            id: z.string(),
+            kind: z.enum(['mooncalf-hen', 'bluff-goat']),
+            name: z.string().min(1),
+            habitat: z.enum(['coop', 'barn', 'pasture']),
+            affection: z.number().int().min(0).max(1000),
+            fedToday: z.boolean(),
+            pettedToday: z.boolean(),
+            daysSinceProduce: z.number().int().nonnegative(),
+            daysSincePetted: z.number().int().nonnegative(),
+            outside: z.boolean(),
+          })
+          .strict(),
+      )
+      .default({}),
   })
   .strict();
 export type SaveData = z.infer<typeof saveSchema>;
@@ -129,6 +148,7 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
   // A friendly handful of starter seeds in the first hotbar slot — gives the
   // first day of play something to do without forcing a shop visit.
   inventory.slots[0] = { itemId: 'bell-pea-seeds', qty: 5, quality: 0 };
+  inventory.slots[1] = { itemId: 'hay', qty: 8, quality: 0 };
   return {
     version: SAVE_VERSION,
     createdAt: now,
@@ -190,6 +210,41 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
     flags: {},
     mapState: {},
     machines: defaultFarmMachines(),
+    animals: defaultFarmAnimals(),
+  };
+}
+
+/**
+ * Default coop + barn occupants on Day 1. One named hen + one named goat
+ * lets the player exercise the full feeding / petting / produce loop
+ * without having to acquire animals first.
+ */
+function defaultFarmAnimals(): Record<string, import('./animals').AnimalInstance> {
+  return {
+    'Farm:hen:1': {
+      id: 'Farm:hen:1',
+      kind: 'mooncalf-hen',
+      name: 'Pip',
+      habitat: 'coop',
+      affection: 150,
+      fedToday: true,
+      pettedToday: false,
+      daysSinceProduce: 1,
+      daysSincePetted: 0,
+      outside: false,
+    },
+    'Farm:goat:1': {
+      id: 'Farm:goat:1',
+      kind: 'bluff-goat',
+      name: 'Clover',
+      habitat: 'barn',
+      affection: 150,
+      fedToday: true,
+      pettedToday: false,
+      daysSinceProduce: 1,
+      daysSincePetted: 0,
+      outside: false,
+    },
   };
 }
 
