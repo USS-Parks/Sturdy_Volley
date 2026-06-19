@@ -7,9 +7,10 @@ import {
   type GameTime,
   type DaySummary,
 } from './timeSystem';
-import type { Festival, Item, Npc } from '../data/schemas';
+import type { Crop, Festival, Item, Npc, Weather } from '../data/schemas';
 import type { DayLedger } from './gameState';
 import { buildItemCatalog, containerSellValue } from './itemCatalog';
+import { advanceCrops, buildCropIndex } from './soil';
 
 /** Sync from the save's flat `calendar` into the timeSystem's `GameTime`. */
 export function getGameTime(save: SaveData): GameTime {
@@ -63,6 +64,8 @@ export interface ResolveDayInput {
   festivals: readonly Festival[];
   npcs: readonly Npc[];
   items: readonly Item[];
+  crops: readonly Crop[];
+  todayWeatherId?: string | null;
   penalty?: CollapsePenalty;
 }
 
@@ -71,6 +74,9 @@ export interface ResolveDayResult {
   nextTime: GameTime;
   collapse: CollapseOutcome | null;
   shipmentEarnings: number;
+  cropsGrew: number;
+  cropsMatured: number;
+  cropsKilled: number;
 }
 
 /**
@@ -79,7 +85,7 @@ export interface ResolveDayResult {
  * summary. Mutates the save in-place; callers are responsible for persisting it.
  */
 export function resolveDay(input: ResolveDayInput): ResolveDayResult {
-  const { save, ledger, collapsed, festivals, npcs, items } = input;
+  const { save, ledger, collapsed, festivals, npcs, items, crops } = input;
   const catalog = buildItemCatalog(items, npcs);
   const shipmentEarnings = containerSellValue(save.shippingBin, catalog);
   save.shippingBin = { slots: new Array(save.shippingBin.capacity).fill(null), capacity: save.shippingBin.capacity };
@@ -92,6 +98,15 @@ export function resolveDay(input: ResolveDayInput): ResolveDayResult {
   const endingTime = getGameTime(save);
   const nextTime = startNextDay(endingTime);
   applyGameTime(save, nextTime);
+
+  const rained = input.todayWeatherId === 'rain';
+  const cropResult = advanceCrops({
+    plantings: save.plantings,
+    cropsById: buildCropIndex(crops),
+    newSeason: nextTime.season,
+    rained,
+  });
+  save.plantings = cropResult.plantings;
 
   const tomorrowFestival = festivalOn(nextTime, festivals);
   const tomorrowBirthdays = birthdaysOn(nextTime, npcs).map((n) => n.name);
@@ -108,6 +123,27 @@ export function resolveDay(input: ResolveDayInput): ResolveDayResult {
   if (shipmentEarnings > 0) {
     summary.notices.unshift(`Yesterday's shipment earned ${shipmentEarnings} g.`);
   }
+  if (cropResult.killed > 0) {
+    summary.notices.push(
+      `${cropResult.killed} crop${cropResult.killed === 1 ? '' : 's'} wilted overnight.`,
+    );
+  }
+  if (cropResult.matured > 0) {
+    summary.notices.push(
+      `${cropResult.matured} crop${cropResult.matured === 1 ? ' is' : 's are'} ready to harvest.`,
+    );
+  }
 
-  return { summary, nextTime, collapse, shipmentEarnings };
+  return {
+    summary,
+    nextTime,
+    collapse,
+    shipmentEarnings,
+    cropsGrew: cropResult.grew,
+    cropsMatured: cropResult.matured,
+    cropsKilled: cropResult.killed,
+  };
 }
+
+// Re-export Weather here for callers that need it co-located with resolveDay.
+export type { Weather };

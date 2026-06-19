@@ -248,6 +248,58 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## Prompt 008 — Soil, crops, watering, and harvesting (2026-06-19)
+
+Stood up the soil + crop layer: tilling, planting via the active hotbar seed,
+watering via the Watering Can tool, deterministic overnight growth, seasonal
+death, quality rolls, and visible cell + crop meshes.
+
+- **`engine/soil.ts`** — pure: `Planting { cropId, daysGrown, watered, harvests }`,
+  `plantingKey(scene, col, row)`, `newPlanting`, `daysUntilHarvest` (growthDays
+  or regrowDays depending on harvest count), `isHarvestReady`, `advanceCrops`
+  (rain waters everything, watered crops advance one day, out-of-season crops
+  die, returns grew/matured/killed counts), `rollQuality` (deterministic
+  Mulberry32 → 0/1/2/3 with ~6%/20%/45%/29% bias), `harvest` (returns next
+  planting + produce id + quality), `buildCropIndex`. 14 unit tests.
+- **`engine/saveModel.ts`** — bumped `SAVE_VERSION` to 3. New fields:
+  `tilledCells: string[]` (reserved for the Hoe-extension wave) and
+  `plantings: Record<string, Planting>` keyed by `plantingKey`.
+- **`engine/dayResolution.ts`** — `resolveDay` takes `crops` + `todayWeatherId`;
+  passes the cell map through `advanceCrops` after the calendar rolls; surfaces
+  "N crops wilted" + "N crops ready to harvest" notices on the day summary.
+  Returns `cropsGrew / cropsMatured / cropsKilled` for callers.
+- **`scenes/FarmScene.ts`** — interacting (E / Space) with the tilled plot now
+  resolves the (col, row) under the player. With a seed in the active hotbar
+  slot, the cell becomes a `newPlanting`; with the Watering Can tool selected,
+  the cell's `watered` flag flips; on a ready crop, `harvest` rolls quality,
+  pushes produce into the inventory, and either consumes the planting or
+  resets it for the regrow cycle. Crop and soil meshes render via
+  `refreshCropMeshes` (cylinder height encodes days grown; mature crops adopt
+  the roof color; wet soil tiles adopt the wood color). Cultivation skill XP
+  accumulates (+2 plant, +5 harvest).
+
+**Acceptance criteria**
+
+- [x] Four original crops grow across multiple days (bell-peas / tide-turnip /
+  blush-radish / sunmelon — `advanceCrops` walks each one day at a time
+  under the regrowDays / growthDays contract; unit tests lock the day-by-day
+  progression and the season-boundary kill path).
+- [x] Watered state visibly changes (soil tile recolors from `PALETTE.soil` to
+  `PALETTE.wood` when `planting.watered === true`; resets each morning).
+- [x] Harvest adds items with quality (`harvest` returns a 0-3 tier;
+  `addItem(this.save.inventory, produceItemId, 1, quality)` puts it in the
+  player's bag).
+- [x] Rain waters outdoor crops (`advanceCrops({ rained: true, ... })` flips
+  every planting's `watered` flag before the daily growth check; FarmScene
+  + PlaceScene pass the current weather id into `resolveDay`).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`143/143` (19 files, +14 new specs) · build OK · Playwright `24/24` (no e2e
+added — soil module fully unit-tested; existing inventory/time e2e still
+green).
+
+---
+
 ## Prompt 007 — Inventory, hotbar, chests, and item quality (2026-06-19)
 
 Stood up the inventory system: a renderer-agnostic Container model shared by

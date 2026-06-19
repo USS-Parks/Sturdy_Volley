@@ -88,6 +88,7 @@ describe('resolveDay', () => {
       festivals: FESTIVALS,
       npcs: NPCS,
       items: [],
+      crops: [],
     });
     expect(save.wallet.gold).toBe(before + 150);
     expect(save.calendar.day).toBe(2);
@@ -110,6 +111,7 @@ describe('resolveDay', () => {
       festivals: [],
       npcs: [],
       items: [],
+      crops: [],
     });
     expect(result.collapse).not.toBeNull();
     expect(result.collapse!.goldLost).toBe(100);
@@ -130,6 +132,7 @@ describe('resolveDay', () => {
       festivals: [],
       npcs: NPCS,
       items: ITEMS,
+      crops: [],
     });
     // 4 * 24 + 2 * round(24*1.5) = 96 + 72 = 168 (shipment)
     expect(result.shipmentEarnings).toBe(168);
@@ -149,6 +152,7 @@ describe('resolveDay', () => {
       festivals: [],
       npcs: [],
       items: [],
+      crops: [],
     });
     expect(save.calendar).toEqual({ year: 1, season: 'summer', day: 1, timeMinutes: DAY_START_MIN });
     expect(result.nextTime.season).toBe('summer');

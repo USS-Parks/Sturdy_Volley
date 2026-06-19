@@ -35,9 +35,19 @@ import {
 } from '../engine/timeClock';
 import { formatClock as formatGameClock } from '../engine/timeSystem';
 import type { Weather } from '../data/schemas';
-import { moveBetween, placeOrMerge, clearSlot } from '../engine/inventory';
+import { addItem, moveBetween, placeOrMerge, clearSlot, removeItem } from '../engine/inventory';
 import { buildItemCatalog, getItem, type ItemCatalog } from '../engine/itemCatalog';
 import type { SlotMove } from '../ui/overlay';
+import {
+  buildCropIndex,
+  harvest,
+  isHarvestReady,
+  newPlanting,
+  plantingKey,
+} from '../engine/soil';
+import { recordIncome as _recordIncome, recordSkillXp } from '../engine/gameState';
+import type { Crop } from '../data/schemas';
+import type { AbstractMesh as BabylonMesh } from '@babylonjs/core';
 
 const FARM_HALF = 20;
 const TOOLS = ['Hoe', 'Watering Can', 'Axe', 'Pick', 'Sickle'] as const;
@@ -89,7 +99,13 @@ export class FarmScene extends GameScene {
   private partnerKind: PartnerKind = null;
   private partnerId: string | null = null;
   private catalog!: ItemCatalog;
+  private cropIndex!: ReturnType<typeof buildCropIndex>;
+  private seedToCropId: Map<string, string> = new Map();
+  private readonly cellMeshes = new Map<string, BabylonMesh>();
+  private readonly cropMeshes = new Map<string, BabylonMesh>();
   private readonly homePosition = new Vector3(-8, 0.9, -5.4);
+  private readonly plotOrigin = new Vector3(-6, 0, -4);
+  private static readonly SCENE_KEY = 'Farm';
 
   private readonly pressed = new Set<string>();
   private touch = { active: false, dx: 0, dy: 0, ox: 0, oy: 0 };
@@ -126,7 +142,7 @@ export class FarmScene extends GameScene {
   }
 
   private buildTilledPlot(scene: Scene): void {
-    const origin = new Vector3(-6, 0, -4);
+    const origin = this.plotOrigin;
     const soil = flatMaterial(scene, 'soil', PALETTE.soil, 0.22);
     this.grid.forEach((cell) => {
       if (cell.state === 'untilled') return;
@@ -138,6 +154,7 @@ export class FarmScene extends GameScene {
       }, scene);
       tile.position.set(origin.x + local.x, 0.06, origin.z + local.z);
       tile.material = soil;
+      this.cellMeshes.set(`${cell.col},${cell.row}`, tile);
     });
   }
 
@@ -217,6 +234,9 @@ export class FarmScene extends GameScene {
 
     const content = loadGameContent();
     this.catalog = buildItemCatalog(content.items, content.npcs);
+    this.cropIndex = buildCropIndex(content.crops);
+    this.seedToCropId = new Map(content.crops.map((c) => [c.seedItemId, c.id] as const));
+    this.refreshCropMeshes();
 
     this.controller = createControllerState();
     this.clock = createTimeClock(getGameTime(save));
@@ -305,6 +325,8 @@ export class FarmScene extends GameScene {
         this.openInventory({ kind: 'shipping-bin', id: 'shipping-bin' });
       } else if (this.nearest.id === 'porch-chest') {
         this.openInventory({ kind: 'chest', id: 'farm-porch-chest' });
+      } else if (this.nearest.id === 'tilled-plot') {
+        this.handlePlotInteract();
       } else {
         this.actionLabel = this.nearest.label;
         this.actionTimer = 1.6;
@@ -570,6 +592,146 @@ export class FarmScene extends GameScene {
     this.refreshHud();
   }
 
+  private handlePlotInteract(): void {
+    const cell = this.nearestPlotCell();
+    if (!cell) return;
+    const key = plantingKey(FarmScene.SCENE_KEY, cell.col, cell.row);
+    const planting = this.save.plantings[key];
+    const stack = this.save.inventory.slots[this.selectedHotbar];
+    const tool = stack ? null : TOOLS[this.selectedTool];
+
+    if (planting) {
+      const crop = this.cropIndex.get(planting.cropId);
+      if (crop && isHarvestReady(crop, planting)) {
+        this.doHarvest(key, crop, planting);
+        return;
+      }
+      if (tool === 'Watering Can' && !planting.watered) {
+        this.save.plantings = {
+          ...this.save.plantings,
+          [key]: { ...planting, watered: true },
+        };
+        this.flashAction('Watered the crop');
+        this.refreshCropMeshes();
+        persistActiveSave();
+        return;
+      }
+      this.flashAction(`Growing: ${crop?.name ?? planting.cropId}`);
+      return;
+    }
+
+    if (stack && this.seedToCropId.has(stack.itemId)) {
+      const cropId = this.seedToCropId.get(stack.itemId)!;
+      this.save.plantings = {
+        ...this.save.plantings,
+        [key]: newPlanting(cropId),
+      };
+      const after = removeItem(this.save.inventory, stack.itemId, 1);
+      this.save.inventory = after.container;
+      recordSkillXp('cultivation', 2);
+      this.flashAction(`Planted ${this.cropIndex.get(cropId)?.name ?? cropId}`);
+      this.refreshCropMeshes();
+      this.refreshHotbar();
+      persistActiveSave();
+      return;
+    }
+
+    if (tool === 'Watering Can') {
+      this.flashAction('Nothing planted here yet');
+      return;
+    }
+
+    this.flashAction('Select a seed in the hotbar to plant');
+  }
+
+  private nearestPlotCell(): { col: number; row: number } | null {
+    const localX = this.player.position.x - this.plotOrigin.x;
+    const localZ = this.player.position.z - this.plotOrigin.z;
+    return this.grid.worldToCell(localX, localZ);
+  }
+
+  private doHarvest(key: string, crop: Crop, planting: import('../engine/soil').Planting): void {
+    const result = harvest(crop, planting, this.save.calendar.day + this.save.calendar.year * 31);
+    if (!result.harvested) return;
+    const added = addItem(this.save.inventory, result.produceItemId, 1, result.quality);
+    this.save.inventory = added.container;
+    if (result.next) {
+      this.save.plantings = { ...this.save.plantings, [key]: result.next };
+    } else {
+      const { [key]: _drop, ...rest } = this.save.plantings;
+      void _drop;
+      this.save.plantings = rest;
+    }
+    recordSkillXp('cultivation', 5);
+    const item = getItem(this.catalog, result.produceItemId);
+    this.flashAction(`Harvested ${item?.name ?? result.produceItemId}`);
+    this.refreshCropMeshes();
+    this.refreshHotbar();
+    persistActiveSave();
+  }
+
+  private flashAction(label: string): void {
+    this.actionLabel = label;
+    this.actionTimer = 1.6;
+  }
+
+  private refreshCropMeshes(): void {
+    if (!this.scene) return;
+    const seen = new Set<string>();
+    for (const [key, planting] of Object.entries(this.save.plantings)) {
+      if (!key.startsWith(`${FarmScene.SCENE_KEY}:`)) continue;
+      const [, coord] = key.split(':');
+      const [colStr, rowStr] = (coord ?? '').split(',');
+      const col = Number(colStr);
+      const row = Number(rowStr);
+      if (!Number.isFinite(col) || !Number.isFinite(row)) continue;
+      const localKey = `${col},${row}`;
+      seen.add(localKey);
+      const crop = this.cropIndex.get(planting.cropId);
+      const ready = crop ? isHarvestReady(crop, planting) : false;
+      const stage = ready ? 1 : Math.min(0.85, 0.25 + planting.daysGrown * 0.12);
+      let mesh = this.cropMeshes.get(localKey);
+      if (!mesh) {
+        const local = this.grid.cellToWorld(col, row);
+        mesh = MeshBuilder.CreateCylinder(
+          `crop-${localKey}`,
+          { height: 1, diameterTop: 0, diameterBottom: 0.6, tessellation: 6 },
+          this.scene,
+        );
+        mesh.position.set(this.plotOrigin.x + local.x, 0.55, this.plotOrigin.z + local.z);
+        this.cropMeshes.set(localKey, mesh);
+      }
+      mesh.scaling.y = stage;
+      mesh.position.y = 0.12 + (mesh.scaling.y * 1.0) / 2;
+      mesh.material = flatMaterial(
+        this.scene,
+        `crop-mat-${localKey}-${ready ? 'r' : 'g'}`,
+        ready ? PALETTE.roof : PALETTE.grassAlt,
+        0.25,
+      );
+      // Recolor the soil tile to indicate watered state.
+      const cellMesh = this.cellMeshes.get(localKey);
+      if (cellMesh) {
+        cellMesh.material = flatMaterial(
+          this.scene,
+          `soil-${localKey}-${planting.watered ? 'wet' : 'dry'}`,
+          planting.watered ? PALETTE.wood : PALETTE.soil,
+          0.22,
+        );
+      }
+    }
+    // Remove crop meshes that no longer have a planting (harvested / wilted).
+    for (const [localKey, mesh] of this.cropMeshes) {
+      if (seen.has(localKey)) continue;
+      mesh.dispose();
+      this.cropMeshes.delete(localKey);
+      const cellMesh = this.cellMeshes.get(localKey);
+      if (cellMesh) {
+        cellMesh.material = flatMaterial(this.scene, `soil-${localKey}-dry`, PALETTE.soil, 0.22);
+      }
+    }
+  }
+
   private triggerSleep(collapsed: boolean): void {
     if (this.dayResolving) return;
     this.dayResolving = true;
@@ -584,6 +746,8 @@ export class FarmScene extends GameScene {
       festivals: content.festivals,
       npcs: content.npcs,
       items: content.items,
+      crops: content.crops,
+      todayWeatherId: this.weather?.id ?? null,
     });
 
     resetDayLedger();
@@ -602,6 +766,7 @@ export class FarmScene extends GameScene {
       this.dayResolving = false;
       this.menuOpen = false;
       this.clock = pauseClock(this.clock, false);
+      this.refreshCropMeshes();
       this.refreshHud();
     });
   }

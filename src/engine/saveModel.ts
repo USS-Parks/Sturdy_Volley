@@ -10,7 +10,7 @@ import { seasonSchema } from '../data/schemas';
  * the player, chests, and the shipping bin. The hotbar is the first
  * hotbarSize slots of the player inventory.
  */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export const inventoryStackSchema = z
   .object({
@@ -20,6 +20,16 @@ export const inventoryStackSchema = z
   })
   .strict();
 export type InventoryStack = z.infer<typeof inventoryStackSchema>;
+
+export const plantingSchema = z
+  .object({
+    cropId: z.string(),
+    daysGrown: z.number().int().nonnegative(),
+    watered: z.boolean(),
+    harvests: z.number().int().nonnegative(),
+  })
+  .strict();
+export type Planting = z.infer<typeof plantingSchema>;
 
 export const containerSchema = z
   .object({
@@ -59,6 +69,8 @@ export const saveSchema = z
     hotbarSize: z.number().int().positive(),
     chests: z.record(z.string(), containerSchema),
     shippingBin: containerSchema,
+    tilledCells: z.array(z.string()),
+    plantings: z.record(z.string(), plantingSchema),
     relationships: z.record(z.string(), z.number()),
     skills: z.record(z.string(), z.number()),
     flags: z.record(z.string(), z.union([z.boolean(), z.number(), z.string()])),
@@ -105,6 +117,8 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
       'farm-porch-chest': emptyContainer(DEFAULT_STARTER_CHEST_CAPACITY),
     },
     shippingBin: emptyContainer(DEFAULT_SHIPPING_BIN_CAPACITY),
+    tilledCells: [],
+    plantings: {},
     relationships: {},
     skills: {},
     flags: {},
