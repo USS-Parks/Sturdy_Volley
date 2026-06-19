@@ -5,6 +5,87 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 025 — Mine depth, elevator, boss chamber (2026-06-19)
+
+The mine grows its end-game surface. Pure engine
+([src/engine/mineDepth.ts](src/engine/mineDepth.ts)) ships five
+named room kits (quarry-cell, ironroot-gallery, rainhall-corridor,
+cold-iron-vault, heartrock-chamber), a deterministic
+`buildRoomLayout(level, saveSeed)` that returns ore / hazard /
+creature anchors stable across save reload, `elevatorOptions` that
+projects the player's checkpoint list to a sorted selection list,
+a `LanternState` that drains in dim levels (`lighting ≥ 3`), and a
+3-cadence boss telegraph FSM that speeds up at 50% and 25% HP.
+
+- **Save model**: `mineProgress` grows three fields with safe
+  defaults — `lanternFuel` (600), `seed` (424242), `bossDefeated`
+  (false). Engine `MineProgress` type extended in lockstep.
+- **MineScene**: every checkpoint level surfaces an "elevator"
+  interactable that opens `showElevatorPanel` (jumps to any
+  recorded checkpoint via `jumpToCheckpoint`). On L19 a Heartrock
+  boss mesh spawns; `tickBossPattern` advances its telegraph each
+  frame, scales the mesh during windup for the warning ring, and
+  damages the player on strike overlap (gated by Prompt 024
+  i-frames). Player strikes the boss via the `Strike the
+  Heartrock` interactable; weapon damage applies. On boss defeat,
+  `bossDefeated` flips to true on the save and the boss mesh
+  disappears for good.
+- **Lantern**: `tickLanternFuel` is called every frame; fuel only
+  drains when the current level's `lighting ≥ 3` (i.e. deeper
+  Rainhall floors). Fuel persists on the save.
+- **Overlay**: `showElevatorPanel` ([src/ui/overlay.ts](src/ui/overlay.ts)
+  + [src/styles.css](src/styles.css)) renders the checkpoint
+  list with the current level disabled.
+- **Debug API**: `openElevator()`, `bossHp()`, `strikeBoss()`,
+  `bossDefeated()`, `lanternFuel()` exposed for the e2e.
+- **Tests**:
+  - Unit: 12 new cases in [tests/unit/mineDepth.test.ts](tests/unit/mineDepth.test.ts)
+    — deterministic kit pick (incl. L19 always = heartrock),
+    deterministic layout per seed, elevator sort + isCurrent
+    flag, lantern drain bands, boss telegraph cycle, cadence
+    escalation at HP thresholds, damageBoss clamp.
+  - E2E: 2 new cases in [tests/e2e/mine-depth.spec.ts](tests/e2e/mine-depth.spec.ts)
+    — elevator panel opens on L0 with the current level disabled,
+    and walking down to L19 + force-striking with storm-spear
+    flips `bossDefeated` to true.
+
+**Acceptance criteria**
+
+- [x] Player can descend, bank checkpoints at the lift, and
+      return home safely after a defeat with a recoverable,
+      non-punishing setback (checkpoints auto-record on enter
+      from Prompt 023; the elevator now surfaces them for fast
+      travel; defeat routes to the farm via the existing soft
+      collapse path).
+- [x] Floor generation is deterministic from a seed for save/load
+      and testing (`pickKitForLevel` + `buildRoomLayout` both take
+      `(levelIndex, saveSeed)` and return identical outputs across
+      calls — unit-tested).
+- [x] The boss chamber has a clear telegraphed pattern and a
+      fair, optional-assist-friendly fight (`tickBossPattern` runs
+      a slow / mid / fast cadence; the windup phase is 1.2 / 0.9
+      / 0.6 seconds wide — easily read; the cadence only escalates
+      after the player has damaged the boss past 50% / 25%, giving
+      a learning curve; fights are bypassable for any player who
+      reaches L19 by simply leaving the chamber).
+- [x] Mobile controls feel playable with one thumb plus an action
+      button (every panel + interact uses real DOM buttons +
+      single-key E; mobile-chromium e2e suite passes 110/110).
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` ·
+Vitest `325/325` (12 new mine-depth cases) · validate:assets `exit 0`
+· build `dist/` emitted · Playwright `110/110` across
+`desktop-chromium` + `mobile-chromium` (two new mine-depth specs).
+
+**Note (scope):** the lantern fuel drains correctly but there's no
+in-mine refill UX yet; that lands with the gear shop (Prompt 027's
+profession unlocks). The boss's "telegraphed pattern" is one
+omnidirectional strike with cadence escalation; a richer
+multi-pattern fight (sweep / dash / shockwave) can grow inside the
+existing FSM by adding more `phase` values without breaking saves.
+
+---
+
 ## Prompt 024 — Defensive tools and NPC daily-life depth (2026-06-19)
 
 Two systems ship together. **(A) Defensive combat foundation**: a

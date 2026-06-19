@@ -120,9 +120,15 @@ export const saveSchema = z
         deepestLevel: z.number().int().nonnegative(),
         currentLevel: z.number().int().nonnegative(),
         checkpoints: z.array(z.number().int().nonnegative()),
+        /** Prompt 025: per-save lantern fuel (drains at lighting ≥ 3). */
+        lanternFuel: z.number().nonnegative().default(600),
+        /** Prompt 025: deterministic seed for room layout + boss roll. */
+        seed: z.number().int().default(424242),
+        /** Prompt 025: true once the boss has been defeated. */
+        bossDefeated: z.boolean().default(false),
       })
       .strict()
-      .default({ deepestLevel: 0, currentLevel: 0, checkpoints: [] }),
+      .default({ deepestLevel: 0, currentLevel: 0, checkpoints: [], lanternFuel: 600, seed: 424242, bossDefeated: false }),
     crabPots: z
       .record(
         z.string(),
@@ -265,7 +271,7 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
     fishingAssist: false,
     firstCatchSeen: {},
     reef: { health: 0, fragmentsDonated: 0, tier: 0 },
-    mineProgress: { deepestLevel: 0, currentLevel: 0, checkpoints: [0] },
+    mineProgress: { deepestLevel: 0, currentLevel: 0, checkpoints: [0], lanternFuel: 600, seed: 424242, bossDefeated: false },
     crabPots: {},
     pet: {
       kind: 'tide-cat',

@@ -52,6 +52,15 @@ import {
   type CreatureSnapshot,
   type WeaponId,
 } from '../engine/combat';
+import {
+  buildRoomLayout,
+  createBoss,
+  damageBoss,
+  elevatorOptions,
+  tickBossPattern,
+  tickLantern,
+  type BossPattern,
+} from '../engine/mineDepth';
 
 interface MineDebugApi {
   level: () => number;
@@ -66,6 +75,11 @@ interface MineDebugApi {
   forceSwing: () => void;
   teleport: (x: number, z: number) => void;
   equipWeapon: (id: 'fists' | 'driftwood-club' | 'tide-blade' | 'storm-spear') => void;
+  openElevator: () => void;
+  bossHp: () => number;
+  strikeBoss: () => void;
+  bossDefeated: () => boolean;
+  lanternFuel: () => number;
 }
 
 /**
@@ -101,6 +115,10 @@ export class MineScene extends GameScene {
   private swingCooldown = 0;
   private equippedWeapon: WeaponId = 'fists';
   private fPrev = false;
+  // Prompt 025
+  private elevatorOpen = false;
+  private boss: BossPattern | null = null;
+  private bossMesh: AbstractMesh | null = null;
   private readonly pressed = new Set<string>();
   private readonly onKeyDown = (e: KeyboardEvent) => this.pressed.add(e.key.toLowerCase());
   private readonly onKeyUp = (e: KeyboardEvent) => this.pressed.delete(e.key.toLowerCase());
@@ -180,6 +198,11 @@ export class MineScene extends GameScene {
       equipWeapon: (id: 'fists' | 'driftwood-club' | 'tide-blade' | 'storm-spear') => {
         this.equippedWeapon = id;
       },
+      openElevator: () => this.openElevator(),
+      bossHp: () => this.boss?.hp ?? -1,
+      strikeBoss: () => this.swingAtBoss(),
+      bossDefeated: () => this.save.mineProgress?.bossDefeated ?? false,
+      lanternFuel: () => this.save.mineProgress?.lanternFuel ?? 0,
     };
   }
 
@@ -245,15 +268,57 @@ export class MineScene extends GameScene {
     if (def.checkpoint) {
       this.save.mineProgress = recordCheckpoint(this.save.mineProgress!, def.index);
     }
+    // Prompt 025: deterministic room layout per save seed (used for tests
+    // + future asset-swap; the visual layout cluster around the layout's
+    // ore anchors gives each save a stable mine).
+    const layout = buildRoomLayout(def.index, this.save.mineProgress?.seed ?? 424242);
+    void layout;
+    // Boss on L19 (only spawn if not yet defeated).
+    if (this.bossMesh) {
+      this.bossMesh.dispose();
+      this.bossMesh = null;
+    }
+    this.boss = null;
+    if (def.index === 19 && !this.save.mineProgress?.bossDefeated) {
+      this.boss = createBoss();
+      const boss = MeshBuilder.CreateCylinder('boss-heartrock', { height: 2.2, diameter: 1.6 }, this.scene!);
+      boss.position.set(0, 1.1, -6);
+      boss.material = flatMaterial(this.scene!, 'boss-heartrock-mat', PALETTE.warmLight, 0.6);
+      this.bossMesh = boss;
+    }
     this.rebuildTargets();
   }
 
   private rebuildTargets(): void {
+    const def = levelAt(this.save.mineProgress?.currentLevel ?? 0);
     const base: InteractTarget[] = [
       { id: 'ladder-up', kind: 'climb', label: 'Climb up the ladder', x: 0, z: 10, radius: 1.5, priority: 4 },
       { id: 'ladder-down', kind: 'climb', label: 'Descend further', x: 0, z: -10, radius: 1.5, priority: 4 },
       { id: 'leave', kind: 'door', label: 'Leave the quarry', x: -10, z: 10, radius: 1.4, priority: 3 },
     ];
+    // Prompt 025: elevator lift surfaces on every checkpoint level.
+    if (def?.checkpoint) {
+      base.push({
+        id: 'elevator',
+        kind: 'prop',
+        label: 'Use the elevator',
+        x: 10,
+        z: 10,
+        radius: 1.4,
+        priority: 3,
+      });
+    }
+    if (this.boss) {
+      base.push({
+        id: 'boss',
+        kind: 'machine',
+        label: 'Strike the Heartrock',
+        x: 0,
+        z: -6,
+        radius: 1.8,
+        priority: 4,
+      });
+    }
     for (const node of this.oreNodes) {
       const def = levelAt(this.save.mineProgress?.currentLevel ?? 0);
       base.push({
@@ -271,7 +336,7 @@ export class MineScene extends GameScene {
 
   override update(dt: number): void {
     if (!this.save) return;
-    if (this.menuOpen) {
+    if (this.menuOpen || this.elevatorOpen) {
       this.clock = pauseClock(this.clock, true);
       this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
       return;
@@ -290,6 +355,8 @@ export class MineScene extends GameScene {
       else if (this.nearest.id === 'ladder-down') this.handleDescend();
       else if (this.nearest.id === 'leave') this.goTo('Farm', { entry: 'farmhouse-door' });
       else if (this.nearest.id.startsWith('ore:')) this.handleSwing(this.nearest.id.slice('ore:'.length));
+      else if (this.nearest.id === 'elevator') this.openElevator();
+      else if (this.nearest.id === 'boss') this.swingAtBoss();
     }
     this.ePrev = interact;
     if (this.actionTimer > 0) this.actionTimer -= dt;
@@ -298,6 +365,8 @@ export class MineScene extends GameScene {
     // Combat tick (Prompt 024). Always advance creature telegraphs +
     // i-frames so the player can swing without waiting for a clock minute.
     this.tickCombat(dt);
+    this.tickBoss(dt);
+    this.tickLanternFuel(dt);
 
     if (tick.advancedMinutes > 0) {
       this.save.calendar.timeMinutes = this.clock.time.minutes;
@@ -478,6 +547,93 @@ export class MineScene extends GameScene {
     } else {
       this.actionLabel = `${weapon.name} hit (${result.damage})`;
       this.actionTimer = 0.8;
+    }
+  }
+
+  private openElevator(): void {
+    const progress = this.save.mineProgress;
+    if (!progress) return;
+    this.elevatorOpen = true;
+    const opts = elevatorOptions({
+      checkpoints: progress.checkpoints,
+      currentLevel: progress.currentLevel,
+      levelName: (lvl) => levelAt(lvl)?.name ?? `Level ${lvl}`,
+    });
+    this.ctx.overlay.showElevatorPanel({
+      options: opts,
+      onSelect: (level) => {
+        this.save.mineProgress = jumpToCheckpoint(progress, level);
+        this.elevatorOpen = false;
+        persistActiveSave();
+        this.loadCurrentLevel();
+        this.player.position.set(10, 0.9, 10);
+        this.refreshHud();
+      },
+      onClose: () => {
+        this.elevatorOpen = false;
+        this.refreshHud();
+      },
+    });
+  }
+
+  private tickBoss(dt: number): void {
+    if (!this.boss) return;
+    const t = tickBossPattern(this.boss, dt);
+    this.boss = t.state;
+    if (this.bossMesh) {
+      this.bossMesh.scaling.x = this.boss.phase === 'windup' ? 1.25 : 1;
+      this.bossMesh.scaling.z = this.boss.phase === 'windup' ? 1.25 : 1;
+    }
+    if (t.striking) {
+      const dx = (this.bossMesh?.position.x ?? 0) - this.player.position.x;
+      const dz = (this.bossMesh?.position.z ?? 0) - this.player.position.z;
+      if (Math.hypot(dx, dz) < 2.5) {
+        const hit = applyHitToPlayer({ state: this.playerCombat, damage: 10, dt });
+        this.playerCombat = hit.state;
+        if (hit.damaged) {
+          this.mineHealth = hurtPlayer(this.mineHealth, 10);
+          if (this.mineHealth.hp === 0) {
+            this.actionLabel = 'The Heartrock drove you out — try again from a checkpoint.';
+            this.actionTimer = 2;
+            this.goTo('Farm', { entry: 'farmhouse-door' });
+          }
+        }
+      }
+    }
+  }
+
+  private swingAtBoss(): void {
+    if (!this.boss) return;
+    const weapon = WEAPON_DEFS[this.equippedWeapon];
+    this.boss = damageBoss(this.boss, weapon.damage);
+    this.actionLabel = `Heartrock takes ${weapon.damage} (HP ${this.boss.hp}/${this.boss.maxHp})`;
+    this.actionTimer = 1.0;
+    if (this.boss.hp === 0) {
+      this.save.mineProgress = { ...this.save.mineProgress!, bossDefeated: true };
+      persistActiveSave();
+      if (this.bossMesh) {
+        this.bossMesh.dispose();
+        this.bossMesh = null;
+      }
+      this.boss = null;
+      this.actionLabel = 'The Heartrock is still. The mine quiets.';
+      this.actionTimer = 2.5;
+      this.rebuildTargets();
+    }
+  }
+
+  private tickLanternFuel(dt: number): void {
+    const progress = this.save.mineProgress;
+    if (!progress) return;
+    const def = levelAt(progress.currentLevel);
+    if (!def) return;
+    const next = tickLantern({
+      state: { fuel: progress.lanternFuel, max: 600 },
+      lighting: def.lighting,
+      dt,
+    });
+    if (next.fuel !== progress.lanternFuel) {
+      this.save.mineProgress = { ...progress, lanternFuel: next.fuel };
     }
   }
 

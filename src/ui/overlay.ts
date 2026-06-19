@@ -85,6 +85,18 @@ export interface AnimalPanelOptions {
   onClose: () => void;
 }
 
+export interface ElevatorPanelOption {
+  level: number;
+  name: string;
+  isCurrent: boolean;
+}
+
+export interface ElevatorPanelOptions {
+  options: ElevatorPanelOption[];
+  onSelect: (level: number) => void;
+  onClose: () => void;
+}
+
 export interface ReefPanelOptions {
   /** "open" | "wading" | "closed". */
   access: 'open' | 'wading' | 'closed';
@@ -791,6 +803,44 @@ export class UIOverlay {
     close.type = 'button';
     close.textContent = 'Close';
     close.dataset.testid = 'crafting-close';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /**
+   * Elevator panel (Prompt 025). A checkpoint list; player picks one and
+   * the scene fast-travels to that level.
+   */
+  showElevatorPanel(opts: ElevatorPanelOptions): void {
+    this.clear();
+    const panel = this.createPanel('Elevator');
+    panel.classList.add('elevator-panel');
+    panel.dataset.testid = 'elevator-panel';
+
+    const list = document.createElement('ul');
+    list.className = 'elevator-list';
+    for (const opt of opts.options) {
+      const li = document.createElement('li');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'menu-button';
+      btn.textContent = `L${opt.level} — ${opt.name}${opt.isCurrent ? ' (here)' : ''}`;
+      btn.dataset.testid = `elevator-jump-${opt.level}`;
+      btn.disabled = opt.isCurrent;
+      btn.addEventListener('click', () => opts.onSelect(opt.level));
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+    panel.appendChild(list);
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'menu-button';
+    close.textContent = 'Close';
+    close.dataset.testid = 'elevator-close';
     close.addEventListener('click', opts.onClose);
     panel.appendChild(close);
 

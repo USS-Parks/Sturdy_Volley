@@ -807,6 +807,11 @@ body {
 .reef-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .reef-actions .menu-button { flex: 1; min-width: 120px; }
 
+/* Elevator panel (Prompt 025). */
+.elevator-panel { width: min(420px, 96vw); }
+.elevator-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: min(55vh, 460px); overflow-y: auto; }
+.elevator-list .menu-button { width: 100%; }
+
 /* Shop panel (Prompt 016). */
 .shop-panel {
   width: min(480px, 94vw);

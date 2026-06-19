@@ -230,10 +230,14 @@ export interface MineProgress {
   currentLevel: number;
   /** Levels with cleared checkpoints, sorted ascending. */
   checkpoints: number[];
+  /** Prompt 025 fields: lantern fuel + room-layout seed + boss flag. */
+  lanternFuel: number;
+  seed: number;
+  bossDefeated: boolean;
 }
 
 export function createMineProgress(): MineProgress {
-  return { deepestLevel: 0, currentLevel: 0, checkpoints: [] };
+  return { deepestLevel: 0, currentLevel: 0, checkpoints: [], lanternFuel: 600, seed: 424242, bossDefeated: false };
 }
 
 export function descend(progress: MineProgress): MineProgress {
