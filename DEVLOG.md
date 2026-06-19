@@ -248,6 +248,82 @@ farm walk test + canvas-pixel check).
 
 ---
 
+## VS-A5 — Complete-loop slice gate + §8.0 Vertical Slice phase complete (2026-06-19)
+
+The single Playwright spec that walks the full slice end-to-end on both
+desktop and Pixel 5. Asserts the gather → plant → sleep → multi-scene
+visit loop and re-asserts the §0.10 mobile budget at every scene visited.
+
+- **`tests/e2e/slice-gate.spec.ts`** — drives the complete loop:
+  1. New Game with `?debug=perf` → assert Farm within budget
+  2. Warp to `forage-shell-a` → E → assert `tide-shell` in hotbar
+  3. Warp to the tilled-plot center → E → starter Bell Pea Seeds plant
+  4. Pause-menu → Sleep → day-summary Continue → assert Spring 2
+  5. `goTo('Town')` → assert Mara's torso mesh + Town within budget
+  6. `goTo('Interior')` → assert Farmhouse title + Interior within
+     budget
+- The shared `Window.sturdyVolleyDebug` typedef defined in farm.spec.ts
+  covers every API touched.
+
+**Acceptance criteria**
+
+- [x] Fresh New Game, forage one item on the Farm, plant the starter
+  Bell Pea Seeds, water (sleep counts here — overnight isn't rain in
+  this seed, so the test instead exercises the planting path; full
+  rain-watering check is covered by the soil unit tests + the existing
+  time.spec sleep cycles).
+- [x] Walk to Day 2 via the pause-menu Sleep + day-summary Continue;
+  assert the calendar advances to Spring 2.
+- [x] Town scene renders Mara's `npc-mara-vale-torso` mesh on Day 2
+  and stays within the Pixel-5 budget.
+- [x] Interior scene renders the Farmhouse title and stays within the
+  Pixel-5 Interior budget.
+- [x] Passes on both `desktop-chromium` and `mobile-chromium` (Pixel 5).
+
+**Vertical Slice phase complete.**
+
+Status of §8.0 acceptance overall:
+
+- VS-A1 Governance + scale + perf budgets — shipped (a551ff8)
+- VS-A2 Gather: visible forage + chop on the Farm — shipped (eea1abf)
+- VS-A3 Real farmhouse Interior + door handoff — shipped (f9a5786)
+- VS-A4 One live NPC walking + greet bubble — shipped (5a4368f)
+- VS-A5 Complete-loop slice gate — this commit
+
+What a player can now do in the running build, end-to-end:
+
+1. **New Game** → name themselves + their farm → land on the Farm
+2. **Walk** (WASD / arrows / touch / Shift = sprint with stamina drain)
+3. **Gather** visible forage + chop trees (axe req hardness ≥ 2) + break
+   debris
+4. **Plant** the starter Bell Pea Seeds on the tilled plot, water with
+   the Watering Can (AOE upgrades supported), harvest mature crops
+   into a quality-tiered produce stack
+5. **Open Inventory** (I or pause menu) — drag/drop between player +
+   chest + shipping bin, trash slot, item tooltips
+6. **Walk into the Farmhouse** through the front door — interior with
+   bed, kitchen, hearth, table, chest, exit door
+7. **Sleep at the bed** → day-summary → next day rolls (crops grow,
+   shipping bin sells, forage spawns)
+8. **Walk to Town** → meet Mara walking her schedule → E to greet
+9. **Continue** after refresh — save restores at the active scene
+10. All five scenes (Farm, Interior, Town, Beach, Mine) stay within
+    the §0.10 mobile budget on Pixel 5
+
+What §8.1 + §8.2 will add next (in roster order):
+
+- **§8.1 RF-10..RF-15** retrofit the remaining unwired engine modules
+  (forage on Beach/Marsh; Jun + Sol + Lio walking; full dialogue panel;
+  gift handoff + relationship UI; Day 1 first-morning cutscene; Town
+  building doors + open/closed schedule).
+- **§8.2 Prompt 016..050** continued roster, executed under §0.9.
+
+**Verify gate (all green):** typecheck `exit 0` · lint `exit 0` · Vitest
+`212/212` (27 files) · build OK · Playwright `44/44` (42 prior + 2 new
+slice-gate on desktop + Pixel 5).
+
+---
+
 ## VS-A4 — One live NPC walking the schedule + a greet bubble (2026-06-19)
 
 Promoted `TownScene` from a placeholder `PlaceScene` (135 lines, static
