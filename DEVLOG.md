@@ -5,6 +5,77 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 038 — World atlas: adjacency + region sheets (WEF-06b) (2026-06-20)
+
+Authored the world atlas: global adjacency + progression across the twelve §4.2
+core regions, an authoritative spatial sheet per region, the two-community +
+river spine, and the starting-farm attachments — as both a human-readable doc and
+validated machine-readable data wired into the live Dev data report.
+
+**Atlas data (`src/world/atlas.ts`).** `RegionSheet` carries every §4.2 field
+(purpose, footprint, elevation bands, adjacencies, sightline landmark, traversal
+vocabulary, activity density, streaming cells, variant axes, required interiors,
+camera context + risks, navigation risks, production order, provisional flag).
+`ATLAS` = all 12 regions (willa-crick, klam-ity-river, breakpoint-farm,
+ballast-bay-town, netlight-point, driftwood-beach, kelpglass-reefs, belltide-marsh,
+ironroot-quarry, rainhall-caverns, splitwind-ridge, outer-islets), grounded in the
+top-down boards + the PSPR canon. `WORLD_SPINE` = willa-crick ↔ klam-ity-river ↔
+ballast-bay-town; `STARTING_FARMS` = the 8 variants split across both communities.
+`validateAtlas` enforces: unique ids, symmetric + resolvable adjacencies, a
+connected graph, the spine intact, unique production order, real camera contexts,
+and starting farms attached to present communities. Only willa-crick +
+klam-ity-river are `provisional` (role fixed, metrics await the inland board).
+
+**Integration.** `getAtlasReport()` appended to the Title "Dev · Validate data"
+report (`src/scenes/TitleScene.ts`), beside content + map validation — a
+malformed atlas shows red in-game and fails the gate.
+
+**Doc (`docs/world/ATLAS.md`).** The spine + two communities, the global
+adjacency graph + table, the production-order progression, all twelve region
+sheets, and the enforced invariants.
+
+Files: `src/world/atlas.ts` (new), `docs/world/ATLAS.md` (new),
+`tests/unit/atlas.test.ts` (new), `src/scenes/TitleScene.ts`.
+
+**Acceptance criteria**
+
+- [x] `docs/world/ATLAS.md` defines global adjacency + progression across the
+  §4.2 regions, with the two-community + river spine explicit and horse-traversal
+  routes noted (§§1–3; spine + mounted-traversal vocabulary on willa-crick /
+  klam-ity-river / splitwind-ridge).
+- [x] Each region has an authoritative spatial sheet with all §4.2 fields
+  (`RegionSheet` in `atlas.ts`, doc §4; the per-field-present unit test). The
+  inland **Willa Crick** + **Klam-ity River** sheets are marked *provisional*
+  where dimensioned art does not yet exist, but their adjacency + role are fixed
+  (asserted: only those two carry the flag).
+- [x] No region layout copies another game's topology or landmark arrangement
+  (original purposes/landmarks grounded in the Ballast Bay boards + PSPR canon;
+  §0.7 honored).
+- [x] **Art reference:** each region sheet is grounded in its authoritative
+  top-down board — overworld `sv_map_011` + per-region `sv_map_012`–`021`
+  (redwood-meets-coast setting captured, not reinvented).
+
+**Decision record**
+
+- **Atlas as validated data, not just prose.** Mirroring Prompt 037, the atlas is
+  a typed module with `validateAtlas` (adjacency symmetry, connectivity, spine,
+  production order) surfaced in the Dev data report — so it can't silently drift
+  as 039/046–049 fill it in. The doc and the data are kept in lockstep.
+- **Adjacency topology** designed original from the overworld board: Ballast Bay
+  Town is the hub; the inland spine runs town → river → Willa Crick → ridge →
+  quarry → caverns; the coastal arc runs town → beach → reefs → islets. Symmetric
+  + connected, validated.
+- **Provisional only where art is missing.** Per master roster §1.4, just
+  willa-crick + klam-ity-river are provisional; every coastal region has a board.
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **487 passed** (+13 atlas) · Playwright **181 passed + 1
+skipped** (desktop-only aspect sweep) on both `desktop-chromium` +
+`mobile-chromium` (atlas report is dev-only) · `validate:assets` 0 · `build` 0 ·
+GitDoctor **100/100**.
+
+---
+
 ## Prompt 037 — Map metric kit + map schemas (WEF-06a) (2026-06-20)
 
 Locked the world's spatial grammar now that camera, motor, topology, and

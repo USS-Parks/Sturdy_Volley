@@ -7,6 +7,7 @@ import { setActiveSave, clearActiveSave } from '../engine/gameState';
 import { downloadSave, pickAndImportSave } from '../engine/saveTransfer';
 import { getContentReport } from '../data/content';
 import { getWorldMapReport } from '../world/sample-map';
+import { getAtlasReport } from '../world/atlas';
 
 const RESUMABLE_SCENES = new Set(['Farm', 'Town', 'Interior', 'Beach', 'Mine']);
 
@@ -189,6 +190,12 @@ export class TitleScene extends GameScene {
       ok: summary.ok,
       detail: summary.ok ? undefined : summary.issues.slice(0, 3).join('; '),
     }));
-    this.ctx.overlay.showReport('Data validation', [...contentRows, ...mapRows], () => this.showMenu(), 'dev-data-report');
+    // The world atlas validates against the WEF-06b structural invariants (Prompt 038).
+    const atlasRows = getAtlasReport().map((summary) => ({
+      label: `${summary.name} (${summary.count})`,
+      ok: summary.ok,
+      detail: summary.ok ? undefined : summary.issues.slice(0, 3).join('; '),
+    }));
+    this.ctx.overlay.showReport('Data validation', [...contentRows, ...mapRows, ...atlasRows], () => this.showMenu(), 'dev-data-report');
   }
 }
