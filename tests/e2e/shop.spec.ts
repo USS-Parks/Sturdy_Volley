@@ -54,13 +54,21 @@ test.describe('Prompt 016 — Shops and economy', () => {
     // Give InteriorScene's update loop several frames after the teleport so
     // resolveInteraction(...) picks up `shop-counter` as `nearest` before E.
     await page.waitForTimeout(350);
-    await page.keyboard.down('e');
-    // Hold long enough that at least one update tick observes pressed.has('e')
-    // with the correct `nearest` (slow SwiftShader frames on desktop CI).
-    await page.waitForTimeout(300);
-    await page.keyboard.up('e');
-
-    await expect(page.getByTestId('shop-panel')).toBeVisible({ timeout: 4000 });
+    // Dispatch the 'e' keydown/keyup directly on `window` (same pattern as
+    // inventory.spec.ts + slice-gate.spec.ts): Playwright's CDP keyboard
+    // dispatch races with focus state on desktop-chromium CI and the event
+    // can miss InteriorScene's window-level onKeyDown listener. Hold the key
+    // until the shop panel actually opens, then release in `finally`.
+    await page.evaluate(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'e' }));
+    });
+    try {
+      await expect(page.getByTestId('shop-panel')).toBeVisible({ timeout: 5000 });
+    } finally {
+      await page.evaluate(() => {
+        window.dispatchEvent(new KeyboardEvent('keyup', { key: 'e' }));
+      });
+    }
     await expect(page.getByTestId('shop-list')).toContainText('Garden Omelet');
 
     // The garden omelet base price is 120 g, ×1.5 markup = 180 g. Wallet starts at 500.

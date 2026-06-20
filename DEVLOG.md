@@ -5,6 +5,27 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Test: extend window.dispatchEvent pattern to shop.spec.ts (2026-06-19)
+
+The prior commit fixed inventory + slice-gate but missed shop.spec.ts
+because it had been passing on retry in the previous CI run. The next
+push showed it failing both attempts on the desktop-chromium GH runner
+with the same symptom — `shop-panel` never appeared — confirming the
+flake was the same CDP-keyboard-vs-focus race as inventory and
+slice-gate.
+
+Applied the same `window.dispatchEvent` pattern in
+[tests/e2e/shop.spec.ts](tests/e2e/shop.spec.ts) for the "walking up to
+the bakery counter opens the shop panel" test: keydown dispatched
+directly on `window`, panel visibility asserted with a 5 s timeout,
+keyup dispatched in `finally`. The 350 ms post-teleport settle wait is
+preserved so InteriorScene's `resolveInteraction(...)` has time to
+register `shop-counter` as `nearest` before the press fires.
+
+Verify gate: `npx tsc --noEmit` ✓, lint on touched file ✓; targeted
+Playwright run with `--repeat-each=3` on the shop test on
+desktop-chromium: 3 / 3 pass (each in ~2.6 s).
+
 ## Test: dispatch keyboard via window.dispatchEvent on flaky desktop CI specs (2026-06-19)
 
 Follow-up: the prior round of timeout bumps in
