@@ -1,5 +1,6 @@
 import {
   Scene,
+  Matrix,
   MeshBuilder,
   TransformNode,
   Vector3,
@@ -9,8 +10,10 @@ import {
 } from '@babylonjs/core';
 import { GameScene } from './GameScene';
 import { makeScene, addFog, addLights, flatMaterial, PALETTE } from '../render/scene-helpers';
-import { CameraRig, type FollowTarget } from '../camera/rig';
+import { CameraRig, type FollowTarget, type ObstructionMode } from '../camera/rig';
 import {
+  baselineProfile,
+  CAMERA_BASELINES,
   CAMERA_CONTEXTS,
   variantsForContext,
   type CameraContextId,
@@ -81,8 +84,9 @@ export class CameraLabScene extends GameScene {
 
     this.buildKit(scene);
 
-    // Data-driven camera rig (029), framing the movable reference player.
-    this.rig = new CameraRig(scene, this.currentProfile(), -Math.PI / 2);
+    // Data-driven camera rig (029), framing the movable reference player. The
+    // locked exterior baseline (030) is the starting profile.
+    this.rig = new CameraRig(scene, baselineProfile('exterior'), -Math.PI / 2);
     const follow: FollowTarget = {
       position: () => new Vector3(this.playerMesh.position.x, this.playerMesh.position.y + 0.6, this.playerMesh.position.z),
       velocity: () => this.playerVel,
@@ -153,6 +157,9 @@ export class CameraLabScene extends GameScene {
     return this.currentProfile().id;
   }
 
+  private reducedMotion = false;
+  private obstructionMode: ObstructionMode = 'fade';
+
   private handleSwitchKey(key: string): void {
     const n = Number(key);
     if (n >= 1 && n <= CAMERA_CONTEXTS.length) {
@@ -160,6 +167,12 @@ export class CameraLabScene extends GameScene {
       this.applyProfile();
     } else if (key === '[' || key === ']') {
       this.cycleVariant();
+    } else if (key === 'm' || key === 'M') {
+      this.reducedMotion = !this.reducedMotion;
+      this.rig.setReducedMotion(this.reducedMotion);
+    } else if (key === 'c' || key === 'C') {
+      this.obstructionMode = this.obstructionMode === 'fade' ? 'cutaway' : 'fade';
+      this.rig.setObstructionMode(this.obstructionMode);
     }
   }
 
@@ -457,6 +470,21 @@ export class CameraLabScene extends GameScene {
       },
       recenter: (): void => this.rig.requestRecenter(),
       setReducedMotion: (on: boolean): void => this.rig.setReducedMotion(on),
+      setObstructionMode: (mode: ObstructionMode): void => this.rig.setObstructionMode(mode),
+      baselines: (): Readonly<Record<string, string>> => CAMERA_BASELINES,
+      /** Normalised viewport position of the framed player (0..1) + on-screen flag. */
+      playerScreen: (): { x: number; y: number; onScreen: boolean } => {
+        const cam = this.rig.camera;
+        const engine = this.ctx.engine;
+        const w = engine.getRenderWidth();
+        const h = engine.getRenderHeight();
+        const world = new Vector3(this.playerMesh.position.x, this.playerMesh.position.y + 0.6, this.playerMesh.position.z);
+        const p = Vector3.Project(world, Matrix.Identity(), this.scene.getTransformMatrix(), cam.viewport.toGlobal(w, h));
+        const nx = p.x / w;
+        const ny = p.y / h;
+        const onScreen = p.z > 0 && p.z < 1 && nx >= 0 && nx <= 1 && ny >= 0 && ny <= 1;
+        return { x: nx, y: ny, onScreen };
+      },
     };
     (window as unknown as { sturdyVolleyLab?: typeof api }).sturdyVolleyLab = api;
   }

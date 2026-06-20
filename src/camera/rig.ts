@@ -36,6 +36,10 @@ export interface FollowTarget {
   ignore?(): readonly AbstractMesh[];
 }
 
+/** How an occluder between camera and target is treated (WEF-01c). `fade` is the
+ *  locked baseline rule; `cutaway` is the recorded fallback for opaque interiors. */
+export type ObstructionMode = 'fade' | 'cutaway';
+
 export interface CameraRigState {
   profileId: string;
   context: string;
@@ -50,6 +54,7 @@ export interface CameraRigState {
   fade: number;
   recentering: boolean;
   reducedMotion: boolean;
+  obstructionMode: ObstructionMode;
 }
 
 const RAD2DEG = 180 / Math.PI;
@@ -77,6 +82,7 @@ export class CameraRig {
   private fade = 0;
   private occluder: AbstractMesh | null = null;
   private reducedMotion = false;
+  private obstructionMode: ObstructionMode = 'fade';
 
   constructor(scene: Scene, profile: CameraProfile, restYaw = -Math.PI / 2) {
     this.profile = profile;
@@ -112,6 +118,14 @@ export class CameraRig {
    *  recenter impulses and use conservative blend timing. */
   setReducedMotion(on: boolean): void {
     this.reducedMotion = on;
+  }
+
+  /** Switch occluder handling between the locked `fade` rule and the `cutaway`
+   *  fallback (WEF-01c). */
+  setObstructionMode(mode: ObstructionMode): void {
+    if (this.occluder) this.occluder.visibility = 1;
+    if (this.occluder) this.occluder.isVisible = true;
+    this.obstructionMode = mode;
   }
 
   getProfile(): CameraProfile {
@@ -218,12 +232,21 @@ export class CameraRig {
   private setOccluder(mesh: AbstractMesh | null): void {
     if (this.occluder && this.occluder !== mesh) {
       this.occluder.visibility = 1; // restore the previous occluder
+      this.occluder.isVisible = true;
     }
     this.occluder = mesh;
   }
 
   private applyOccluderFade(): void {
-    if (this.occluder) this.occluder.visibility = 1 - this.fade;
+    if (!this.occluder) return;
+    if (this.obstructionMode === 'cutaway') {
+      // Hard cutaway once the blocker meaningfully occludes the target.
+      this.occluder.visibility = 1;
+      this.occluder.isVisible = this.fade < 0.5;
+    } else {
+      this.occluder.isVisible = true;
+      this.occluder.visibility = 1 - this.fade;
+    }
   }
 
   getState(): CameraRigState {
@@ -238,6 +261,7 @@ export class CameraRig {
       fade: this.fade,
       recentering: this.timeSinceInput >= this.profile.recenterDelay && Math.abs(this.yawOffset) > 1e-3,
       reducedMotion: this.reducedMotion,
+      obstructionMode: this.obstructionMode,
     };
   }
 

@@ -5,6 +5,93 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 030 — Lock camera baselines, reduced motion, telemetry, decision record (WEF-01c) (2026-06-19)
+
+**Closes the camera gate (WEF-01, Prompts 028–030).** Locked one baseline
+profile per §2 context, recorded the exact values (degrees **and** Babylon arc),
+finalised the reduced-motion policy + obstruction rule, and wrote the decision
+record. No production map metric is finalised before this gate; the metric kit
+(037) and every graybox map build on these numbers.
+
+**Locked baselines.** `CAMERA_BASELINES` + `baselineProfile()` in
+`src/camera/profiles.ts` lock the mid-range `standard` variant per context
+(centre of each §2 band; framed the full player HUD-safe at all tested aspect
+ratios; reads as the slightly-elevated 3/4 adventure framing of the art boards).
+`near`/`far` stay in the catalogue for retuning. The lab now starts on
+`baselineProfile('exterior')`.
+
+**Reduced motion + telemetry.** `CameraRig.setReducedMotion` (already present)
+is the locked policy: it drops the look-ahead lead + recenter impulses and uses
+conservative blend timing (follow-lag floor 0.28 s, transition blend 0.4 s); the
+rig introduces no shake. `getState()` telemetry now also reports the obstruction
+mode. Lab `M` key + `window.sturdyVolleyLab.setReducedMotion` toggle it.
+
+**Obstruction rule (fade chosen, cutaway fallback).** New `ObstructionMode` +
+`CameraRig.setObstructionMode`: the locked `fade` rule ramps the occluder's
+`visibility` 1→0; the recorded `cutaway` fallback hides the blocker outright once
+it occludes ≥50 % (for opaque interior shells). Lab `C` key toggles; per-volume
+authoring lands with the interior kit (036).
+
+**Framing evidence.** New `playerScreen()` debug projection + e2e assert the full
+player stays inside the HUD-safe frame on the default viewport (desktop + Pixel 5
+projects) and across tablet / ultrawide / tall-phone aspect ratios (desktop
+sweep, one screenshot attached per aspect). A live-rig test asserts the exterior
+/ farm / mounted baselines converge to the recorded downward-view / FOV /
+distance values. The **mounted** baseline is locked against the proving-ground
+stand-in (the player in the `mounted` context).
+
+**Decision record.** New `docs/GAMEPLAY_CAMERA_AND_CONTROLS.md`: the full locked
+baseline table (downward view, beta rad, distance, FOV deg+rad, orbit limit,
+recenter, look-ahead, follow lag, obstruction), input mapping, reduced-motion
+policy, fade-vs-cutaway decision, rejected alternatives, and the §1.4 art-mood
+reference (`sv_style_006/007`).
+
+Files: `src/camera/profiles.ts`, `src/camera/rig.ts`,
+`src/scenes/CameraLabScene.ts`, `docs/GAMEPLAY_CAMERA_AND_CONTROLS.md` (new),
+`tests/unit/camera.test.ts`, `tests/e2e/camera-lab.spec.ts`.
+
+**Acceptance criteria**
+
+- [x] Exact selected values recorded for every §2 context (downward view,
+  distance, FOV, orbit limits, recenter, look-ahead, obstruction) — the locked
+  table in `docs/GAMEPLAY_CAMERA_AND_CONTROLS.md` §2, sourced from
+  `CAMERA_BASELINES`/`CAMERA_PROFILES`.
+- [x] Full character visibility + HUD-safe framing pass at desktop, tablet,
+  Pixel 5, ultrawide, and tall-phone aspect ratios (`playerScreen()` + e2e
+  default-viewport test on both projects + desktop aspect sweep with attached
+  screenshots).
+- [x] Interior obstruction demonstrates both selective fade and cutaway
+  candidates; chosen rule + fallback recorded (`ObstructionMode` fade/cutaway,
+  e2e switch, doc §5 records `fade` chosen + `cutaway` fallback). Reduced motion
+  removes impulses + conservative blend timing (rig policy + doc §4).
+- [x] Camera telemetry + screenshot routes exist; the decision record explains
+  rejected alternatives and locks the baseline — **this completes the camera
+  gate.**
+- [x] The mounted/horseback context is locked here (tested against a
+  proving-ground stand-in body); the interior/exterior-transition handoff follows
+  the OoT-era feel (recorded in doc §2/§8; ridden integration is Prompt 044).
+- [x] Art reference: locked camera mood matches `sv_style_006_lighting_board.png`
+  + `sv_style_007_camera_scale_guide.png` (doc §8).
+
+**Decision record**
+
+- Baseline = `standard` in every context (not `near`/`far`): `near` cropped the
+  player on tall-phone, `far` shrank the player on ultrawide; `standard` framed
+  the full player within HUD-safe margins at all five tested ratios.
+- Obstruction `fade` chosen as the baseline (smoothest, N64-register-correct);
+  `cutaway` kept as the recorded fallback for opaque interior shells, selectable
+  per camera volume in 036.
+- Reduced motion strips look-ahead + recenter impulses and floors the blend
+  timing rather than freezing the camera, so the framing stays correct without
+  motion that could trigger discomfort.
+
+**Verify gate** — `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest 364 passed (41 files; +1 baseline) · Playwright 127 passed
++ 1 skipped (desktop-only aspect sweep; +7 new WEF-01c cases across projects) ·
+`validate:assets` 0 · `build` 0 · GitDoctor 100/100, `--fail-on high` exit 0.
+
+---
+
 ## Prompt 029 — Data-driven camera profiles, rig, obstruction, and input (WEF-01b) (2026-06-19)
 
 Stood up the `src/camera/` system the rest of the foundation frames against: a

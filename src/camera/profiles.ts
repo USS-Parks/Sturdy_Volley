@@ -180,3 +180,28 @@ export function variantsForContext(context: CameraContextId): CameraProfile[] {
 export function profileById(id: string): CameraProfile | undefined {
   return CAMERA_PROFILES.find((p) => p.id === id);
 }
+
+/**
+ * Locked baselines (WEF-01c, Prompt 030): the one variant chosen per §2 context.
+ * The mid-range `standard` variant is the baseline in every context — it sits in
+ * the centre of each §2 band, keeps the full player visible with HUD-safe
+ * framing across the tested aspect ratios, and reads as the slightly-elevated
+ * 3/4 adventure framing of the art boards. The decision record lives in
+ * docs/GAMEPLAY_CAMERA_AND_CONTROLS.md. `near`/`far` stay available for retuning.
+ */
+export const CAMERA_BASELINES: Readonly<Record<CameraContextId, string>> = {
+  exterior: 'exterior:standard',
+  farm: 'farm:standard',
+  smallInterior: 'smallInterior:standard',
+  largeInterior: 'largeInterior:standard',
+  cave: 'cave:standard',
+  water: 'water:standard',
+  mounted: 'mounted:standard',
+};
+
+/** The locked baseline profile for a context (WEF-01c). */
+export function baselineProfile(context: CameraContextId): CameraProfile {
+  const p = profileById(CAMERA_BASELINES[context]);
+  if (!p) throw new Error(`camera: no baseline profile for context "${context}"`);
+  return p;
+}

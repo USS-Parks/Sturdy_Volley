@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
+  CAMERA_BASELINES,
   CAMERA_CONTEXTS,
   CAMERA_PROFILES,
+  baselineProfile,
   betaFromPitchDeg,
   fovRadFromDeg,
   profileById,
@@ -39,6 +41,17 @@ describe('camera profiles', () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(profileById('exterior:standard')?.context).toBe('exterior');
     expect(profileById('nope')).toBeUndefined();
+  });
+
+  it('locks exactly one baseline per context, all resolvable (WEF-01c)', () => {
+    for (const ctx of CAMERA_CONTEXTS) {
+      const id = CAMERA_BASELINES[ctx];
+      expect(id, `${ctx} baseline id`).toBeDefined();
+      const p = baselineProfile(ctx);
+      expect(p.id).toBe(id);
+      expect(p.context).toBe(ctx);
+    }
+    expect(Object.keys(CAMERA_BASELINES).length).toBe(CAMERA_CONTEXTS.length);
   });
 
   it('converts downward view to Babylon beta (beta = 90° − pitch)', () => {

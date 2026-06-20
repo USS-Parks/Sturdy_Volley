@@ -11,6 +11,7 @@ interface CameraState {
   fade: number;
   recentering: boolean;
   reducedMotion: boolean;
+  obstructionMode: 'fade' | 'cutaway';
 }
 
 declare global {
@@ -30,6 +31,9 @@ declare global {
       nudgeYaw: (rad: number) => void;
       recenter: () => void;
       setReducedMotion: (on: boolean) => void;
+      setObstructionMode: (mode: 'fade' | 'cutaway') => void;
+      baselines: () => Record<string, string>;
+      playerScreen: () => { x: number; y: number; onScreen: boolean };
     };
   }
 }
@@ -162,5 +166,90 @@ test.describe('Camera Lab proving ground (WEF-01a)', () => {
     await page.waitForTimeout(1200);
     state = await page.evaluate(() => window.sturdyVolleyLab!.cameraState());
     expect(Math.abs(state.yawOffsetDeg), 'recentered to rest').toBeLessThan(2);
+  });
+
+  test('locks one baseline per context with the recorded values (WEF-01c)', async ({ page }) => {
+    await page.goto('/?scene=CameraLab');
+    await page.waitForFunction(() => Boolean(window.sturdyVolleyLab?.baselines));
+
+    const baselines = await page.evaluate(() => window.sturdyVolleyLab!.baselines());
+    expect(Object.keys(baselines).length, 'a baseline per §2 context').toBeGreaterThanOrEqual(7);
+    for (const id of Object.values(baselines)) expect(id).toContain(':standard');
+
+    // The live rig converges to the recorded downward view / FOV / distance.
+    const cases: Array<[string, number, number, number]> = [
+      ['exterior', 31, 47, 9.5],
+      ['farm', 42, 45, 9],
+      ['mounted', 29, 49, 10.5],
+    ];
+    for (const [ctx, pitch, fov, dist] of cases) {
+      await page.evaluate((c) => {
+        window.sturdyVolleyLab!.setPlayer(0, 0);
+        window.sturdyVolleyLab!.setContext(c);
+      }, ctx);
+      await page.waitForTimeout(1000); // let the beta/fov blend fully settle
+      const s = await page.evaluate(() => window.sturdyVolleyLab!.cameraState());
+      expect(s.pitchDeg, `${ctx} downward view`).toBeCloseTo(pitch, 0);
+      expect(s.fovDeg, `${ctx} FOV`).toBeCloseTo(fov, 0);
+      expect(s.distance, `${ctx} follow distance`).toBeCloseTo(dist, 0);
+    }
+  });
+
+  test('reduced motion and the obstruction-mode fallback are switchable', async ({ page }) => {
+    await page.goto('/?scene=CameraLab');
+    await page.waitForFunction(() => Boolean(window.sturdyVolleyLab?.cameraState));
+
+    await page.evaluate(() => window.sturdyVolleyLab!.setReducedMotion(true));
+    let s = await page.evaluate(() => window.sturdyVolleyLab!.cameraState());
+    expect(s.reducedMotion, 'reduced motion engaged').toBe(true);
+
+    await page.evaluate(() => window.sturdyVolleyLab!.setObstructionMode('cutaway'));
+    s = await page.evaluate(() => window.sturdyVolleyLab!.cameraState());
+    expect(s.obstructionMode, 'obstruction fallback engaged').toBe('cutaway');
+    expect(s.obstructionMode).not.toBe('fade');
+  });
+
+  test('keeps the full player HUD-safe in the default viewport', async ({ page }, testInfo) => {
+    await page.goto('/?scene=CameraLab');
+    await page.waitForFunction(() => Boolean(window.sturdyVolleyLab?.playerScreen));
+    await page.evaluate(() => {
+      window.sturdyVolleyLab!.setPlayer(0, 0);
+      window.sturdyVolleyLab!.setContext('exterior');
+    });
+    await page.waitForTimeout(400);
+    const ps = await page.evaluate(() => window.sturdyVolleyLab!.playerScreen());
+    expect(ps.onScreen, `player on screen (${testInfo.project.name})`).toBe(true);
+    expect(ps.x, 'player horizontally framed').toBeGreaterThan(0.2);
+    expect(ps.x).toBeLessThan(0.8);
+    expect(ps.y, 'player vertically framed').toBeGreaterThan(0.1);
+    expect(ps.y).toBeLessThan(0.92);
+  });
+
+  test('keeps the full player HUD-safe across tablet / ultrawide / tall-phone aspect ratios', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'aspect-ratio sweep runs once, on desktop');
+    await page.goto('/?scene=CameraLab');
+    await page.waitForFunction(() => Boolean(window.sturdyVolleyLab?.playerScreen));
+
+    const sizes: Array<[string, number, number]> = [
+      ['tablet', 1024, 768],
+      ['ultrawide', 2560, 1080],
+      ['tall-phone', 360, 780],
+    ];
+    for (const [label, w, h] of sizes) {
+      await page.setViewportSize({ width: w, height: h });
+      await page.evaluate(() => {
+        window.sturdyVolleyLab!.setPlayer(0, 0);
+        window.sturdyVolleyLab!.setContext('exterior');
+      });
+      await page.waitForTimeout(350);
+      const ps = await page.evaluate(() => window.sturdyVolleyLab!.playerScreen());
+      expect(ps.onScreen, `player on screen @ ${label}`).toBe(true);
+      expect(ps.x, `player framed @ ${label}`).toBeGreaterThan(0.15);
+      expect(ps.x).toBeLessThan(0.85);
+      expect(ps.y).toBeGreaterThan(0.08);
+      expect(ps.y).toBeLessThan(0.95);
+      const shot = await page.screenshot();
+      await testInfo.attach(`camera-baseline-${label}`, { body: shot, contentType: 'image/png' });
+    }
   });
 });
