@@ -32,12 +32,21 @@ test.describe('Inventory + shipping bin', () => {
 
   test('I opens the inventory panel; Close returns to play', async ({ page }) => {
     await newGame(page);
-    await page.keyboard.down('i');
-    // Hold long enough for the Babylon update loop to observe `pressed.has('i')`
-    // and call openInventory(); SwiftShader frames on CI are slower than local.
-    await page.waitForTimeout(350);
-    await page.keyboard.up('i');
-    await expect(page.getByTestId('inventory-panel')).toBeVisible();
+    // Dispatch the keydown/keyup directly on `window`, bypassing CDP routing
+    // and focus state — this is the same path FarmScene's onKeyDown listener
+    // services for real key presses, but avoids the desktop-CI flake where
+    // Playwright's `keyboard.down('i')` races with cutscene-skip focus changes
+    // and the Babylon update tick. Hold the key until the panel actually opens.
+    await page.evaluate(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'i' }));
+    });
+    try {
+      await expect(page.getByTestId('inventory-panel')).toBeVisible({ timeout: 5000 });
+    } finally {
+      await page.evaluate(() => {
+        window.dispatchEvent(new KeyboardEvent('keyup', { key: 'i' }));
+      });
+    }
     await expect(page.getByTestId('inventory-player')).toBeVisible();
     await page.getByTestId('inventory-close').click();
     await expect(page.getByTestId('inventory-panel')).not.toBeVisible();

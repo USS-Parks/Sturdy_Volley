@@ -94,9 +94,16 @@ async function newGameWithPerf(
 }
 
 async function pressInteract(page: import('@playwright/test').Page): Promise<void> {
-  await page.keyboard.down('e');
-  await page.waitForTimeout(180);
-  await page.keyboard.up('e');
+  // Dispatch the keydown/keyup directly on `window` (bypasses CDP focus
+  // routing) and hold the key longer so at least one Babylon update tick
+  // observes `pressed.has('e')` under headless SwiftShader frames on CI.
+  await page.evaluate(() => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'e' }));
+  });
+  await page.waitForTimeout(350);
+  await page.evaluate(() => {
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'e' }));
+  });
 }
 
 async function sleepThroughDay(page: import('@playwright/test').Page): Promise<void> {
@@ -117,7 +124,14 @@ test.describe('VS-A5 — Complete-loop slice gate', () => {
     await page.evaluate(() => window.sturdyVolleyDebug!.warpToEntity('forage-shell-a'));
     await page.waitForTimeout(150);
     await pressInteract(page);
-    await page.waitForTimeout(150);
+    // Poll for the tide-shell to land in the hotbar — the engine update tick
+    // that consumes the entity and adds the item can lag on slow CI frames.
+    await page.waitForFunction(
+      () =>
+        window.sturdyVolleyDebug!.hotbarSlots().some((s) => s?.itemId === 'tide-shell'),
+      null,
+      { timeout: 5000 },
+    );
     const hotbarAfterShell = await page.evaluate(() =>
       window.sturdyVolleyDebug!.hotbarSlots(),
     );

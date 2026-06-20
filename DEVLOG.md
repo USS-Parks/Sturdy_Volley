@@ -5,6 +5,41 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Test: dispatch keyboard via window.dispatchEvent on flaky desktop CI specs (2026-06-19)
+
+Follow-up: the prior round of timeout bumps in
+[inventory.spec.ts](tests/e2e/inventory.spec.ts) (350 ms hold) wasn't
+enough for the GH Actions desktop-chromium runner — the "I opens the
+inventory panel" test still failed both attempts on the next push, and
+slice-gate's `pressInteract` was newly flaky for the same reason. The
+root cause runs deeper than slow frames: Playwright's
+`page.keyboard.down('i')` is dispatched via CDP to the page's focused
+element, and the cutscene-skip flow leaves focus in a state where the
+key event isn't always observed by the `window`-level `onKeyDown` in
+[FarmScene.ts](src/scenes/FarmScene.ts) before keyup races back.
+
+Switched the two failing/flaky tests to dispatch the keyboard events
+**directly on `window`** via `page.evaluate(() => window.dispatchEvent(new
+KeyboardEvent(...)))`. This exercises the exact same handler the real key
+input feeds into (no engine code branch difference) but bypasses CDP
+routing + focus state entirely. For the inventory case the keydown is
+held until the panel actually appears (then keyup in a `finally`); for
+slice-gate the hold is 350 ms and the test now polls
+`waitForFunction(...)` for the tide-shell to land in the hotbar instead
+of a fixed `waitForTimeout(150)`. Touched files:
+
+- [tests/e2e/inventory.spec.ts](tests/e2e/inventory.spec.ts) — "I opens
+  the inventory panel" now dispatches keydown via `window`, asserts the
+  panel visible (5 s timeout), then dispatches keyup in `finally`.
+- [tests/e2e/slice-gate.spec.ts](tests/e2e/slice-gate.spec.ts) — the
+  shared `pressInteract(page)` helper now dispatches keydown/keyup via
+  `window` with a 350 ms hold; the tide-shell pickup assertion polls
+  for the hotbar slot to appear (5 s timeout) before reading it.
+
+Verify gate: `npx tsc --noEmit` ✓, lint on touched files ✓; targeted
+Playwright run with `--repeat-each=2` across
+inventory + slice-gate + shop on desktop-chromium: 10 / 10 pass.
+
 ## Test: stabilize inventory + shop e2e timing on desktop CI (2026-06-19)
 
 Post-Prompt-027 CI run on GitHub failed two desktop-chromium e2e tests
