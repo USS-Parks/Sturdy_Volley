@@ -6,6 +6,7 @@ import { hasSaveGame, readSave, deleteSave } from '../engine/save';
 import { setActiveSave, clearActiveSave } from '../engine/gameState';
 import { downloadSave, pickAndImportSave } from '../engine/saveTransfer';
 import { getContentReport } from '../data/content';
+import { getWorldMapReport } from '../world/sample-map';
 
 const RESUMABLE_SCENES = new Set(['Farm', 'Town', 'Interior', 'Beach', 'Mine']);
 
@@ -177,11 +178,17 @@ export class TitleScene extends GameScene {
   }
 
   private showDataReport(): void {
-    const rows = getContentReport().map((summary) => ({
+    const contentRows = getContentReport().map((summary) => ({
       label: `${summary.name} (${summary.count})`,
       ok: summary.ok,
       detail: summary.ok ? undefined : summary.issues.slice(0, 3).join('; '),
     }));
-    this.ctx.overlay.showReport('Data validation', rows, () => this.showMenu(), 'dev-data-report');
+    // World-map documents validate against the WEF-06a map schema (Prompt 037).
+    const mapRows = getWorldMapReport().map((summary) => ({
+      label: `${summary.name} (${summary.count})`,
+      ok: summary.ok,
+      detail: summary.ok ? undefined : summary.issues.slice(0, 3).join('; '),
+    }));
+    this.ctx.overlay.showReport('Data validation', [...contentRows, ...mapRows], () => this.showMenu(), 'dev-data-report');
   }
 }

@@ -5,6 +5,96 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 037 — Map metric kit + map schemas (WEF-06a) (2026-06-20)
+
+Locked the world's spatial grammar now that camera, motor, topology, and
+interior findings are known: a single metric kit (reconciled to the motor +
+interior kit + art scale guide), a machine-readable Zod map schema with semantic
+validation, a validated reference sample, and the doc — wired into the live
+Dev data-validation report so a malformed map fails fast in-game and in the gate.
+
+**Metric kit (`src/world/metric-kit.ts`).** `BODY` (capsule 0.8 = 2×motor
+radius, small animal 0.5, large animal 1.2) + `METRIC_KIT`: every world element
+(path/road/desire-line/plaza, farm cell/crop-row/paddock-gate/fence, doorway/
+room/bed/counter/nav-corridor, building/dock/bridge, tree/crop-clearance,
+slope-max/step-max/stair/cliff/shoreline/wade-depth/cave-corridor/encounter-room,
+transition-threshold/landmark-sightline) with `value` + `tolerance` + optional
+`cameraClearance`/`secondary`. Reconciled to `DEFAULT_MOTOR_CONFIG` (slope 50°,
+step 0.4, swim depth 1.3) and `INTERIOR_METRICS` (036) so a route the kit calls
+walkable actually is. Helpers: `routeSupports`, `routeWidthOk` (per-kind body
+requirements — every route clears capsule+small animal; road/dock/bridge also
+the large-animal body), `slopeWalkable`, `mediumForDepth`.
+
+**Map schema (`src/world/map-schema.ts`).** `.strict()` kebab-id Zod schemas for
+a `MapDocument`: coordinate frame (region + floating origin + `+z`/meters),
+chunks, anchors, camera volumes (full WEF-05 contract), collision + navigation
+**references** (no geometry), routes, variants, transitions.
+`validateMapDocument` runs the schema **and** semantic cross-checks
+(duplicate-anchor-id, route-too-narrow, unknown-camera-context vs
+`CAMERA_CONTEXTS`, transition-region-mismatch, dangling-anchor-ref,
+inconsistent-chunk-size) with stable issue codes.
+
+**Reference + integration (`src/world/sample-map.ts`).**
+`BREAKPOINT_FARM_SAMPLE` — a complete schema-valid slice exercising every field,
+the authoring template for 038/039/046–049. `getWorldMapReport()` validates
+every authored map and is **appended to the Title "Dev · Validate data" report**
+(`src/scenes/TitleScene.ts`), so the schema is a live in-game surface, not dead
+code (the content-validation pattern it sits beside).
+
+**Doc (`docs/world/METRIC_KIT.md`).** Final dimensions, tolerances, rationale,
+camera compatibility for every element; the per-kind route-support rule; the
+full map-schema field list + cross-checks + where validation runs.
+
+Files: `src/world/metric-kit.ts` (new), `src/world/map-schema.ts` (new),
+`src/world/sample-map.ts` (new), `docs/world/METRIC_KIT.md` (new),
+`tests/unit/metric-kit.test.ts` (new), `tests/unit/map-schema.test.ts` (new),
+`src/scenes/TitleScene.ts`.
+
+**Acceptance criteria**
+
+- [x] `docs/world/METRIC_KIT.md` gives final dimensions, tolerances, rationale,
+  and camera compatibility for every kit element (§2 tables; every `METRIC_KIT`
+  entry carries a tolerance — asserted in the unit test).
+- [x] Machine-readable map schemas validate coordinate frames, chunks, anchors,
+  volumes, collision/navigation references, variants, and transitions
+  (`map-schema.ts` + 14 schema/semantic unit tests over the valid sample + each
+  failure mode).
+- [x] Every route supports player capsule, NPC, relevant animal body, camera
+  clearance, and mobile legibility (`routeWidthOk` per-kind rule + the validator
+  rejects under-clearing routes; the sample's routes use metric-kit widths;
+  `cameraClearance` carried per element).
+- [x] **Art reference:** dimensions reconciled against
+  `sv_style_007_camera_scale_guide.png` (1.7–1.8 m human, 1 m farm cells,
+  cottage/door proportions) + the theme-03 material/shape boards (documented in
+  the kit header + §intro; farm cell 1.0, doorway/room/building proportions).
+
+**Decision record**
+
+- **Per-kind route support, not "every route fits a horse."** The acceptance's
+  "relevant animal body" is per-route: footpaths/desire-lines clear capsule +
+  small animal (a 1.2 m desire-line is valid); only road/dock/bridge must clear
+  the 1.2 m large-animal body. An initial "every route clears all bodies" rule
+  wrongly rejected desire-lines — fixed via `routeWidthOk(kind, width)`.
+- **Schema speaks references, not geometry.** Collision/navigation entries are
+  ids + kind + width, honoring the §3.1 separation; the geometry lives in the
+  builders (036/streaming) and the navmesh bake (040–041).
+- **Reconcile, don't duplicate.** The metric kit imports `DEFAULT_MOTOR_CONFIG`
+  and `INTERIOR_METRICS` rather than re-stating numbers, so the motor/interior
+  values can't drift from the map grammar (asserted by reconciliation tests).
+- **Live integration via the existing data-validation report** rather than a new
+  scene: a pure schema prompt's faithful "exercised surface" is the validator
+  running over real maps in the gate + the Dev report; 038/039 add real region
+  maps to the same validation.
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **474 passed** (+22: metric-kit 8, map-schema 14) ·
+Playwright **181 passed + 1 skipped** (desktop-only aspect sweep) on both
+`desktop-chromium` + `mobile-chromium` (data-report addition is dev-only, absent
+from the prod preview build) · `validate:assets` 0 · `build` 0 · GitDoctor
+**100/100**.
+
+---
+
 ## Prompt 036 — Interior construction kit + authored camera volumes (WEF-05) (2026-06-20)
 
 Built the reusable interior construction kit (metric modules → closed-shell
