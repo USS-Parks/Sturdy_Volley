@@ -5,6 +5,62 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Tooling: rewrite local audit scanner for Sturdy Volley invariants (2026-06-19)
+
+The previous [tools/local_gitdoctor_scan.py](tools/local_gitdoctor_scan.py)
+was the MAI / appliance-project scanner — hardcoded ignores for
+`mai-api/`, `mai-core/`, `compliance-dashboard/`, `adapters/`, with
+"appliance profile" comments and category checks aimed at a Rust/Python
+backend. Wrong shop for this codebase. Rewrote it from scratch as a
+27-check suite across 11 categories tailored to Sturdy Volley's
+[PSPR](STURDY_VOLLEY_PSPR.md) §0 invariants:
+
+- **Engine Purity** (3) — `src/engine/` + `src/data/` stay
+  renderer/DOM/storage-agnostic, with a named allow-list
+  (`ENGINE_BRIDGE_FILES`) for `save.ts` / `saveTransfer.ts` /
+  `saveStore.ts`.
+- **Scene Discipline** (2) — `keydown`/`keyup` listeners paired with
+  removal (SCN-001); any scene that adds a window listener must
+  override `dispose()` (SCN-002).
+- **UX Guardrails** (1) — no blocking
+  `window.prompt`/`alert`/`confirm` in shipping code.
+- **Test Discipline** (4) — no `.only(` modifiers, no `page.pause()`,
+  no `console.log/warn/error`, every spec asserts at least once.
+- **Type Discipline** (2) — `as any` budget (≤ 10 in non-test src),
+  `@ts-ignore` requires a reason.
+- **Originality, PSPR §0.7** (1) — banlist of cozy-game franchise
+  names in shipping code (`src/`, `public/`, `tests/`); docs +
+  `SESSION_LOG/` exempt because plan/log writing legitimately
+  references prior art.
+- **Save Model Safety** (1) — `src/engine/saveModel.ts` must export a
+  numeric `SAVE_VERSION` and reference it from a schema (replaces the
+  noisy "every field needs `.default()` / `.optional()`" heuristic that
+  flagged nested-schema rows).
+- **Project Hygiene** (4) — no committed `.env`, `.gitignore` covers
+  `node_modules` / `.env` / `dist` / `playwright-report` /
+  `test-results`, README present, package-lock tracked.
+- **Package Scripts** (2) — all PSPR §0.2 verify-gate scripts wired
+  (`typecheck`, `lint`, `test`, `test:e2e`, `validate:assets`,
+  `build`), `tsconfig.json` strict.
+- **PSPR Discipline** (3) — `STURDY_VOLLEY_PSPR.md` and `DEVLOG.md`
+  present, DEVLOG has at least one `## Prompt …` entry.
+- **Security** (4) — no hardcoded secrets, no private keys, no `eval`
+  / `new Function()`, no direct `.innerHTML =` assignment.
+
+Also fixed: `.claude/` now in `IGNORED_DIRS` so parallel-session
+worktrees stop polluting the report (was the source of 29 of the 32
+findings from the old script); `playwright-report/`, `test-results/`,
+`coverage/` likewise ignored; cp1252 Windows-console mojibake on `—`
+and `§` fixed via a utf-8 stdout wrapper; `--format text` is now the
+terminal default with `markdown` for an audit artifact and `json` for
+machine consumption; `--fail-on high` exits 1 when any HIGH/CRITICAL
+finding is present (CI-friendly).
+
+Current scan: **96/100, 26 passed, 1 failed.** The single failing
+check is ORI-001: two `tests/unit/` test descriptions reference
+"Stardew" by name (`friendship.test.ts:47`, `inventory.test.ts:20`).
+Real PSPR §0.7 finding, left as-is for a future cleanup commit.
+
 ## Test: drive inventory + shop panel-open via debug API (2026-06-19)
 
 Even `window.dispatchEvent` for the keyboard didn't reliably reach the
