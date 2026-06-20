@@ -44,7 +44,7 @@ describe('relationshipLevel', () => {
     expect(relationshipLevel(POINTS_PER_LEVEL * 12, 14)).toBe(12);
   });
 
-  it('bands map roughly to Stardew heart milestones', () => {
+  it('bands map roughly to cozy-sim heart milestones', () => {
     expect(relationshipBand(0)).toBe('cold');
     expect(relationshipBand(1)).toBe('neutral');
     expect(relationshipBand(4)).toBe('warm');

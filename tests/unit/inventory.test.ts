@@ -17,7 +17,7 @@ import {
 } from '../../src/engine/inventory';
 
 describe('quality multiplier', () => {
-  it('returns Stardew-adjacent factors clamped to 0..3', () => {
+  it('returns cozy-sim-adjacent factors clamped to 0..3', () => {
     expect(qualityMultiplier(0)).toBe(1);
     expect(qualityMultiplier(1)).toBe(1.25);
     expect(qualityMultiplier(2)).toBe(1.5);
