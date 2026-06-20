@@ -5,6 +5,82 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 039 — Dimensioned blockouts: Breakpoint Farm + Ballast Bay district (WEF-06c) (2026-06-20)
+
+Derived dimensioned top-down + elevation blockouts for the first two
+production-foundation regions as machine-readable `MapDocument`s traceable to the
+metric kit — the authoritative source the Prompt 046/047 graybox builds read.
+
+**Schema (`src/world/map-schema.ts`).** Extended the map document with an
+`elevation` band array (`{name, minY, maxY}`, schema-refined `maxY>minY`) + a
+semantic `elevation-band-overlap` check, so a blockout is dimensioned on the Y
+axis too.
+
+**Blockouts (`src/world/blockouts/`).** `BREAKPOINT_FARM_BLOCKOUT` (128×128 m =
+4×4 chunks; lowland→farmyard→orchard-bluff bands; farmhouse/shed/greenhouse
+doorways + well + pasture + crop field + tide-gated creek ford + 3 region edges;
+`vol-farmyard` farm + `vol-orchard-bluff` exterior; yard/town roads 3.0, garden
+path 1.6, creek desire-line 1.2, footbridge 1.8; tide + season variants; 6
+transitions) and `BALLAST_BAY_DISTRICT_BLOCKOUT` (160×128 m = 5×4 chunks;
+harborfront→market-lane→upper-terraces with a stair elevation-link bridging the
+bands; 4 shop doorways + market well + harbor dock + beach access + 3 region
+edges; `vol-market-lane` + `vol-harborfront`; market road 3.0, harbor dock 2.0,
+paths 1.6; season + restoration variants; 7 transitions). Route widths are the
+literal `METRIC_KIT` values, so every route provably clears its required bodies.
+
+**Integration.** Both registered in `AUTHORED_MAPS` (`src/world/sample-map.ts`),
+so they validate in the gate + the live Title "Dev · Validate data" report.
+
+**Doc (`docs/world/BLOCKOUTS.md`).** Top-down extents, elevation bands, anchors,
+camera volumes, routes, references, variants, transitions for both, with the
+metric-kit traceability + art-board grounding (`sv_map_012`/`041`, `sv_map_013`/
+`026`/`027`).
+
+Files: `src/world/blockouts/breakpoint-farm.ts` (new),
+`src/world/blockouts/ballast-bay-district.ts` (new), `docs/world/BLOCKOUTS.md`
+(new), `tests/unit/blockouts.test.ts` (new), `src/world/map-schema.ts`,
+`src/world/sample-map.ts`, `tests/unit/map-schema.test.ts`.
+
+**Acceptance criteria**
+
+- [x] Both receive dimensioned top-down and elevation/blockout diagrams traceable
+  to the Prompt 037 kit (the two `MapDocument`s: 32 m chunk grids + ordered
+  elevation bands + metric-kit route widths; the traceability unit test asserts
+  every route width is a `METRIC_KIT` value).
+- [x] Routes shown support capsule, NPC, relevant animal body, camera clearance,
+  and phone legibility (`routeWidthOk(kind, width)` passes for every route;
+  camera volumes carry the framing; legibility is the metric-kit clearance).
+- [x] Diagrams are the authoritative source for the Prompt 046/047 graybox builds
+  (the blockout `MapDocument`s + `docs/world/BLOCKOUTS.md` are the named contract;
+  validated in the gate + Dev report).
+- [x] **Art reference:** blockouts derived from
+  `sv_map_012_breakpoint_farm_layout.png` (farmhouse + barn + fenced pasture +
+  quadrant crop field + pond/waterfall + creek footbridge + cliff-to-ocean) and
+  `sv_map_013_ballast_bay_town_layout.png` (harbor docks + lighthouse point +
+  river-through-town + terraced market lane + beach + elevation change).
+
+**Decision record**
+
+- **Blockouts as validated MapDocuments, not just drawings.** A "dimensioned
+  blockout diagram" in this codebase is the schema-valid data the graybox build
+  consumes — top-down (anchors/routes/chunks) + elevation (bands) + the full
+  separated-concern references — so 046/047 build from a checked contract, not a
+  picture. Route widths pulled from `METRIC_KIT` give literal traceability.
+- **Elevation added to the schema** (optional, default `[]`) rather than a
+  side-file, so the vertical dimension validates with everything else
+  (non-overlap + `maxY>minY`).
+- **Representative town district**, not the whole town: a 160×128 m slice with
+  the required market-lane + harbor + harbor→terrace elevation change, matching
+  the §4.1 "representative Ballast Bay town district" deliverable.
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **501 passed** (+14: blockouts 12, elevation schema 2) ·
+Playwright **181 passed + 1 skipped** (desktop-only aspect sweep) on both
+`desktop-chromium` + `mobile-chromium` · `validate:assets` 0 · `build` 0 ·
+GitDoctor **100/100**.
+
+---
+
 ## Prompt 038 — World atlas: adjacency + region sheets (WEF-06b) (2026-06-20)
 
 Authored the world atlas: global adjacency + progression across the twelve §4.2

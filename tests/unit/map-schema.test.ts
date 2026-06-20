@@ -110,4 +110,22 @@ describe('map schema — semantic cross-checks', () => {
     const res = validateMapDocument(m);
     expect(res.issues.some((i) => i.code === 'inconsistent-chunk-size')).toBe(true);
   });
+
+  it('rejects an inverted elevation band (maxY ≤ minY) at the schema level', () => {
+    const m = clone();
+    m.elevation = [{ name: 'bad', minY: 2, maxY: 1 }];
+    const res = validateMapDocument(m);
+    expect(res.ok).toBe(false);
+    expect(res.issues.some((i) => i.code === 'schema')).toBe(true);
+  });
+
+  it('flags overlapping elevation bands', () => {
+    const m = clone();
+    m.elevation = [
+      { name: 'low', minY: 0, maxY: 2 },
+      { name: 'mid', minY: 1, maxY: 3 },
+    ];
+    const res = validateMapDocument(m);
+    expect(res.issues.some((i) => i.code === 'elevation-band-overlap')).toBe(true);
+  });
 });

@@ -40,6 +40,16 @@ export const chunkSchema = z
   })
   .strict();
 
+/** A named vertical elevation band (the dimensioned blockout's Y axis). */
+export const elevationBandSchema = z
+  .object({
+    name: z.string().min(1),
+    minY: z.number(),
+    maxY: z.number(),
+  })
+  .strict()
+  .refine((b) => b.maxY > b.minY, { message: 'elevation band maxY must exceed minY' });
+
 export const anchorSchema = z
   .object({
     id: idSchema,
@@ -122,6 +132,7 @@ export const mapDocumentSchema = z
     schemaVersion: z.literal(1),
     coordinateFrame: coordinateFrameSchema,
     chunks: z.array(chunkSchema).default([]),
+    elevation: z.array(elevationBandSchema).default([]),
     anchors: z.array(anchorSchema).default([]),
     cameraVolumes: z.array(cameraVolumeSchema).default([]),
     collision: z.array(collisionRefSchema).default([]),
@@ -142,7 +153,8 @@ export interface MapIssue {
     | 'unknown-camera-context'
     | 'dangling-anchor-ref'
     | 'transition-region-mismatch'
-    | 'inconsistent-chunk-size';
+    | 'inconsistent-chunk-size'
+    | 'elevation-band-overlap';
   message: string;
 }
 
@@ -224,6 +236,14 @@ export function validateMapDocument(input: unknown): MapValidationResult {
     const size = doc.chunks[0].size;
     if (doc.chunks.some((c) => Math.abs(c.size - size) > 1e-9)) {
       issues.push({ code: 'inconsistent-chunk-size', message: `chunks have mixed sizes; the region grid must be uniform` });
+    }
+  }
+
+  // Elevation bands must not overlap (a dimensioned blockout stacks them).
+  const bands = [...doc.elevation].sort((a, b) => a.minY - b.minY);
+  for (let i = 1; i < bands.length; i++) {
+    if (bands[i].minY < bands[i - 1].maxY - 1e-9) {
+      issues.push({ code: 'elevation-band-overlap', message: `elevation bands "${bands[i - 1].name}" and "${bands[i].name}" overlap` });
     }
   }
 

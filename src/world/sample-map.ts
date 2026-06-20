@@ -13,6 +13,8 @@
  */
 import { METRIC_KIT } from './metric-kit';
 import { validateMapDocument, type MapDocument } from './map-schema';
+import { BREAKPOINT_FARM_BLOCKOUT } from './blockouts/breakpoint-farm';
+import { BALLAST_BAY_DISTRICT_BLOCKOUT } from './blockouts/ballast-bay-district';
 
 /** A Breakpoint-Farm-flavoured reference slice (region `breakpoint-farm`). */
 export const BREAKPOINT_FARM_SAMPLE: MapDocument = {
@@ -29,6 +31,10 @@ export const BREAKPOINT_FARM_SAMPLE: MapDocument = {
     { cx: 1, cz: 0, size: 32 },
     { cx: 0, cz: 1, size: 32 },
     { cx: 1, cz: 1, size: 32 },
+  ],
+  elevation: [
+    { name: 'lowland', minY: 0, maxY: 0.5 },
+    { name: 'yard', minY: 0.5, maxY: 2 },
   ],
   anchors: [
     { id: 'farmhouse-door', kind: 'doorway', at: { x: 8, y: 0, z: 6 }, facing: Math.PI },
@@ -80,9 +86,11 @@ export const BREAKPOINT_FARM_SAMPLE: MapDocument = {
   ],
 };
 
-/** Every authored reference map (Prompts 038/039 append their region maps here). */
+/** Every authored map: the schema template + the Prompt 039 dimensioned blockouts. */
 export const AUTHORED_MAPS: ReadonlyArray<{ name: string; doc: MapDocument }> = [
   { name: 'breakpoint-farm (sample)', doc: BREAKPOINT_FARM_SAMPLE },
+  { name: 'breakpoint-farm (blockout)', doc: BREAKPOINT_FARM_BLOCKOUT },
+  { name: 'ballast-bay-district (blockout)', doc: BALLAST_BAY_DISTRICT_BLOCKOUT },
 ];
 
 /** Validation summary for one authored map, in the data-report shape. */
