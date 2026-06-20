@@ -1,8 +1,9 @@
-# 2026-06-19-02 — Master Roster STS: camera gate + motor core (Prompts 028–031)
+# 2026-06-19-02 — Master Roster STS: camera + motor + interaction (Prompts 028–034)
 
-> Spans the 2026-06-19 → 2026-06-20 date rollover; one conversation. The entry
-> was first written at the 030 handoff point, then the user directed the session
-> to continue (governance fix + Prompt 031). Updated to cover the full session.
+> Spans the 2026-06-19 → 2026-06-20 date rollover; one long conversation. Written
+> at the 030 handoff point, then the user repeatedly directed the session onward
+> (governance fix, Prompt 031, then "keep going for ≥3 more" → 032–034, with a
+> full art-direction review interleaved). Updated to cover the whole session.
 
 ## Operator
 Claude Opus 4.8 (`claude-opus-4-8`), via Claude Code.
@@ -57,29 +58,45 @@ prompt.
   motor (stamina/gait from the existing controller). Havok confirmed loading in
   the headless preview. Fixed a `Vector3`-spread NaN bug. Pushed
   (`752e04e..ddc79c3`).
-- Batons: `PLANNING/handoffs/HANDOFF-030-2026-06-19.md` (camera gate) +
-  `PLANNING/handoffs/HANDOFF-031-2026-06-20.md` (this close-out).
+- **Prompt 032 `a9d8398`** — motor terrain handling (slope limit + slide,
+  step-up/stairs, wall collide-and-slide, low-ceiling clamp, moving-platform
+  carry, penetration + out-of-bounds recovery); `stepMotor` now consumes a
+  `MotorEnvironment`; Havok box colliders on the kit terrain. Pushed.
+- **Art-direction review** — assessed all **79** images in
+  `art-production/current-direction` (A style bible → F NPCs + WIP) at the user's
+  instruction. User locked **Market Lane `sv_env_043`/`044`** as the town-gameplay
+  north-star (memory `project_town_marketlane_northstar`).
+- **Prompt 033 `343a6f7`** — water (wade/swim, depth-driven), authored traversal
+  links (no free jump, cancellable, camera-continuous), `groundedPoseAt`
+  save/region recovery; stamina/gait feed the motor through every medium. Pushed.
+- **Prompt 034 `c531180`** — shared interaction resolver
+  (`src/engine/interaction-targeting.ts`): scoring (priority/facing/distance/reach
+  /tool/obstruction/hysteresis) + facing alignment + anticipation→impact→recovery
+  action lifecycle; proving-ground focus ring + one-button commit; input-agnostic.
+  Pushed.
+- Batons: `HANDOFF-030`, `HANDOFF-031`, `HANDOFF-034-2026-06-20.md` (this
+  close-out → Prompt 035).
 
 ## Verify gate
-Run per prompt; last commit (`ddc79c3`, Prompt 031): `tsc -p tsconfig.json` 0 ·
-`tsc -p tsconfig.node.json` 0 · `eslint .` 0 · Vitest **373 passed** · Playwright
-**131 passed + 1 skipped** (desktop-only aspect sweep) on desktop-chromium +
+Run per prompt; last commit (`c531180`, Prompt 034): `tsc -p tsconfig.json` 0 ·
+`tsc -p tsconfig.node.json` 0 · `eslint .` 0 · Vitest **401 passed** · Playwright
+**149 passed + 1 skipped** (desktop-only aspect sweep) on desktop-chromium +
 mobile-chromium · `validate:assets` 0 · `build` 0 · GitDoctor **100/100**
-(`--fail-on high` exit 0). No waivers. (Camera gate 030 commit `39cd4d0`: vitest
-364 / playwright 127+1.)
+(`--fail-on high` exit 0). No waivers. (Prior gates: 031 vitest 373 / pw 131+1;
+032 vitest 381 / pw 139+1; 033 vitest 388 / pw 145+1.)
 
 ## Outcome
-`handed off` — successor session resumes STS at **Prompt 032 (Motor terrain
-handling + recovery, WEF-02b)**: slope limit, sliding, step offset, stairs,
-low-ceiling, pushing, penetration + out-of-bounds recovery, built on the 031
-motor + Havok port.
+`handed off` — successor session resumes STS at **Prompt 035 (Exterior topology,
+chunks, streaming, coordinate frames, WEF-04)**: the exterior world container +
+`docs/WORLD_TOPOLOGY_AND_STREAMING.md`, accounting for horse-speed traversal + the
+Willa Crick ↔ Ballast Bay river transition. WEF-01 (camera), WEF-02 (motor), and
+WEF-03 (interaction) are complete.
 
 ## Open items
-- **Push policy: RESOLVED.** STS = push every prompt is now locked in
-  MASTER_ROSTER §0.5 + the memory. All work pushed to `main` through `ddc79c3`.
-- Prompt 032 adds the Havok shape-sweep collide-and-slide + per-obstacle
-  colliders (031 grounds on the flat plane only); slope/stairs/step stations in
-  the proving ground are ready to exercise it.
+- **Push policy: RESOLVED.** STS = push every prompt; all work pushed through
+  `c531180`.
+- Market Lane (`sv_env_043`/`044`) is the locked town north-star — load-bearing
+  for Prompt 047 + festivals + shops; don't drift.
 - `npm run build` emits a Babylon chunk-size > 4000 kB warning (now larger with
   the Havok WASM asset); not a gate failure — relevant to the mobile/PWA prompt
   (068).
