@@ -46,7 +46,20 @@ export interface MotorConfig {
   slideSpeed: number;
   /** Y below which the player is out of bounds and recovers to the last safe pose (m). */
   recoverMinY: number;
+  /** Water column depth (m) above which the player swims instead of wading. */
+  swimDepth: number;
+  /** Horizontal speed multiplier while wading. */
+  wadeSpeedFactor: number;
+  /** Horizontal speed multiplier while swimming. */
+  swimSpeedFactor: number;
+  /** How far below the surface the capsule centre floats while swimming (m). */
+  waterlineOffset: number;
+  /** Buoyancy smoothing time constant toward the float waterline (s). */
+  buoyancyLag: number;
 }
+
+/** The medium the capsule is moving through this step. */
+export type Medium = 'ground' | 'wade' | 'swim';
 
 /** Locked motor tuning (documented in docs/GAMEPLAY_MOTOR.md). */
 export const DEFAULT_MOTOR_CONFIG: MotorConfig = {
@@ -61,7 +74,24 @@ export const DEFAULT_MOTOR_CONFIG: MotorConfig = {
   stepOffset: 0.4,
   slideSpeed: 6,
   recoverMinY: -25,
+  swimDepth: 1.3,
+  wadeSpeedFactor: 0.55,
+  swimSpeedFactor: 0.7,
+  waterlineOffset: 0.5,
+  buoyancyLag: 0.2,
 };
+
+/** An authored, contextual traversal (vault / climb / elevation link). No free
+ *  jump — the scene starts one only when the player is at a link. */
+export interface TraversalState {
+  kind: string;
+  from: Vec3;
+  to: Vec3;
+  elapsed: number;
+  duration: number;
+  /** Whether the player may cancel it mid-way and return to `from`. */
+  cancellable: boolean;
+}
 
 export interface MotorState {
   /** Capsule centre position (m). Feet are at `y - capsuleHeight/2`. */
@@ -72,10 +102,22 @@ export interface MotorState {
   grounded: boolean;
   /** Whether the capsule is sliding down too-steep ground this step. */
   sliding: boolean;
+  /** Medium moved through this step (ground / wade / swim). */
+  medium: Medium;
+  /** Active authored traversal, or null. */
+  traversal: TraversalState | null;
   /** Facing yaw (rad), atan2(x, z) convention. */
   facing: number;
-  /** Last stably-grounded pose, used for out-of-bounds recovery. */
+  /** Last stably-grounded pose, used for out-of-bounds + traversal recovery. */
   lastSafe: Vec3;
+}
+
+/** Water column beneath the capsule's XZ (from the scene's water volume). */
+export interface WaterColumn {
+  /** World Y of the water surface (m). */
+  surfaceY: number;
+  /** World Y of the bed beneath the water (m). */
+  bedY: number;
 }
 
 export interface MotorStepInput {
@@ -119,6 +161,8 @@ export interface MotorEnvironment {
   stepGround: GroundHit;
   /** Ceiling directly above the capsule. */
   ceiling: CeilingHit;
+  /** Water column at the capsule's XZ, if it is over water. */
+  water?: WaterColumn;
 }
 
 export const NO_WALL: WallHit = { hit: false, distance: Number.POSITIVE_INFINITY, normal: { x: 0, y: 0, z: 0 } };
@@ -140,7 +184,67 @@ export function createMotorState(position: Vec3, facing = 0): MotorState {
   // x/y/z are getters — `{ ...v }` would copy the private _x/_y/_z and leave
   // x/y/z undefined, poisoning the motor with NaN.
   const p = { x: position.x, y: position.y, z: position.z };
-  return { position: { ...p }, velocityY: 0, grounded: false, sliding: false, facing, lastSafe: { ...p } };
+  return {
+    position: { ...p },
+    velocityY: 0,
+    grounded: false,
+    sliding: false,
+    medium: 'ground',
+    traversal: null,
+    facing,
+    lastSafe: { ...p },
+  };
+}
+
+/**
+ * Build a valid grounded motor state at (x, z) resting on ground at `groundY`.
+ * Used on save/load + region entry so the player always restores to a stable,
+ * grounded pose + anchor rather than a brittle mid-air position.
+ */
+export function groundedPoseAt(
+  x: number,
+  z: number,
+  groundY: number,
+  facing = 0,
+  cfg: MotorConfig = DEFAULT_MOTOR_CONFIG,
+): MotorState {
+  const s = createMotorState({ x, y: groundY + cfg.capsuleHeight / 2, z }, facing);
+  s.grounded = true;
+  return s;
+}
+
+/** The medium for a capsule whose feet are at `feetY` over the given water (if any). */
+export function mediumFor(water: WaterColumn | undefined, feetY: number, cfg: MotorConfig): Medium {
+  if (!water || water.surfaceY - feetY <= 0.05) return 'ground';
+  return water.surfaceY - water.bedY > cfg.swimDepth ? 'swim' : 'wade';
+}
+
+/**
+ * Begin an authored traversal from the current pose to `to`. The scene calls
+ * this only when the player is at a link (contextual; there is no free jump).
+ */
+export function beginTraversal(
+  state: MotorState,
+  to: Vec3,
+  kind: string,
+  duration: number,
+  cancellable = true,
+): MotorState {
+  return {
+    ...state,
+    traversal: { kind, from: { ...state.position }, to: { ...to }, elapsed: 0, duration, cancellable },
+  };
+}
+
+/** Cancel an in-progress traversal where allowed, returning to its start. */
+export function cancelTraversal(state: MotorState): MotorState {
+  const t = state.traversal;
+  if (!t || !t.cancellable) return state;
+  return { ...state, position: { ...t.from }, velocityY: 0, traversal: null };
+}
+
+function smoothstep(u: number): number {
+  return u * u * (3 - 2 * u);
 }
 
 const TWO_PI = Math.PI * 2;
@@ -171,6 +275,24 @@ export function stepMotor(
   cfg: MotorConfig = DEFAULT_MOTOR_CONFIG,
 ): MotorState {
   const half = cfg.capsuleHeight / 2;
+
+  // --- Authored traversal (vault/climb/elevation link): scripted, no physics --
+  if (state.traversal) {
+    const t = state.traversal;
+    const elapsed = t.elapsed + dt;
+    const u = Math.min(1, elapsed / t.duration);
+    const k = smoothstep(u);
+    const pos = {
+      x: t.from.x + (t.to.x - t.from.x) * k,
+      y: t.from.y + (t.to.y - t.from.y) * k,
+      z: t.from.z + (t.to.z - t.from.z) * k,
+    };
+    if (u >= 1) {
+      return { ...state, position: pos, velocityY: 0, grounded: true, sliding: false, medium: 'ground', traversal: null, lastSafe: { ...pos } };
+    }
+    return { ...state, position: pos, velocityY: 0, grounded: false, sliding: false, medium: 'ground', traversal: { ...t, elapsed } };
+  }
+
   let x = state.position.x;
   let y = state.position.y;
   let z = state.position.z;
@@ -178,8 +300,10 @@ export function stepMotor(
   let facing = state.facing;
   let lastSafe = state.lastSafe;
 
+  const medium = mediumFor(env.water, y - half, cfg);
+  const speedFactor = medium === 'swim' ? cfg.swimSpeedFactor : medium === 'wade' ? cfg.wadeSpeedFactor : 1;
   const moving = input.moveDir.x !== 0 || input.moveDir.z !== 0;
-  const mag = moving ? input.speed * dt : 0;
+  const mag = moving ? input.speed * speedFactor * dt : 0;
 
   // --- Horizontal move: wall collide-and-slide + step-up --------------------
   let steppedUp = false;
@@ -216,11 +340,21 @@ export function stepMotor(
     z += env.wall.normal.z * push;
   }
 
-  // --- Vertical: grounding + gravity ---------------------------------------
+  // --- Vertical: water (swim/wade) or grounding + gravity ------------------
   const g = env.ground;
   const groundY = g.hit ? g.groundY : Number.NEGATIVE_INFINITY;
   let grounded = false;
-  if (steppedUp) {
+  if (medium === 'swim' && env.water) {
+    // Buoyant float: ease the capsule centre toward the waterline.
+    const targetY = env.water.surfaceY - cfg.waterlineOffset;
+    y = dampToward(y, targetY, cfg.buoyancyLag, dt);
+    vy = 0;
+  } else if (medium === 'wade' && env.water) {
+    // Stand on the water bed (slowed horizontally above).
+    y = env.water.bedY + half;
+    vy = 0;
+    grounded = true;
+  } else if (steppedUp) {
     grounded = true;
     vy = 0;
   } else {
@@ -244,7 +378,7 @@ export function stepMotor(
 
   // --- Slope: slide down ground steeper than the limit ---------------------
   let sliding = false;
-  if (grounded && g.hit) {
+  if (medium === 'ground' && grounded && g.hit) {
     const angle = slopeAngleDeg(g.normal.y);
     if (angle > cfg.slopeLimitDeg) {
       sliding = true;
@@ -278,17 +412,25 @@ export function stepMotor(
   }
 
   // --- Safe-pose tracking + out-of-bounds recovery -------------------------
-  if (grounded && !sliding) lastSafe = { x, y, z };
+  if (grounded && !sliding && medium === 'ground') lastSafe = { x, y, z };
   if (y < cfg.recoverMinY) {
     return {
       position: { ...lastSafe },
       velocityY: 0,
       grounded: true,
       sliding: false,
+      medium: 'ground',
+      traversal: null,
       facing,
       lastSafe,
     };
   }
 
-  return { position: { x, y, z }, velocityY: vy, grounded, sliding, facing, lastSafe };
+  return { position: { x, y, z }, velocityY: vy, grounded, sliding, medium, traversal: null, facing, lastSafe };
+}
+
+/** Frame-rate-independent exponential smoothing toward a target (s time constant). */
+function dampToward(current: number, target: number, lag: number, dt: number): number {
+  if (lag <= 0 || dt <= 0) return target;
+  return current + (target - current) * (1 - Math.exp(-dt / lag));
 }

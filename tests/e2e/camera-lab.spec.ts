@@ -35,11 +35,13 @@ declare global {
       baselines: () => Record<string, string>;
       playerScreen: () => { x: number; y: number; onScreen: boolean };
       dropPlayer: (x: number, y: number, z: number) => void;
-      motor: () => { x: number; y: number; z: number; grounded: boolean; sliding: boolean; velocityY: number; facingDeg: number };
+      motor: () => { x: number; y: number; z: number; grounded: boolean; sliding: boolean; medium: string; traversing: boolean; velocityY: number; facingDeg: number };
       controller: () => { stamina: number; gait: string; speed: number };
       physicsBackend: () => string;
       sink: () => void;
       platform: () => { x: number; z: number; topY: number; vel: number };
+      triggerTraversal: () => boolean;
+      reload: () => void;
     };
   }
 }
@@ -329,6 +331,50 @@ test.describe('Camera Lab proving ground (WEF-01a)', () => {
     // Still standing on the platform (carried), not left behind at the start.
     expect(Math.abs(motor.x - plat.x), 'player rode the platform').toBeLessThan(2.2);
     expect(motor.y, 'standing on the platform top').toBeGreaterThan(0.9);
+  });
+
+  test('water: wading in the shallow pool, swimming in the deep pool (WEF-02c)', async ({ page }) => {
+    await page.goto('/?scene=CameraLab');
+    await page.waitForFunction(() => Boolean(window.sturdyVolleyLab?.motor));
+
+    await page.evaluate(() => window.sturdyVolleyLab!.setPlayer(22, 12)); // shallow-water station
+    await page.waitForTimeout(300);
+    const wade = await page.evaluate(() => window.sturdyVolleyLab!.motor());
+    expect(wade.medium, 'wading in the shallow pool').toBe('wade');
+
+    await page.evaluate(() => window.sturdyVolleyLab!.setPlayer(-16, -10)); // deep swim pool
+    await page.waitForTimeout(300);
+    const swim = await page.evaluate(() => window.sturdyVolleyLab!.motor());
+    expect(swim.medium, 'swimming in the deep pool').toBe('swim');
+    expect(swim.grounded, 'not grounded while swimming').toBe(false);
+  });
+
+  test('traversal: the authored climb link lifts the player onto the ledge', async ({ page }) => {
+    await page.goto('/?scene=CameraLab');
+    await page.waitForFunction(() => Boolean(window.sturdyVolleyLab?.triggerTraversal));
+    await page.evaluate(() => window.sturdyVolleyLab!.setPlayer(16, -13.5));
+    await page.waitForTimeout(200);
+    const before = await page.evaluate(() => window.sturdyVolleyLab!.motor());
+    const began = await page.evaluate(() => window.sturdyVolleyLab!.triggerTraversal());
+    expect(began, 'climb link triggered in range').toBe(true);
+    await page.waitForTimeout(1100); // climb duration 0.8 s + settle
+    const after = await page.evaluate(() => window.sturdyVolleyLab!.motor());
+    expect(after.traversing, 'traversal finished').toBe(false);
+    expect(after.y, `climbed onto the ledge (y ${before.y.toFixed(2)} -> ${after.y.toFixed(2)})`).toBeGreaterThan(2.5);
+    expect(after.grounded, 'grounded on the ledge').toBe(true);
+  });
+
+  test('recovery: reload restores a grounded pose + anchor (WEF-02c)', async ({ page }) => {
+    await page.goto('/?scene=CameraLab');
+    await page.waitForFunction(() => Boolean(window.sturdyVolleyLab?.reload));
+    await page.evaluate(() => window.sturdyVolleyLab!.setPlayer(6, -4));
+    await page.waitForTimeout(200);
+    await page.evaluate(() => window.sturdyVolleyLab!.reload());
+    await page.waitForTimeout(150);
+    const after = await page.evaluate(() => window.sturdyVolleyLab!.motor());
+    expect(after.grounded, 'recovered grounded').toBe(true);
+    expect(after.y, 'valid grounded height').toBeGreaterThan(0.5);
+    expect(Math.hypot(after.x - 6, after.z + 4), 'restored to the same anchor').toBeLessThan(1.0);
   });
 
   test('keeps the full player HUD-safe across tablet / ultrawide / tall-phone aspect ratios', async ({ page }, testInfo) => {

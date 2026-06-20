@@ -5,6 +5,84 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 033 — Water, contextual traversal links, and save recovery (WEF-02c) (2026-06-20)
+
+Closed the motor block (WEF-02): added wading + swimming, an authored
+traversal-link state machine (no free jump), and a grounded-pose recovery
+contract for save/load + region entry — all in the pure motor core, exercised in
+the proving ground.
+
+**Water (`src/engine/motor.ts`).** `MotorEnvironment` gains an optional `water`
+column (`surfaceY` + `bedY`). `mediumFor` classifies `ground | wade | swim` from
+the depth at the feet: a column ≤ `swimDepth` (1.3 m) with submerged feet is
+**wading** (stand on the bed, speed × 0.55); deeper is **swimming** (buoyant
+float toward `surfaceY − waterlineOffset`, ungrounded, speed × 0.70). Shore
+entry / water exit is automatic from depth — no mode button. `MotorState.medium`
+reports the medium.
+
+**Traversal links.** `TraversalState` + `beginTraversal` / `cancelTraversal`;
+`stepMotor` runs an active traversal as a scripted smoothstep `from → to`,
+ignoring gravity + input, and restores control **grounded** at `to`. Cancellable
+where the link allows (returns to start). Contextual — the scene starts one only
+within range of a link. There is **no free jump**. Smooth interpolation keeps the
+camera continuous.
+
+**Save / region recovery.** `groundedPoseAt(x, z, groundY, facing)` builds a
+valid grounded pose + stable anchor; with the §3b out-of-bounds recovery the
+player can never be stranded mid-air.
+
+**Gait/stamina migration.** The existing `controller.ts` (stamina + gait) feeds
+the motor's horizontal speed end-to-end through every medium — wade/swim scale
+that speed, they don't bypass the controller. (Full play-scene migration onto the
+motor is Prompt 053 per the §5 seam; the proving ground is the end-to-end
+consumer here.)
+
+**Proving ground.** Added a deep swim pool (the second water volume), kept the
+shallow-water station as the wade pool, and one authored **climb link** onto a
+2 m ledge (`e` key / `triggerTraversal`). Debug API gains `medium` + `traversing`
+on `motor()`, `triggerTraversal()`, and `reload()` (simulates save→load
+recovery). Swim-pool meshes excluded from collision (handled by the water model).
+
+Files: `src/engine/motor.ts`, `src/scenes/CameraLabScene.ts`,
+`tests/unit/motor.test.ts`, `tests/e2e/camera-lab.spec.ts`,
+`docs/GAMEPLAY_MOTOR.md`.
+
+**Acceptance criteria**
+
+- [x] Shore entry, water exit, and traversal links are contextual, cancellable
+  where safe, and restore control without camera discontinuity — water medium is
+  depth-driven (auto entry/exit); traversal is range-gated + smoothstep-interpolated
+  (rig follows continuously); `cancelTraversal` returns to start when cancellable.
+  Unit + e2e (wade/swim state, climb-onto-ledge) on both projects.
+- [x] Save/load and region entry recover to a valid grounded pose and stable
+  anchor — `groundedPoseAt` + the `reload()` e2e (restores grounded at the same
+  anchor) + out-of-bounds recovery.
+- [x] Buoyancy/recovery thresholds documented (`docs/GAMEPLAY_MOTOR.md` §2 Water
+  + §3c); existing stamina and gait behaviour remain functional (consumed through
+  the motor in every medium; the play scenes' own behaviour is untouched until
+  053).
+
+**Decision record**
+
+- Water entry/exit is **automatic from depth at the feet**, not a button — matches
+  the contextual-traversal doctrine (§1.1: no unrestricted modes).
+- Traversal is a pure state machine on `MotorState`; the scene owns link
+  placement + the trigger. Keeps the "no free jump" rule structural (you can only
+  traverse at an authored link) and unit-testable.
+- The swim float coincides with the flat proving-ground plane (no hole cut in the
+  graybox ground); the swim **state** is what 033 proves. Real sunken water lands
+  with the map builds (046–049).
+- Full play-scene migration deferred to 053 (the §5 seam); 033 proves the
+  controller→motor path end-to-end in the lab.
+
+**Verify gate** — `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest 388 passed (42 files; +7 water/traversal/recovery) ·
+Playwright 145 passed + 1 skipped (desktop-only aspect sweep; +6 new cases across
+projects) · `validate:assets` 0 · `build` 0 · GitDoctor 100/100, `--fail-on high`
+exit 0.
+
+---
+
 ## Prompt 032 — Motor terrain handling and recovery (WEF-02b) (2026-06-20)
 
 Extended the kinematic capsule motor with full terrain handling — slope limit +

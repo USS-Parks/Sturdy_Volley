@@ -4,8 +4,12 @@ import {
   NO_CEILING,
   NO_GROUND,
   NO_WALL,
+  beginTraversal,
+  cancelTraversal,
   createMotorState,
   flatGround,
+  groundedPoseAt,
+  mediumFor,
   openEnv,
   slopeAngleDeg,
   stepMotor,
@@ -148,5 +152,68 @@ describe('stepMotor — terrain handling (032)', () => {
     const s = stepMotor(s0, still, airEnv, 1 / 60);
     expect(s.position).toEqual({ x: 5, y: HALF, z: 5 });
     expect(s.grounded).toBe(true);
+  });
+});
+
+describe('stepMotor — water + traversal + recovery (033)', () => {
+  it('classifies the medium by water depth', () => {
+    expect(mediumFor(undefined, 0, cfg)).toBe('ground');
+    // feet above the surface = on dry land.
+    expect(mediumFor({ surfaceY: 0.3, bedY: -0.1 }, 0.5, cfg)).toBe('ground');
+    // shallow column, feet submerged = wade.
+    expect(mediumFor({ surfaceY: 0.3, bedY: -0.1 }, 0, cfg)).toBe('wade');
+    // deep column, feet submerged = swim.
+    expect(mediumFor({ surfaceY: 0.5, bedY: -2.4 }, -0.4, cfg)).toBe('swim');
+  });
+
+  it('wades on the bed, slowed', () => {
+    const water = { surfaceY: 0.3, bedY: -0.1 };
+    const s = stepMotor(createMotorState({ x: 0, y: HALF, z: 0 }), { moveDir: { x: 1, z: 0 }, speed: 4 }, env({ water }), 0.1);
+    expect(s.medium).toBe('wade');
+    expect(s.grounded).toBe(true);
+    expect(s.position.y, 'stands on the bed').toBeCloseTo(water.bedY + HALF, 6);
+    expect(s.position.x, 'slowed to wade factor').toBeCloseTo(4 * cfg.wadeSpeedFactor * 0.1, 6);
+  });
+
+  it('swims (buoyant float) in deep water, slowed', () => {
+    const water = { surfaceY: 0.5, bedY: -2.4 };
+    let s = createMotorState({ x: 0, y: 0.5, z: 0 });
+    s = stepMotor(s, { moveDir: { x: 1, z: 0 }, speed: 4 }, env({ ground: NO_GROUND, water }), 0.1);
+    expect(s.medium).toBe('swim');
+    expect(s.grounded).toBe(false);
+    expect(s.position.y, 'eased toward the waterline').toBeLessThan(0.5);
+    expect(s.position.x, 'slowed to swim factor').toBeCloseTo(4 * cfg.swimSpeedFactor * 0.1, 6);
+  });
+
+  it('runs an authored traversal to completion, ignoring input', () => {
+    let s = beginTraversal(createMotorState({ x: 0, y: HALF, z: 0 }), { x: 0, y: 2.9, z: 5 }, 'climb', 0.8);
+    s = stepMotor(s, { moveDir: { x: -1, z: 0 }, speed: 9 }, env(), 0.4); // input should be ignored
+    expect(s.traversal, 'still traversing').not.toBeNull();
+    expect(s.position.y, 'rising toward the ledge').toBeGreaterThan(HALF);
+    expect(s.position.x, 'input ignored during traversal').toBeCloseTo(0, 6);
+    s = stepMotor(s, still, env(), 0.5); // total 0.9 > 0.8 duration
+    expect(s.traversal, 'traversal finished').toBeNull();
+    expect(s.position).toEqual({ x: 0, y: 2.9, z: 5 });
+    expect(s.grounded).toBe(true);
+  });
+
+  it('cancels a cancellable traversal back to its start', () => {
+    let s = beginTraversal(createMotorState({ x: 1, y: HALF, z: 1 }), { x: 0, y: 5, z: 0 }, 'climb', 1, true);
+    s = stepMotor(s, still, env(), 0.3);
+    s = cancelTraversal(s);
+    expect(s.traversal).toBeNull();
+    expect(s.position).toEqual({ x: 1, y: HALF, z: 1 });
+  });
+
+  it('does not cancel a non-cancellable traversal', () => {
+    const s = cancelTraversal(beginTraversal(createMotorState({ x: 0, y: HALF, z: 0 }), { x: 0, y: 5, z: 0 }, 'climb', 1, false));
+    expect(s.traversal, 'still active').not.toBeNull();
+  });
+
+  it('builds a valid grounded pose for save/region recovery', () => {
+    const s = groundedPoseAt(3, 4, 1.5);
+    expect(s.position).toEqual({ x: 3, y: 1.5 + HALF, z: 4 });
+    expect(s.grounded).toBe(true);
+    expect(s.medium).toBe('ground');
   });
 });

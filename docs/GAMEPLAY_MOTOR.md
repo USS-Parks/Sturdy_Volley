@@ -1,6 +1,6 @@
 # Gameplay Motor and Physics — Sturdy Volley
 
-Last revised: 2026-06-20 (Prompt 032, WEF-02b).
+Last revised: 2026-06-20 (Prompt 033, WEF-02c).
 Normative for the player kinematic-capsule motor. Units: **metres and seconds**.
 
 ## 1. Architecture
@@ -62,6 +62,15 @@ needed). Water + authored traversal links (vault/climb/swim) are **Prompt 033**.
 | Step offset | **0.4 m** — max ledge the capsule climbs without jumping |
 | Out-of-bounds floor | **−25 m** — below this the player recovers to the last safe grounded pose |
 
+### Water + traversal (WEF-02c)
+| Property | Value |
+|---|---|
+| Swim depth | **1.3 m** — water columns deeper than this make the player swim (can't stand) |
+| Wade speed factor | **0.55×** horizontal speed while wading |
+| Swim speed factor | **0.70×** horizontal speed while swimming |
+| Waterline offset | **0.5 m** — the capsule centre floats this far below the surface when swimming |
+| Buoyancy lag | **0.2 s** — float-to-waterline smoothing time constant |
+
 ### Horizontal (from `controller.ts`, consumed by the motor)
 | Property | Value |
 |---|---|
@@ -118,6 +127,32 @@ velocity is **carried** while grounded on it; a wall reporting negative gap
 (penetration) **pushes the capsule out** along its normal; and falling below
 **`recoverMinY`** **recovers** the player to the last stably-grounded pose. Each
 case has deterministic unit coverage in `tests/unit/motor.test.ts`.
+
+## 3c. Water, traversal links, and recovery (WEF-02c)
+
+- **Wading / swimming.** The scene supplies an optional `water` column
+  (`surfaceY` + `bedY`) in the `MotorEnvironment`. With the feet below the
+  surface: a column ≤ `swimDepth` is **wading** (stand on the bed, horizontal
+  speed × `wadeSpeedFactor`); deeper is **swimming** (buoyant float toward
+  `surfaceY − waterlineOffset`, not grounded, speed × `swimSpeedFactor`). Shore
+  entry / water exit is automatic from the depth at the player's feet — no mode
+  button. `MotorState.medium` reports `ground | wade | swim`.
+- **Authored traversal links (no free jump).** `beginTraversal(state, to, kind,
+  duration, cancellable)` starts a scripted move (vault / climb / elevation
+  link); `stepMotor` interpolates `from → to` with smoothstep, ignoring gravity
+  and input, and on completion restores control **grounded** at `to`.
+  `cancelTraversal` returns the player to the start when `cancellable`. The scene
+  starts one only when the player is within range of a link (contextual). The
+  smooth interpolation keeps the camera continuous (the rig follows the lerped
+  position).
+- **Save / region-entry recovery.** `groundedPoseAt(x, z, groundY, facing)`
+  builds a valid grounded pose + stable anchor, so save/load and region entry
+  always restore the player standing on ground rather than at a brittle mid-air
+  position. Combined with the out-of-bounds recovery (§3b), the player can never
+  be stranded.
+- **Gait / stamina.** The existing `controller.ts` (stamina + gait) feeds the
+  motor's horizontal speed end-to-end through every medium — wading and swimming
+  scale that speed, they do not bypass the controller.
 
 ## 4. Proving ground + debug
 

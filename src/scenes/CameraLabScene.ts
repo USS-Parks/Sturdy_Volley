@@ -14,7 +14,9 @@ import { GameScene } from './GameScene';
 import { makeScene, addFog, addLights, flatMaterial, PALETTE } from '../render/scene-helpers';
 import { CameraRig, type FollowTarget, type ObstructionMode } from '../camera/rig';
 import {
+  beginTraversal,
   createMotorState,
+  groundedPoseAt,
   stepMotor,
   DEFAULT_MOTOR_CONFIG,
   NO_WALL,
@@ -110,6 +112,14 @@ export class CameraLabScene extends GameScene {
   private platformMesh: Mesh | null = null;
   private readonly platform = { cx: 12, cz: -16, hx: 2, hz: 1.5, topY: 0.3, amp: 4, vel: 0, t: 0 };
 
+  // Water + traversal (033). Wade pool (the shallow-water station) + a deep swim
+  // pool, plus one authored climb link onto a ledge (no free jump).
+  private readonly waters = [
+    { cx: 22, cz: 12, hx: 3.5, hz: 3.5, surfaceY: 0.3, bedY: -0.1 }, // wade (shallow station)
+    { cx: -16, cz: -10, hx: 3.5, hz: 3.5, surfaceY: 0.5, bedY: -2.4 }, // deep swim pool
+  ];
+  private readonly climbLink = { x: 16, z: -12.2, range: 1.9, to: { x: 16, y: 2 + PLAYER_HEIGHT / 2, z: -9.5 }, duration: 0.8 };
+
   build(): Scene {
     const scene = makeScene(this.ctx.engine, PALETTE.sky);
     this.scene = scene; // station()/box() build against this.scene below
@@ -129,6 +139,8 @@ export class CameraLabScene extends GameScene {
     plat.material = flatMaterial(scene, 'lab-platform', PALETTE.accent, 0.35);
     plat.isPickable = false; // grounded geometrically, not by raycast
     this.platformMesh = plat;
+
+    this.buildWaterAndLinks(scene);
 
     // Data-driven camera rig (029), framing the movable reference player. The
     // locked exterior baseline (030) is the starting profile.
@@ -244,6 +256,8 @@ export class CameraLabScene extends GameScene {
     } else if (key === 'c' || key === 'C') {
       this.obstructionMode = this.obstructionMode === 'fade' ? 'cutaway' : 'fade';
       this.rig.setObstructionMode(this.obstructionMode);
+    } else if (key === 'e' || key === 'E') {
+      this.tryTraversal(); // contextual climb link (no free jump)
     }
   }
 
@@ -308,6 +322,47 @@ export class CameraLabScene extends GameScene {
     this.platformMesh.position.x = p.cx;
   }
 
+  /** Deep swim pool geometry + the climb-link ledge (033). */
+  private buildWaterAndLinks(scene: Scene): void {
+    // Deep swim pool: a sunken bed + translucent surface (the second water vol).
+    const pool = this.waters[1];
+    const poolBed = MeshBuilder.CreateBox('lab-swim-bed', { width: pool.hx * 2, height: 0.3, depth: pool.hz * 2 }, scene);
+    poolBed.position.set(pool.cx, pool.bedY, pool.cz);
+    poolBed.material = flatMaterial(scene, 'lab-swim-bed', PALETTE.cliff, 0.16);
+    poolBed.isPickable = false; // grounded via the water model
+    const poolWater = MeshBuilder.CreateBox('lab-swim-water', { width: pool.hx * 2, height: pool.surfaceY - pool.bedY, depth: pool.hz * 2 }, scene);
+    poolWater.position.set(pool.cx, (pool.surfaceY + pool.bedY) / 2, pool.cz);
+    poolWater.material = flatMaterial(scene, 'lab-swim-water', PALETTE.sea, 0.4);
+    poolWater.visibility = 0.5;
+    poolWater.isPickable = false;
+
+    // Climb-link ledge: a 2 m wall too tall to step, climbed via the link.
+    const ledge = MeshBuilder.CreateBox('lab-climb-ledge', { width: 4, height: 2, depth: 3 }, scene);
+    ledge.position.set(this.climbLink.x, 1, -10);
+    ledge.material = flatMaterial(scene, 'lab-climb-ledge', PALETTE.quarry, 0.16);
+  }
+
+  /** Water column at (x,z) if over a water volume (highest surface wins). */
+  private waterAt(x: number, z: number): { surfaceY: number; bedY: number } | undefined {
+    let best: { surfaceY: number; bedY: number } | undefined;
+    for (const w of this.waters) {
+      if (x >= w.cx - w.hx && x <= w.cx + w.hx && z >= w.cz - w.hz && z <= w.cz + w.hz) {
+        if (!best || w.surfaceY > best.surfaceY) best = { surfaceY: w.surfaceY, bedY: w.bedY };
+      }
+    }
+    return best;
+  }
+
+  /** Begin the climb traversal if the player is within range of the link. */
+  private tryTraversal(): boolean {
+    if (this.motorState.traversal) return false;
+    const p = this.motorState.position;
+    const d = Math.hypot(p.x - this.climbLink.x, p.z - this.climbLink.z);
+    if (d > this.climbLink.range) return false;
+    this.motorState = beginTraversal(this.motorState, this.climbLink.to, 'climb', this.climbLink.duration, true);
+    return true;
+  }
+
   /** Assemble the ground/wall/step/ceiling probes the motor core consumes. */
   private buildEnvironment(moveDir: Planar, mag: number): MotorEnvironment {
     const cfg = DEFAULT_MOTOR_CONFIG;
@@ -345,7 +400,7 @@ export class CameraLabScene extends GameScene {
     const cr = this.physics.raycast({ x: pos.x, y: pos.y + half - 0.05, z: pos.z }, { x: 0, y: 1, z: 0 }, cfg.stepOffset + 0.4);
     if (cr.hit) ceiling = { hit: true, ceilingY: cr.point.y };
 
-    return { ground, wall, stepGround, ceiling };
+    return { ground, wall, stepGround, ceiling, water: this.waterAt(pos.x, pos.z) };
   }
 
   /** Override the ground hit with the moving platform when the player is over it. */
@@ -628,15 +683,28 @@ export class CameraLabScene extends GameScene {
         this.playerVel = { x: 0, z: 0 };
         this.playerMesh.position.set(this.motorState.position.x, y, this.motorState.position.z);
       },
-      motor: (): { x: number; y: number; z: number; grounded: boolean; sliding: boolean; velocityY: number; facingDeg: number } => ({
+      motor: (): { x: number; y: number; z: number; grounded: boolean; sliding: boolean; medium: string; traversing: boolean; velocityY: number; facingDeg: number } => ({
         x: this.motorState.position.x,
         y: this.motorState.position.y,
         z: this.motorState.position.z,
         grounded: this.motorState.grounded,
         sliding: this.motorState.sliding,
+        medium: this.motorState.medium,
+        traversing: this.motorState.traversal !== null,
         velocityY: this.motorState.velocityY,
         facingDeg: (this.motorState.facing * 180) / Math.PI,
       }),
+      /** Begin the contextual climb traversal if in range (no free jump). */
+      triggerTraversal: (): boolean => this.tryTraversal(),
+      /** Simulate a save→load / region entry: recover to a grounded pose + anchor. */
+      reload: (): void => {
+        const p = this.motorState.position;
+        const probe = this.physics.groundProbe(p.x, p.y + 1, p.z, 50);
+        this.motorState = groundedPoseAt(p.x, p.z, probe.hit ? probe.groundY : 0, this.motorState.facing);
+        this.controllerState = createControllerState();
+        this.playerVel = { x: 0, z: 0 };
+        this.playerMesh.position.set(this.motorState.position.x, this.motorState.position.y, this.motorState.position.z);
+      },
       controller: (): { stamina: number; gait: string; speed: number } => ({
         stamina: this.controllerState.stamina,
         gait: this.controllerState.gait,
@@ -719,6 +787,8 @@ const COLLIDER_SKIP = new Set([
   'lab-player',
   'lab-water',
   'lab-platform',
+  'lab-swim-water',
+  'lab-swim-bed',
   'lab-canopy',
   'lab-roof',
   'lab-trunk',
