@@ -48,6 +48,7 @@ import type { Weather } from '../data/schemas';
 
 interface InteriorDebugApi {
   openCrafting: () => void;
+  openShop: () => void;
   placedDecor: () => Array<{ id: string; itemId: string; x: number; z: number }>;
   grantStarterIngredients: () => void;
   grantItem: (itemId: string, qty: number) => void;
@@ -323,6 +324,7 @@ export class InteriorScene extends GameScene {
     // Prompt 017: per-scene debug hook for the crafting playwright spec.
     (window as unknown as { sturdyVolleyInterior?: InteriorDebugApi }).sturdyVolleyInterior = {
       openCrafting: () => this.openCrafting(),
+      openShop: () => this.openShop(),
       placedDecor: () => listPlacements(this.save, 'Interior').map((p) => ({ ...p })),
       grantStarterIngredients: () => {
         const r = addItem(this.save.inventory, 'driftwood', 2);
