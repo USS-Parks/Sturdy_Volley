@@ -11,6 +11,7 @@ import { MineScene } from './MineScene';
 import { CameraLabScene } from './CameraLabScene';
 import { StreamingLabScene } from './StreamingLabScene';
 import { InteriorLabScene } from './InteriorLabScene';
+import { NavLabScene } from './NavLabScene';
 
 /** All game scenes, keyed by the names used in save.location.sceneKey + transitions. */
 export const SCENE_FACTORIES: Record<string, SceneFactory> = {
@@ -31,4 +32,6 @@ export const SCENE_FACTORIES: Record<string, SceneFactory> = {
   StreamingLab: (ctx) => new StreamingLabScene(ctx),
   // Dev-only interior-kit proving ground (WEF-05). `?scene=InteriorLab`.
   InteriorLab: (ctx) => new InteriorLabScene(ctx),
+  // Dev-only NPC-navigation proving ground (WEF-07a). `?scene=NavLab`.
+  NavLab: (ctx) => new NavLabScene(ctx),
 };

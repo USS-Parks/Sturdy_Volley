@@ -5,6 +5,76 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 040 — NPC navigation service core (WEF-07a) (2026-06-20)
+
+Replaced the straight-line `liveStep` waypoint interpolation with a real
+navigation service — a navmesh of convex patches joined by portals + authored
+off-mesh links (door / stair / slope), A* pathfinding, and a path follower that
+feeds the **shared motor** — and proved it driving the four existing NPCs across
+exterior / doorway / interior / stair-slope.
+
+**Navigation core (`src/engine/navigation.ts`).** Pure + deterministic.
+`NavMesh` = `NavPatch[]` (axis-aligned walkable rects, area-tagged) + `NavLink[]`
+(portal/door/stair/slope, each with `at`/`toAt` points). `findPath` runs A* over
+the patches via the links and emits walk waypoints inside patches + link-kind
+waypoints when crossing — so the renderer knows a door/stair is being traversed.
+`setNavGoal`/`navDesiredDir`/`navAdvance`/`currentKind` are the per-agent path
+follower: navigation supplies the unit move direction + link kind; locomotion is
+`engine/motor.stepMotor`. Off-mesh endpoints + unreachable goals return null
+(handled gracefully).
+
+**Proving ground (`src/scenes/NavLabScene.ts`).** Bakes a navmesh over a yard
+(exterior) + house (interior, via a door) + loft (interior, via a stair) + a
+slope-reached overlook, and drives Mara / Wren / Bree / Cas along scheduled goal
+cycles through the service on the shared motor. Each NPC's goal cycle re-paths on
+arrival (a schedule transition routed through the service); `talk(npc)` faces an
+NPC to the player (conversation alignment via `faceTarget`); `?debug=nav` renders
+the navmesh patches, link markers, and each NPC's live path. `window.sturdyVolleyNav`
+debug API + a deterministic `tick()` stepper. Reachable via Title "Dev · Nav Lab"
++ `?scene=NavLab`; registry + dev-route + Title wired.
+
+Files: `src/engine/navigation.ts` (new), `src/scenes/NavLabScene.ts` (new),
+`tests/unit/navigation.test.ts` (new), `tests/e2e/nav-lab.spec.ts` (new),
+`src/scenes/registry.ts`, `src/scenes/dev-route.ts`, `src/scenes/TitleScene.ts`.
+
+**Acceptance criteria**
+
+- [x] ≥4 existing NPCs traverse exterior / doorway / interior / stair-slope using
+  the shared motor/navigation contract (Mara/Wren/Bree/Cas on `stepMotor` +
+  `navigation`; the e2e asserts the population traverses door + stair + slope and
+  visits both exterior + interior, and Mara's loop alone covers door + stair +
+  interior + exterior).
+- [x] Conversation alignment + basic schedule transitions remain correct through
+  the new service (a goal change re-paths via `setNavGoal` — `arrivals > 0` per
+  NPC; `talk()` faces the NPC to the player, `facingAligned` asserted).
+- [x] Navigation debug view shows mesh, path, and next link (`?debug=nav` renders
+  patch quads + link markers + live per-NPC path dots; e2e asserts the debug mesh
+  count).
+
+**Decision record**
+
+- **Navigation supplies direction, the motor supplies locomotion.** Per the
+  acceptance ("on the shared motor"), NPCs run `stepMotor` on flat ground for
+  planar movement; `navDesiredDir` feeds the heading and `currentKind` records
+  the link being crossed. Elevation across stairs/slope is cosmetic (mesh Y lerp)
+  — the link *kind* is what proves the traversal, keeping the motor path reliable.
+- **Patches share edges, never overlap.** An overlap made `patchAt` resolve a
+  point to the first-listed patch, collapsing a cross-link goal to a same-patch
+  walk (caught in the slope case during e2e). The navmesh now shares only edges;
+  link exits land unambiguously in the destination patch.
+- **Proving ground, not TownScene migration.** The service is proven with the 4
+  existing NPC ids in a dedicated nav lab (the WEF lab pattern); the live
+  FarmScene/TownScene migration onto the service is Prompt 053. The straight-line
+  `liveStep` stays until then.
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **509 passed** (+8 navigation) · Playwright **189 passed +
+1 skipped** (desktop-only aspect sweep) on both `desktop-chromium` +
+`mobile-chromium` (+8 nav-lab) · `validate:assets` 0 · `build` 0 · GitDoctor
+**100/100**.
+
+---
+
 ## Prompt 039 — Dimensioned blockouts: Breakpoint Farm + Ballast Bay district (WEF-06c) (2026-06-20)
 
 Derived dimensioned top-down + elevation blockouts for the first two

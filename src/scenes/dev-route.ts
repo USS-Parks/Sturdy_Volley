@@ -10,7 +10,7 @@
  */
 
 /** Scene keys that may be entered directly via `?scene=<key>`. */
-export const DEV_SCENES: ReadonlySet<string> = new Set(['CameraLab', 'StreamingLab', 'InteriorLab']);
+export const DEV_SCENES: ReadonlySet<string> = new Set(['CameraLab', 'StreamingLab', 'InteriorLab', 'NavLab']);
 
 /**
  * Returns the requested dev scene key when the current URL carries a valid
