@@ -1,4 +1,8 @@
-# 2026-06-19-02 — Master Roster STS: camera gate (Prompts 028–030)
+# 2026-06-19-02 — Master Roster STS: camera gate + motor core (Prompts 028–031)
+
+> Spans the 2026-06-19 → 2026-06-20 date rollover; one conversation. The entry
+> was first written at the 030 handoff point, then the user directed the session
+> to continue (governance fix + Prompt 031). Updated to cover the full session.
 
 ## Operator
 Claude Opus 4.8 (`claude-opus-4-8`), via Claude Code.
@@ -39,33 +43,52 @@ prompt.
   reduced-motion + fade/cutaway obstruction policy, added telemetry +
   `playerScreen()`, proved HUD-safe framing across 5 aspect ratios. **Closes the
   camera gate (WEF-01).**
-- Wrote the forward baton `PLANNING/handoffs/HANDOFF-030-2026-06-19.md`.
+- **Governance `752e04e`** — after the user clarified that **STS = push every
+  prompt** ("I say STS? That means send it stem to stern"), rewrote
+  MASTER_ROSTER §0.5 (STS authorization IS push authorization), updated the
+  `feedback_sts_push_every_prompt` memory's reconciliation note, started tracking
+  `PLANNING/`, committed the pending plan-activation edits (CLAUDE.md pointer,
+  PSPR banner, image-prompt roster) + this session log, and **pushed the whole
+  backlog** (`caf8bd1..752e04e`).
+- **Prompt 031 `ddc79c3`** — integrated **Havok inside Babylon.js**
+  (`@babylonjs/havok` 1.3.12 vs core 7.54.3) behind a narrow `MotorPhysics` port
+  with a ray-pick fallback; pure kinematic capsule motor core
+  (`src/engine/motor.ts`); replaced the proving-ground proxy driver with the real
+  motor (stamina/gait from the existing controller). Havok confirmed loading in
+  the headless preview. Fixed a `Vector3`-spread NaN bug. Pushed
+  (`752e04e..ddc79c3`).
+- Batons: `PLANNING/handoffs/HANDOFF-030-2026-06-19.md` (camera gate) +
+  `PLANNING/handoffs/HANDOFF-031-2026-06-20.md` (this close-out).
 
 ## Verify gate
-Run per prompt; last commit (`39cd4d0`): `tsc -p tsconfig.json` 0 ·
-`tsc -p tsconfig.node.json` 0 · `eslint .` 0 · Vitest **364 passed** · Playwright
-**127 passed + 1 skipped** (desktop-only aspect sweep) on desktop-chromium +
+Run per prompt; last commit (`ddc79c3`, Prompt 031): `tsc -p tsconfig.json` 0 ·
+`tsc -p tsconfig.node.json` 0 · `eslint .` 0 · Vitest **373 passed** · Playwright
+**131 passed + 1 skipped** (desktop-only aspect sweep) on desktop-chromium +
 mobile-chromium · `validate:assets` 0 · `build` 0 · GitDoctor **100/100**
-(`--fail-on high` exit 0). No waivers.
+(`--fail-on high` exit 0). No waivers. (Camera gate 030 commit `39cd4d0`: vitest
+364 / playwright 127+1.)
 
 ## Outcome
-`handed off` — successor session resumes STS at **Prompt 031 (Havok adapter +
-kinematic capsule motor core, WEF-02a)**, a §0.12 session-heavy prompt that
-starts fresh.
+`handed off` — successor session resumes STS at **Prompt 032 (Motor terrain
+handling + recovery, WEF-02b)**: slope limit, sliding, step offset, stairs,
+low-ceiling, pushing, penetration + out-of-bounds recovery, built on the 031
+motor + Havok port.
 
 ## Open items
-- **Push policy needs a user word.** Recalled memory `feedback_sts_push_every_prompt`
-  (push every prompt) conflicts with MASTER_ROSTER §0.5 (push only when asked;
-  never volunteer). Followed §0.5 — **nothing pushed.** Four commits sit local on
-  `main`. If push-per-prompt is still wanted, say so and the stale memory should
-  be updated.
-- Prompt 031 must verify Babylon/Havok APIs against the pinned package and add
-  `@babylonjs/havok`; it replaces the lab's proxy planar player driver with the
-  real motor (keep `playerVel`/`FollowTarget` wired for camera look-ahead).
-- This session log + the handoff file are written but **uncommitted** (per
-  SESSION_LOG/README: committing is the user's call or on explicit instruction).
+- **Push policy: RESOLVED.** STS = push every prompt is now locked in
+  MASTER_ROSTER §0.5 + the memory. All work pushed to `main` through `ddc79c3`.
+- Prompt 032 adds the Havok shape-sweep collide-and-slide + per-obstacle
+  colliders (031 grounds on the flat plane only); slope/stairs/step stations in
+  the proving ground are ready to exercise it.
+- `npm run build` emits a Babylon chunk-size > 4000 kB warning (now larger with
+  the Havok WASM asset); not a gate failure — relevant to the mobile/PWA prompt
+  (068).
 
 ## Decisions
 - Baseline = `standard` variant per context; `fade` chosen / `cutaway` fallback
-  for occluders; rig holds no tuning (retune via profile data). Full rationale in
-  `docs/GAMEPLAY_CAMERA_AND_CONTROLS.md` and the Prompt 030 DEVLOG entry.
+  for occluders; rig holds no tuning. (`docs/GAMEPLAY_CAMERA_AND_CONTROLS.md`.)
+- **Havok runs inside Babylon.js** as its physics plugin (user-confirmed); it's
+  the primary backend, ray-pick is a safety-net fallback.
+  (`docs/GAMEPLAY_MOTOR.md`.)
+- Motor core stays pure (`{x,y,z}`), physics isolated behind the `MotorPhysics`
+  port — so the core unit-tests in jsdom and Havok/ray-pick are swappable.
