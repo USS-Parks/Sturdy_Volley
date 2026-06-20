@@ -5,6 +5,75 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 042 — Animal family framework + domestic-animal migration (WEF-08a) (2026-06-20)
+
+Defined animal movement **families** (not one generic mover) and migrated the
+existing pet + farm animals onto the shared foundation (navigation + motor +
+avoidance + sim tiers), with their husbandry data untouched.
+
+**Families (`src/engine/animal-families.ts`).** `ANIMAL_FAMILIES` —
+`small-quadruped-pet`, `grazing-livestock`, `poultry` — each declaring scale,
+body proxy (radius/height), gait bands, turn rate, slope limit, water capability,
+obstacle policy, interaction distance, animation clips, LOD tiers, activation
+radius, and save authority. `familyForAnimalKind`/`familyForPetKind` map the
+existing kinds; `gaitSpeed`/`familyCanEnterWater`/`familyCanWalkSlope` helpers.
+
+**Migration (`src/scenes/FaunaLabScene.ts`).** A Bay Dog (follows the player,
+target chosen by the **unchanged** `pets.ts tickPetFollow`, locomotion via the
+family framework), two Bluff Goats (graze the fenced pasture), two Mooncalf Hens
+(peck the yard) — all driven by navigation + `stepMotor` + `steerAvoid`
+parameterised by family. The pasture (fence + cliff edge), gate, coop door, and
+pond (water hazard) exercise the boundary policies. Husbandry (`petPet`,
+`petAnimal`, `heartsOf`) reused untouched — petting still raises affection.
+
+**Doc (`docs/ANIMAL_AND_FAUNA_PHYSICS.md`).** The per-family table, the
+behaviour-vs-locomotion split, the boundary policies, and verification.
+
+Files: `src/engine/animal-families.ts` (new), `src/scenes/FaunaLabScene.ts`
+(new), `docs/ANIMAL_AND_FAUNA_PHYSICS.md` (new),
+`tests/unit/animal-families.test.ts` (new), `tests/e2e/fauna-lab.spec.ts` (new),
+`src/scenes/registry.ts`, `src/scenes/dev-route.ts`, `src/scenes/TitleScene.ts`.
+
+**Acceptance criteria**
+
+- [x] The doc defines scale, body proxy, gait bands, turning, slope/water
+  capability, obstacle policy, interaction distance, animation needs, LOD/throttle,
+  and save authority **per family** (`docs/ANIMAL_AND_FAUNA_PHYSICS.md` §1 +
+  `ANIMAL_FAMILIES`; the completeness unit test asserts every field present).
+- [x] Existing pets + farm animals migrate without losing affection/feeding/
+  produce/weather/schedule; player/animal + animal/animal contacts feel soft
+  (husbandry e2e: `petDog`/`petLivestock` raise affection; `minPlayerGap` +
+  `minAnimalGap` > 0.3 — `pets.ts`/`animals.ts` untouched).
+- [x] Animals respect fences, gates, cliffs, doors, navigation links, recovery
+  bounds (graze e2e: grazers stay in their fenced home, never enter the pond/cliff;
+  the pet paths the gate following the player; off-navmesh/pond positions snap back).
+- [x] **Art reference:** body proxies + scale follow the friendly-animal base
+  meshes + the chicken/goat scale in `sv_style_007_camera_scale_guide.png`
+  (hen 0.30, goat 0.55, pet 0.45 relative to the 1.8 m human ref).
+
+**Decision record**
+
+- **Behaviour preserved, locomotion migrated.** The split keeps `tickPetFollow` +
+  `animals.ts` as the authority for *where* an animal goes and its husbandry
+  state, while the family framework owns *how* it moves (nav + motor +
+  avoidance). So the migration is movement-only — affection/feeding/produce are
+  literally the same code.
+- **Three families, not a generic mover.** Pet / livestock / poultry differ in
+  scale, body proxy, gait, turn, slope limit, LOD, activation radius, and save
+  authority (full pose vs. position-anchor) — asserted distinct in the unit test.
+- **Water + fence as data, not collision.** Domestic families are
+  `waterCapable: false` and the pond is off the navmesh; fences/cliffs are patch
+  edges. Boundary respect falls out of the navmesh + family capability + recovery,
+  not bespoke collision.
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **535 passed** (+7 animal-families) · Playwright **207
+passed + 1 skipped** (desktop-only aspect sweep) on both `desktop-chromium` +
+`mobile-chromium` (+10 fauna-lab) · `validate:assets` 0 · `build` 0 · GitDoctor
+**100/100**.
+
+---
+
 ## Prompt 041 — Avoidance, schedules, offscreen sim, recovery, performance (WEF-07b) (2026-06-20)
 
 Layered local avoidance, sim tiers + a mobile throttle, deterministic recovery
