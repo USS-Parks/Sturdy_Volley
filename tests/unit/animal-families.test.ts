@@ -9,9 +9,12 @@ import {
   gaitSpeed,
 } from '../../src/engine/animal-families';
 
+const DOMESTIC = Object.values(ANIMAL_FAMILIES).filter((f) => !f.wild);
+
 describe('animal families — definitions', () => {
   it('defines the three domestic families with all required per-family fields', () => {
-    for (const fam of Object.values(ANIMAL_FAMILIES)) {
+    expect(DOMESTIC.length).toBe(3);
+    for (const fam of DOMESTIC) {
       expect(fam.scale).toBeGreaterThan(0);
       expect(fam.bodyProxyRadius).toBeGreaterThan(0);
       expect(fam.gaits.length, `${fam.id} gait bands`).toBeGreaterThanOrEqual(2);
@@ -60,7 +63,7 @@ describe('animal families — capability helpers', () => {
   });
 
   it('water capability gates pond entry (domestic animals stay dry)', () => {
-    for (const fam of Object.values(ANIMAL_FAMILIES)) {
+    for (const fam of DOMESTIC) {
       expect(familyCanEnterWater(fam)).toBe(false);
     }
   });

@@ -13,6 +13,7 @@ import { StreamingLabScene } from './StreamingLabScene';
 import { InteriorLabScene } from './InteriorLabScene';
 import { NavLabScene } from './NavLabScene';
 import { FaunaLabScene } from './FaunaLabScene';
+import { WildLabScene } from './WildLabScene';
 
 /** All game scenes, keyed by the names used in save.location.sceneKey + transitions. */
 export const SCENE_FACTORIES: Record<string, SceneFactory> = {
@@ -37,4 +38,6 @@ export const SCENE_FACTORIES: Record<string, SceneFactory> = {
   NavLab: (ctx) => new NavLabScene(ctx),
   // Dev-only animal-family proving ground (WEF-08a). `?scene=FaunaLab`.
   FaunaLab: (ctx) => new FaunaLabScene(ctx),
+  // Dev-only wild-fauna proving ground (WEF-08b). `?scene=WildLab`.
+  WildLab: (ctx) => new WildLabScene(ctx),
 };

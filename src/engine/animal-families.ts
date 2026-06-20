@@ -17,7 +17,18 @@
 import type { AnimalKind } from './animals';
 import type { PetKind } from './pets';
 
-export type AnimalFamilyId = 'small-quadruped-pet' | 'grazing-livestock' | 'poultry';
+export type AnimalFamilyId =
+  | 'small-quadruped-pet'
+  | 'grazing-livestock'
+  | 'poultry'
+  // Wild families (WEF-08b, Prompt 043).
+  | 'bird'
+  | 'shoreline-crawler'
+  | 'swimming-fauna'
+  | 'cave-creature';
+
+/** The behaviours a family exhibits (assembled from `fauna-behavior.ts`). */
+export type FaunaBehavior = 'patrol' | 'forage' | 'flee' | 'flock' | 'swim';
 
 export interface GaitBand {
   name: string;
@@ -54,6 +65,10 @@ export interface AnimalFamily {
   activationRadius: number;
   /** What persists across save: full pose+state, or just a semantic anchor. */
   saveAuthority: 'full' | 'position-anchor';
+  /** Whether this is a wild family (vs. a domestic one, Prompt 042). */
+  wild?: boolean;
+  /** Behaviours this family exhibits (wild families, Prompt 043). */
+  behaviors?: FaunaBehavior[];
 }
 
 export const ANIMAL_FAMILIES: Record<AnimalFamilyId, AnimalFamily> = {
@@ -122,6 +137,99 @@ export const ANIMAL_FAMILIES: Record<AnimalFamilyId, AnimalFamily> = {
     activationRadius: 20,
     saveAuthority: 'position-anchor',
   },
+  // --- Wild families (WEF-08b) ----------------------------------------------
+  bird: {
+    id: 'bird',
+    label: 'Bird (flocking)',
+    scale: 0.2,
+    bodyProxyRadius: 0.2,
+    bodyProxyHeight: 0.3,
+    gaits: [
+      { name: 'perch', speed: 0 },
+      { name: 'glide', speed: 2.4 },
+      { name: 'flush', speed: 4.5 },
+    ],
+    turnRate: 10,
+    slopeLimitDeg: 90,
+    waterCapable: false,
+    obstaclePolicy: 'avoid',
+    interactionDistance: 0,
+    animationClips: ['glide', 'flush', 'perch'],
+    lodTiers: [20, 40],
+    activationRadius: 36,
+    saveAuthority: 'position-anchor',
+    wild: true,
+    behaviors: ['flock', 'flee'],
+  },
+  'shoreline-crawler': {
+    id: 'shoreline-crawler',
+    label: 'Shoreline crawler',
+    scale: 0.18,
+    bodyProxyRadius: 0.22,
+    bodyProxyHeight: 0.2,
+    gaits: [
+      { name: 'still', speed: 0 },
+      { name: 'scuttle', speed: 0.9 },
+      { name: 'dart', speed: 2.2 },
+    ],
+    turnRate: 9,
+    slopeLimitDeg: 40,
+    waterCapable: true,
+    obstaclePolicy: 'avoid',
+    interactionDistance: 0.8,
+    animationClips: ['still', 'scuttle'],
+    lodTiers: [8, 16],
+    activationRadius: 18,
+    saveAuthority: 'position-anchor',
+    wild: true,
+    behaviors: ['forage', 'flee'],
+  },
+  'swimming-fauna': {
+    id: 'swimming-fauna',
+    label: 'Swimming fauna (schooling)',
+    scale: 0.22,
+    bodyProxyRadius: 0.2,
+    bodyProxyHeight: 0.25,
+    gaits: [
+      { name: 'drift', speed: 0.6 },
+      { name: 'swim', speed: 1.8 },
+      { name: 'dash', speed: 3.4 },
+    ],
+    turnRate: 7,
+    slopeLimitDeg: 90,
+    waterCapable: true,
+    obstaclePolicy: 'avoid',
+    interactionDistance: 0,
+    animationClips: ['swim', 'dash'],
+    lodTiers: [14, 28],
+    activationRadius: 24,
+    saveAuthority: 'position-anchor',
+    wild: true,
+    behaviors: ['flock', 'swim', 'flee'],
+  },
+  'cave-creature': {
+    id: 'cave-creature',
+    label: 'Cave creature',
+    scale: 0.4,
+    bodyProxyRadius: 0.35,
+    bodyProxyHeight: 0.6,
+    gaits: [
+      { name: 'lurk', speed: 0 },
+      { name: 'creep', speed: 0.8 },
+      { name: 'skitter', speed: 2.6 },
+    ],
+    turnRate: 5,
+    slopeLimitDeg: 55,
+    waterCapable: false,
+    obstaclePolicy: 'avoid',
+    interactionDistance: 1.0,
+    animationClips: ['lurk', 'creep', 'skitter'],
+    lodTiers: [10, 20],
+    activationRadius: 20,
+    saveAuthority: 'position-anchor',
+    wild: true,
+    behaviors: ['patrol', 'flee'],
+  },
 };
 
 /** Family for a farm-animal kind (`animals.ts`). */
@@ -151,4 +259,14 @@ export function familyCanEnterWater(family: AnimalFamily): boolean {
 
 export function familyCanWalkSlope(family: AnimalFamily, deg: number): boolean {
   return deg <= family.slopeLimitDeg + 1e-9;
+}
+
+/** All wild families (Prompt 043). */
+export function wildFamilies(): AnimalFamily[] {
+  return Object.values(ANIMAL_FAMILIES).filter((f) => f.wild === true);
+}
+
+/** Whether a family exhibits a given behaviour. */
+export function familyHasBehavior(family: AnimalFamily, behavior: FaunaBehavior): boolean {
+  return family.behaviors?.includes(behavior) ?? false;
 }

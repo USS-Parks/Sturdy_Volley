@@ -5,6 +5,75 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 043 — Wild-fauna movement families (WEF-08b) (2026-06-20)
+
+Implemented the four wild families — bird, shoreline crawler, swimming fauna,
+cave creature — with their signature behaviours, none requiring a dynamic rigid
+body, plus deterministic tier downgrade and an active-skinned-body ceiling.
+
+**Behaviours (`src/engine/fauna-behavior.ts`).** Pure steering primitives:
+`fleeVelocity` (away from a threat within a radius), `flockVelocity` (boids —
+separation + alignment + cohesion, clamped), `patrolStep` (looping waypoints),
+`forageTarget` (deterministic wander). Assembled per family.
+
+**Wild families (`src/engine/animal-families.ts`).** Extended `ANIMAL_FAMILYID`
++ `ANIMAL_FAMILIES` with `bird` (flock+flee), `shoreline-crawler` (forage+flee,
+water-capable), `swimming-fauna` (flock+swim+flee, water-capable), `cave-creature`
+(patrol+flee), each with `wild` + `behaviors`. `wildFamilies` + `familyHasBehavior`
+helpers.
+
+**Proving ground (`src/scenes/WildLabScene.ts`).** A sea / tideflat / cave world
+with 8 birds (flock over the shore), 6 crabs (forage the tideflat, flee to
+water), 8 fish (school in the sea), 3 cave creatures (patrol the cave) — each
+integrating a steering velocity and held to its domain. Distant fauna downgrade
+via `assignTiers`; an active-skinned-body ceiling (`MAX_ACTIVE_SKINNED`) caps
+live meshes (`mesh.setEnabled`). Debug API exposes per-family domain-respect,
+flock spread, flee response, and the skinned-body count.
+
+**Doc (`docs/ANIMAL_AND_FAUNA_PHYSICS.md` §5).** The wild-family table,
+behaviours, domain respect, and the sim-tier + skinned-body ceiling.
+
+Files: `src/engine/fauna-behavior.ts` (new), `src/scenes/WildLabScene.ts` (new),
+`tests/unit/fauna-behavior.test.ts` (new), `tests/e2e/wild-lab.spec.ts` (new),
+`src/engine/animal-families.ts`, `docs/ANIMAL_AND_FAUNA_PHYSICS.md`,
+`tests/unit/animal-families.test.ts`, `src/scenes/registry.ts`,
+`src/scenes/dev-route.ts`, `src/scenes/TitleScene.ts`.
+
+**Acceptance criteria**
+
+- [x] Representative wild fauna demonstrate their behaviours without every animal
+  being dynamic; they respect water eligibility, cliffs, and navigation links
+  (WildLab: flock cohesion, flee response, fish-in-water / cave-in-cave /
+  birds-over-shore / no-forbidden-water — all e2e-asserted; steering integrated,
+  not rigid bodies).
+- [x] Offscreen + distant fauna downgrade through declared tiers deterministically
+  (`assignTiers` by family activation radius; e2e: some fauna abstract when the
+  player is local).
+- [x] Mobile population + active-skinned-body ceilings are measured and enforced
+  (`MAX_ACTIVE_SKINNED`; e2e: `activeSkinnedCount ≤ maxActiveSkinned`, skinned
+  meshes disabled beyond the cap).
+
+**Decision record**
+
+- **Wild fauna integrate steering, not the grounded motor.** Flying birds +
+  swimming fish aren't grounded capsules; the acceptance explicitly allows
+  "without requiring every animal to be dynamic," so wild families integrate a
+  steering velocity clamped to their domain — lighter + correct for flight/swim.
+  (Domestic families in 042 do use the shared grounded motor.)
+- **Active-skinned-body ceiling, not just sim tier.** Beyond the distance tier,
+  a hard cap on live (skinned) meshes models the real mobile cost driver
+  (skinned draw calls); fauna past the cap freeze + hide their mesh.
+- **Domain as bounds + water capability**, mirroring 042: fish/cave/shore/air
+  boxes + `waterCapable` gate domain respect, no bespoke collision.
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **545 passed** (+10: fauna-behavior 10, animal-families
+wild additions) · Playwright **217 passed + 1 skipped** (desktop-only aspect
+sweep) on both `desktop-chromium` + `mobile-chromium` (+10 wild-lab) ·
+`validate:assets` 0 · `build` 0 · GitDoctor **100/100**.
+
+---
+
 ## Prompt 042 — Animal family framework + domestic-animal migration (WEF-08a) (2026-06-20)
 
 Defined animal movement **families** (not one generic mover) and migrated the

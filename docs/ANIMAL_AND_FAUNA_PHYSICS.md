@@ -94,10 +94,39 @@ family activation radius.
 
 ---
 
-## 5. What this layer does **not** do
+## 5. Wild families (WEF-08b, Prompt 043)
 
-- Wild fauna families (bird / shoreline crawler / swimming / cave creature) —
-  Prompt 043 (WEF-08b).
+Four wild families extend the framework, each with **behaviours** assembled from
+`src/engine/fauna-behavior.ts` (pure steering: flee, flock, patrol, forage). None
+requires a dynamic rigid body — they integrate a steering velocity and stay in
+their domain.
+
+| Family | Scale | Water | Behaviours | Domain |
+|---|---|---|---|---|
+| `bird` | 0.20 | no | flock + flee | air over the shore |
+| `shoreline-crawler` | 0.18 | yes | forage + flee (to water) | tideflat |
+| `swimming-fauna` | 0.22 | yes | flock (school) + swim + flee | the sea |
+| `cave-creature` | 0.40 | no | patrol + flee | the cave |
+
+- **Behaviours** — `flee` (away from the player within a radius), `flock` (boids:
+  separation + alignment + cohesion), `patrol` (looping waypoints), `forage`
+  (wander a domain). `familyHasBehavior(family, behavior)` queries them.
+- **Domain respect** — fish stay in the sea, cave creatures in the cave, birds
+  over the shore (never the open sea); crabs may dip into water (water-capable).
+  A non-water family never ends up in the sea (`familyCanEnterWater`).
+- **Sim tiers + ceiling** — distant fauna downgrade through `assignTiers`
+  deterministically; an **active-skinned-body ceiling** (`MAX_ACTIVE_SKINNED`)
+  caps how many fauna render a live mesh at once (mobile throttle) — measured +
+  enforced (`activeSkinnedCount` ≤ `maxActiveSkinned`).
+
+Proving ground: `?scene=WildLab` (8 birds, 6 crabs, 8 fish, 3 cave creatures);
+`tests/e2e/wild-lab.spec.ts` asserts flocking cohesion, flee response, domain
+respect, and the skinned-body ceiling. Unit: `tests/unit/fauna-behavior.test.ts`.
+
+---
+
+## 6. What this layer does **not** do
+
 - The rideable horse — Prompt 044 (extends grazing-livestock with ridden gaits).
 - The live FarmScene animal migration onto the framework — Prompt 053.
 - Final animal art / animation libraries — graybox proxies only (§0.9).
