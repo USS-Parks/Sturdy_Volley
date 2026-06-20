@@ -5,6 +5,124 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 035 — Exterior topology, chunks, streaming, coordinate frames (WEF-04) (2026-06-20)
+
+Stood up the exterior world container **before** any region is laid out: a
+chunked, streamable, numerically-stable coordinate frame with hysteresis,
+horse-speed look-ahead, explicit budgets, failure recovery, anchor-invariant
+content variants, and a multi-chunk proving ground that exercises all of it
+across the two anchor communities.
+
+**Topology (`src/world/topology.ts`).** Pure XZ-plane math: `Region` with a
+world-space **local origin** + stable id; chunk coords computed in region-local
+space (`world − origin`) so they stay small integers near a far region — the
+floating-origin-per-region precision strategy. `worldToChunk` /
+`chunkOrigin`/`chunkCenter`/`chunkBounds`, `chunksInRadius` (Chebyshev),
+`chunkNeighbors`, and the stable persistence id **`${regionId}#cx,cz`**
+(`chunkId`/`parseChunkId`, last-`#` split so hyphenated region ids round-trip).
+`DEFAULT_CHUNK_SIZE = 32 m`.
+
+**Streaming (`src/world/streaming.ts`).** `StreamingController` over a
+`ChunkRecord` map with the `unloaded→preloading→loaded→active`(+`failed`) state
+machine. `desiredSets` is a pure split of active ring (`activeRadius 2`) vs keep
+band (`keepRadius 3`, hysteresis — unload only beyond keep) vs **directional
+look-ahead**: above `lookAheadMinSpeed 3.5 m/s` a speed-scaled `lead` projects a
+keep-radius forward field *ahead* of the focus, so a gallop pulls leading chunk
+columns resident before arrival and a faster gallop reaches farther. Budget
+gate (`maxLoadedChunks 64`, nearest-first admit, focus + active ring always
+admitted) + aggregate mesh/body usage. `markLoaded`/`markFailed`, `safeChunkId`
+(focus or nearest resident — never strands the player), failure retry
+(`failureRetryMs 750`, re-emitted in `toLoad`). `setRegion` drops the old
+region's records wholesale (clean community handoff, no cross-region coord
+collision).
+
+**Variants (`src/world/variants.ts`).** Pure tide/season/weather/restoration
+resolution over a chunk's **stable anchor set**: `hideOnTide`,
+`restorationMinStage`, `season`/`weatherAppearance` flip only `present`/
+`appearance` — the **anchor-id set is invariant across every variant state**
+(the load-bearing rule, so saves/transitions can reference anchor ids).
+
+**Proving ground (`src/scenes/StreamingLabScene.ts`).** A two-community world
+(**Willa Crick** inland @ origin (0,0) + **Ballast Bay** coastal @ (256,0))
+joined by the **Klam-ity River** community transition on `x=200`. Each loaded
+chunk renders its eight separated layers as graybox (render tile / collision
+proxy / interaction anchors / spawn marker, each tagged) grouped under one
+disposable id-keyed `TransformNode` (identity never duplicated). Camera-relative
+keyboard walk (`h` toggles horse pace) over the locked exterior camera rig; the
+community transition swaps the active region and recovers the player onto the
+destination anchor with no empty frame. `window.sturdyVolleyStream` debug API +
+a deterministic fixed-dt `tick()` stepper. Reachable via the Title
+"Dev · Streaming Lab" item + `?scene=StreamingLab`; registry + dev-route +
+Title wired.
+
+**Overlay (`src/render/streaming-overlay.ts`).** `?debug=streaming` → region +
+origin, focus chunk, per-state counts (A/L/P/F), live budget (chunks/meshes/
+bodies, red when over). CSS added to `src/styles.css`.
+
+**Doc (`docs/WORLD_TOPOLOGY_AND_STREAMING.md`).** Records the chunk-size
+derivation (exterior camera + ~60 m fog horizon → 32 m / activeRadius 2),
+floating-origin strategy, the eight separated concerns table, hysteresis,
+look-ahead, budgets, failure/recovery, variant invariance, and the
+community-transition contract.
+
+Files: `src/world/topology.ts` (new), `src/world/streaming.ts` (new),
+`src/world/variants.ts` (new), `src/scenes/StreamingLabScene.ts` (new),
+`src/render/streaming-overlay.ts` (new), `docs/WORLD_TOPOLOGY_AND_STREAMING.md`
+(new), `tests/unit/world-topology.test.ts` (new),
+`tests/unit/world-streaming.test.ts` (new),
+`tests/unit/world-variants.test.ts` (new),
+`tests/e2e/streaming-lab.spec.ts` (new), `src/scenes/registry.ts`,
+`src/scenes/dev-route.ts`, `src/scenes/TitleScene.ts`, `src/styles.css`.
+
+**Acceptance criteria**
+
+- [x] `docs/WORLD_TOPOLOGY_AND_STREAMING.md` records region/chunk/local-origin/
+  seam/preload/unload/persistence/transition contracts (§§1–5).
+- [x] A multi-chunk exterior test crosses seams without visible pop, collision
+  gaps, camera snaps, NPC discontinuity, duplicate entities, or save-identity
+  changes (e2e: seam-crossing keeps `duplicateGroupIds()` empty + ids stable;
+  camera pitch/fov/distance continuous across a seam; abutting ground tiles).
+- [x] Streaming uses hysteresis + explicit memory/mesh/body budgets; origin
+  strategy stays numerically stable across the planned world; failure/slow-load
+  keeps the player on valid ground with recovery (`keepRadius` hysteresis,
+  `budgetUsage`, floating origin unit test, `safeChunkId` + retry e2e).
+- [x] Chunk + preload sizing accounts for **horse-speed traversal**, and the
+  contract supports the **Willa Crick ↔ Ballast Bay** transition without seam
+  pop while mounted (directional look-ahead unit + e2e; community-transition
+  e2e swaps region + recovers onto a resident chunk).
+- [x] Tide/season/weather/restoration variants change chunk content without
+  changing stable anchors; debug overlay exposes chunk bounds, states, region
+  origin, and active budgets (variant invariance unit + e2e; `?debug=streaming`
+  overlay e2e).
+
+**Decision record**
+
+- **Chunk size 32 m / activeRadius 2 / keepRadius 3.** Derived from the locked
+  exterior camera (Prompt 030) over EXP2 fog density ~0.012–0.014 → ~60 m
+  readable horizon; a 5×5 active window (±80 m) keeps everything visible
+  resident, with a one-chunk hysteresis margin. Rejected smaller (24 m, finer
+  but more seams to manage at no readability gain) and a single big ground mesh
+  (defeats the streaming separation).
+- **Look-ahead as a forward field, not a meter projection.** An initial
+  meters-ahead projection was swamped by the already-96 m keep band (gallop ==
+  walk). Switched to a chunk-`lead` forward keep-radius field centred ahead of
+  the focus, which provably extends the resident region past the symmetric band
+  in the travel direction and scales with speed.
+- **`setRegion` clears records.** Two regions can share local chunk indices, so
+  per-region records must be dropped on a swap or coord keys collide. The
+  community transition is therefore a clean wholesale handoff.
+- **Floating origin per region** over a single world origin: keeps chunk
+  arithmetic in small integers near each region, preserving float precision
+  across the full Willa Crick ↔ river ↔ Ballast Bay spine.
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **433 passed** (+32: world-topology 13, world-streaming
+13, world-variants 6) · Playwright **167 passed + 1 skipped** (desktop-only
+aspect sweep) on both `desktop-chromium` + `mobile-chromium` (+18 streaming-lab)
+· `validate:assets` 0 · `build` 0 · GitDoctor **100/100**.
+
+---
+
 ## Prompt 034 — Interaction, facing, and tool-targeting model (WEF-03) (2026-06-20)
 
 Built the shared 3D interaction resolver: a pure, deterministic, input-agnostic

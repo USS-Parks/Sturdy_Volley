@@ -9,6 +9,7 @@ import { InteriorScene } from './InteriorScene';
 import { BeachScene } from './BeachScene';
 import { MineScene } from './MineScene';
 import { CameraLabScene } from './CameraLabScene';
+import { StreamingLabScene } from './StreamingLabScene';
 
 /** All game scenes, keyed by the names used in save.location.sceneKey + transitions. */
 export const SCENE_FACTORIES: Record<string, SceneFactory> = {
@@ -24,4 +25,7 @@ export const SCENE_FACTORIES: Record<string, SceneFactory> = {
   // Dev-only proving ground (WEF-01a). Entered via the Title dev menu or the
   // `?scene=CameraLab` direct-boot route; never part of normal play.
   CameraLab: (ctx) => new CameraLabScene(ctx),
+  // Dev-only streaming proving ground (WEF-04). Entered via the Title dev menu or
+  // the `?scene=StreamingLab` direct-boot route; never part of normal play.
+  StreamingLab: (ctx) => new StreamingLabScene(ctx),
 };
