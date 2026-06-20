@@ -1,8 +1,8 @@
 # Sturdy Volley
 
-An original, browser-first **cozy life sim** set in **Ballast Bay** on the Sturdy Coast — farm, fish, craft, befriend a living town, and rebuild a storm-worn harbor through expressive volleyball play.
+An original, browser-first **cozy life sim** set in **Willa Crick,** just upriver of **Ballast Bay** on the Sturdy Coast — farm, fish, craft, befriend a living town, and rebuild a storm-worn harbor through quests and community-building efforts.
 
-> Sturdy Volley is an **original** work. It borrows only general life-sim *genre ideas*. It contains no code, art, audio, dialogue, maps, names, or data from any other game.
+> Sturdy Volley is an **original** work, inspired by popular games the developer likes to play. It borrows only general life-sim *genre ideas*. It contains no code, art, audio, dialogue, maps, names, or data from any other game.
 
 Visual direction: **Theme 3 — original N64-era low-poly 3D adventure** (chunky
 geometry, hand-painted textures, vertex-style lighting, jewel tones, atmospheric
@@ -53,6 +53,4 @@ tests/
 docs/        Design + architecture notes
 ```
 
-See [`STURDY_VOLLEY_PSPR.md`](./STURDY_VOLLEY_PSPR.md) for the full design and the
-sequential prompt roster, and [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for
-implementation conventions. Build progress is tracked in [`DEVLOG.md`](./DEVLOG.md).
+
