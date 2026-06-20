@@ -5,6 +5,87 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 031 — Havok adapter + kinematic capsule motor core (WEF-02a) (2026-06-20)
+
+Integrated **Havok inside Babylon.js** behind a narrow adapter and built one
+reusable kinematic-capsule player motor, replacing the proving ground's proxy
+planar driver (029) with the real motor.
+
+**API verification.** Confirmed the official Babylon/Havok APIs against the
+pinned packages — `@babylonjs/core` **7.54.3** + newly added `@babylonjs/havok`
+**1.3.12**. The Havok ESM build resolves its WASM via `new URL('HavokPhysics.
+wasm', import.meta.url)`, so `@babylonjs/havok` is added to Vite's
+`optimizeDeps.exclude` (pre-bundling would rewrite + break that URL). Verified
+Havok's WASM **loads and initialises in the headless production-preview build**
+(the Playwright environment), so the primary backend is genuinely exercised.
+
+**Pure motor core.** `src/engine/motor.ts` `stepMotor` — pure, deterministic, no
+Babylon/physics import. Owns gravity (−22 m/s²), terminal fall (−45), grounding,
+ground-snap (0.35 m), and facing turn (12 rad/s) for the 1.8 m × 0.4 m capsule
+(0.08 m skin). Horizontal speed comes from the **existing** `controller.ts`
+(jog 4 / sprint 7.5 m/s, accel 30 / brake 40), so stamina + gait stay
+authoritative through the motor.
+
+**Narrow physics port.** `src/physics/motor-physics.ts` `MotorPhysics.groundProbe`
+with two backends: `HavokMotorPhysics` (downward `engine.raycast` through the
+Havok world — primary) and `RaypickMotorPhysics` (`scene.pickWithRay` fallback).
+`src/physics/havok.ts` loads Havok + builds the `HavokPlugin`, returning null on
+failure so the motor is never blocked on physics. The motor core imports
+neither backend.
+
+**Proving-ground integration.** `CameraLabScene` drives the motor with
+camera-relative WASD/arrows (Shift = sprint); ray-pick works from frame 1 and
+upgrades to Havok (a static ground `PhysicsAggregate`) when the WASM loads. Debug
+API gains `motor()`, `controller()`, `physicsBackend()`, `dropPlayer()`, and
+motor-aware `setPlayer`/`focus`.
+
+**Bug found + fixed mid-prompt.** `createMotorState({ ...position })` spread a
+Babylon `Vector3` (whose x/y/z are getters), copying the private `_x/_y/_z` and
+leaving x/y/z undefined → NaN poisoned the motor and the camera's smoothed
+follow position (blank canvas). Fixed to copy via the accessors. The Havok
+raycast itself was correct throughout.
+
+Files: `package.json` + `package-lock.json` (havok dep), `vite.config.ts`,
+`src/engine/motor.ts` (new), `src/physics/havok.ts` (new),
+`src/physics/motor-physics.ts` (new), `src/scenes/CameraLabScene.ts`,
+`tests/unit/motor.test.ts` (new), `tests/e2e/camera-lab.spec.ts`,
+`docs/GAMEPLAY_MOTOR.md` (new).
+
+**Acceptance criteria**
+
+- [x] One motor produces the same core behaviour in the proving ground on
+  desktop + mobile frame bands (single `stepMotor` core; motor e2e passes on
+  both Playwright projects; both physics backends feed the same core).
+- [x] Capsule dimensions, skin/contact offset, speeds, acceleration, braking,
+  turn rates, and gravity documented in metres and seconds
+  (`docs/GAMEPLAY_MOTOR.md` §2).
+- [x] Motor core has deterministic unit coverage (`tests/unit/motor.test.ts`, 9
+  cases); integration has desktop + mobile Playwright coverage (gravity+landing,
+  keyboard-move-grounded, sprint-drains-stamina). Existing stamina/gait behaviour
+  remains functional through the adapter (consumed from `controller.ts`; asserted
+  in e2e).
+
+**Decision record**
+
+- Havok runs **inside Babylon** as its physics plugin (user-confirmed
+  2026-06-20), per Prompt 031. It's the primary backend; the ray-pick fallback
+  is a safety net for environments that can't instantiate the WASM, not a
+  replacement.
+- The narrow port exposes only `groundProbe` for 031; the shape-sweep
+  collide-and-slide for slopes/stairs/steps/pushing is Prompt 032, and per-
+  obstacle Havok colliders land there too. 031 grounds on the flat plane.
+- Gravity −22 (not −9.81) for snappier game feel; documented.
+- Motor core stays pure (plain `{x,y,z}`) so it unit-tests in jsdom and never
+  imports Babylon/Havok; the adapter is the only physics-touching seam.
+
+**Verify gate** — `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest 373 passed (42 files; +9 motor) · Playwright 131 passed + 1
+skipped (desktop-only aspect sweep; +4 new motor cases across projects) ·
+`validate:assets` 0 · `build` 0 · GitDoctor 100/100, `--fail-on high` exit 0.
+Havok backend confirmed active in the preview build.
+
+---
+
 ## Prompt 030 — Lock camera baselines, reduced motion, telemetry, decision record (WEF-01c) (2026-06-19)
 
 **Closes the camera gate (WEF-01, Prompts 028–030).** Locked one baseline

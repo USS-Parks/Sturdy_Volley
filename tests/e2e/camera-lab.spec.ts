@@ -34,6 +34,10 @@ declare global {
       setObstructionMode: (mode: 'fade' | 'cutaway') => void;
       baselines: () => Record<string, string>;
       playerScreen: () => { x: number; y: number; onScreen: boolean };
+      dropPlayer: (x: number, y: number, z: number) => void;
+      motor: () => { x: number; y: number; z: number; grounded: boolean; velocityY: number; facingDeg: number };
+      controller: () => { stamina: number; gait: string; speed: number };
+      physicsBackend: () => string;
     };
   }
 }
@@ -223,6 +227,51 @@ test.describe('Camera Lab proving ground (WEF-01a)', () => {
     expect(ps.x).toBeLessThan(0.8);
     expect(ps.y, 'player vertically framed').toBeGreaterThan(0.1);
     expect(ps.y).toBeLessThan(0.92);
+  });
+
+  test('motor: a dropped player falls under gravity and lands grounded (WEF-02a)', async ({ page }) => {
+    await page.goto('/?scene=CameraLab');
+    await page.waitForFunction(() => Boolean(window.sturdyVolleyLab?.motor));
+
+    const backend = await page.evaluate(() => window.sturdyVolleyLab!.physicsBackend());
+    expect(['havok', 'raypick'], `physics backend (${backend})`).toContain(backend);
+
+    await page.evaluate(() => window.sturdyVolleyLab!.dropPlayer(0, 8, 0));
+    // Mid-fall: airborne, moving down.
+    await page.waitForTimeout(150);
+    const mid = await page.evaluate(() => window.sturdyVolleyLab!.motor());
+    expect(mid.grounded, 'airborne mid-fall').toBe(false);
+    expect(mid.velocityY, 'falling').toBeLessThan(0);
+
+    // Settles grounded at the capsule rest height (~0.9 m centre).
+    await page.waitForTimeout(1500);
+    const landed = await page.evaluate(() => window.sturdyVolleyLab!.motor());
+    expect(landed.grounded, 'landed grounded').toBe(true);
+    expect(landed.y, 'rests at capsule half-height').toBeCloseTo(0.9, 1);
+    expect(Math.abs(landed.velocityY), 'vertical velocity settled').toBeLessThan(0.5);
+  });
+
+  test('motor: keyboard movement moves the player and keeps it grounded; sprint drains stamina', async ({ page }) => {
+    await page.goto('/?scene=CameraLab');
+    await page.waitForFunction(() => Boolean(window.sturdyVolleyLab?.motor));
+    await page.evaluate(() => window.sturdyVolleyLab!.setPlayer(0, 0));
+
+    const before = await page.evaluate(() => window.sturdyVolleyLab!.motor());
+    const staminaBefore = await page.evaluate(() => window.sturdyVolleyLab!.controller().stamina);
+
+    await page.keyboard.down('Shift');
+    await page.keyboard.down('w');
+    await page.waitForTimeout(600);
+    await page.keyboard.up('w');
+    await page.keyboard.up('Shift');
+
+    const after = await page.evaluate(() => window.sturdyVolleyLab!.motor());
+    const staminaAfter = await page.evaluate(() => window.sturdyVolleyLab!.controller().stamina);
+
+    const dist = Math.hypot(after.x - before.x, after.z - before.z);
+    expect(dist, `player moved (${dist.toFixed(2)} m)`).toBeGreaterThan(0.5);
+    expect(after.grounded, 'stayed grounded while walking').toBe(true);
+    expect(staminaAfter, `sprint drained stamina (before ${staminaBefore}, after ${staminaAfter})`).toBeLessThan(staminaBefore);
   });
 
   test('keeps the full player HUD-safe across tablet / ultrawide / tall-phone aspect ratios', async ({ page }, testInfo) => {

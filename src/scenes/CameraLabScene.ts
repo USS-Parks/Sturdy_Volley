@@ -2,6 +2,8 @@ import {
   Scene,
   Matrix,
   MeshBuilder,
+  PhysicsAggregate,
+  PhysicsShapeType,
   TransformNode,
   Vector3,
   Color3,
@@ -11,6 +13,19 @@ import {
 import { GameScene } from './GameScene';
 import { makeScene, addFog, addLights, flatMaterial, PALETTE } from '../render/scene-helpers';
 import { CameraRig, type FollowTarget, type ObstructionMode } from '../camera/rig';
+import {
+  createMotorState,
+  stepMotor,
+  DEFAULT_MOTOR_CONFIG,
+  type MotorState,
+} from '../engine/motor';
+import { createControllerState, stepController, type ControllerState } from '../engine/controller';
+import { initHavok, enableScenePhysics } from '../physics/havok';
+import {
+  HavokMotorPhysics,
+  RaypickMotorPhysics,
+  type MotorPhysics,
+} from '../physics/motor-physics';
 import {
   baselineProfile,
   CAMERA_BASELINES,
@@ -56,14 +71,15 @@ const WALL_HEIGHT = 3.4; // mid-band of the 3.0–4.0 m wall convention
 const DOOR_W = 1.2; // ≥ 1.0 m
 const DOOR_H = 1.9; // ≥ 1.8 m
 
-const PLAYER_SPEED = 5; // m/s — proxy driver to exercise the camera; real motor is 031.
 const GROUND_HALF = 38;
+const SPAWN = new Vector3(0, PLAYER_HEIGHT / 2, 0);
 
 export class CameraLabScene extends GameScene {
   private readonly stations: KitStation[] = [];
   private rig!: CameraRig;
   private input: CameraInputController | null = null;
   private playerMesh!: Mesh;
+  private groundMesh!: Mesh;
   private playerVel: Planar = { x: 0, z: 0 };
   private contextIndex = 0; // exterior
   private variantIndex = 1; // 'standard'
@@ -71,6 +87,16 @@ export class CameraLabScene extends GameScene {
   private injected: CameraInput = { ...ZERO_INPUT };
   private onKeyDown!: (e: KeyboardEvent) => void;
   private onKeyUp!: (e: KeyboardEvent) => void;
+
+  // Motor (031): pure capsule motor core + the existing locomotion controller
+  // (stamina/gait), grounded through a swappable physics backend (Havok primary,
+  // ray-pick fallback). The proxy planar driver from 029 is gone.
+  private motorState: MotorState = createMotorState(SPAWN);
+  private controllerState: ControllerState = createControllerState();
+  private physics!: MotorPhysics;
+  private lastMoveDir: Planar = { x: 0, z: 1 };
+  private groundBody: PhysicsAggregate | null = null;
+  private disposed = false;
 
   build(): Scene {
     const scene = makeScene(this.ctx.engine, PALETTE.sky);
@@ -81,6 +107,7 @@ export class CameraLabScene extends GameScene {
     // Reference ground — 80 m across so every station sits on solid floor.
     const ground = MeshBuilder.CreateGround('lab-ground', { width: 80, height: 80 }, scene);
     ground.material = flatMaterial(scene, 'lab-ground', PALETTE.grass, 0.22);
+    this.groundMesh = ground;
 
     this.buildKit(scene);
 
@@ -112,21 +139,38 @@ export class CameraLabScene extends GameScene {
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
 
+    // Motor physics: ray-pick works immediately; upgrade to Havok when (if) the
+    // WASM loads. Either backend grounds the same pure motor core.
+    this.physics = new RaypickMotorPhysics(this.scene, () => [this.playerMesh]);
+    void this.initPhysics();
+
     this.installDebugApi();
+  }
+
+  private async initPhysics(): Promise<void> {
+    const plugin = await initHavok();
+    if (!plugin || this.disposed) return;
+    enableScenePhysics(this.scene, plugin);
+    // 031 grounds on the flat ground plane (per-obstacle colliders are 032).
+    this.groundBody = new PhysicsAggregate(this.groundMesh, PhysicsShapeType.MESH, { mass: 0 }, this.scene);
+    this.physics = new HavokMotorPhysics(this.scene);
   }
 
   override update(dt: number): void {
     if (dt <= 0) return;
-    this.drivePlayer(dt);
+    this.stepMotorFrame(dt);
     const camInput = this.input ? this.input.consume(dt) : { ...ZERO_INPUT };
     const merged = mergeInput(camInput, this.drainInjected());
     this.rig.update(dt, merged);
   }
 
   override dispose(): void {
+    this.disposed = true;
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     this.input?.dispose();
+    this.physics?.dispose();
+    this.groundBody?.dispose();
     this.rig?.dispose();
     delete (window as unknown as { sturdyVolleyLab?: unknown }).sturdyVolleyLab;
     super.dispose();
@@ -176,27 +220,52 @@ export class CameraLabScene extends GameScene {
     }
   }
 
-  // --- Reference player driver (camera-relative) ----------------------------
-  private drivePlayer(dt: number): void {
+  // --- Kinematic motor step (camera-relative) -------------------------------
+  private stepMotorFrame(dt: number): void {
     const fwd = (this.held.has('w') || this.held.has('arrowup') ? 1 : 0) - (this.held.has('s') || this.held.has('arrowdown') ? 1 : 0);
     const str = (this.held.has('d') || this.held.has('arrowright') ? 1 : 0) - (this.held.has('a') || this.held.has('arrowleft') ? 1 : 0);
-    if (fwd === 0 && str === 0) {
-      this.playerVel = { x: 0, z: 0 };
-      return;
+    const sprint = this.held.has('shift');
+
+    // Camera-relative move direction (normalised) from the held keys.
+    let mx = 0;
+    let mz = 0;
+    if (fwd !== 0 || str !== 0) {
+      const alpha = this.rig.camera.alpha;
+      const forward: Planar = { x: -Math.cos(alpha), z: -Math.sin(alpha) };
+      const right: Planar = { x: -Math.sin(alpha), z: Math.cos(alpha) };
+      mx = right.x * str + forward.x * fwd;
+      mz = right.z * str + forward.z * fwd;
+      const len = Math.hypot(mx, mz) || 1;
+      mx /= len;
+      mz /= len;
+      this.lastMoveDir = { x: mx, z: mz };
     }
-    const alpha = this.rig.camera.alpha;
-    // Planar forward = from camera toward target (into the screen).
-    const forward: Planar = { x: -Math.cos(alpha), z: -Math.sin(alpha) };
-    const right: Planar = { x: -Math.sin(alpha), z: Math.cos(alpha) };
-    let mx = right.x * str + forward.x * fwd;
-    let mz = right.z * str + forward.z * fwd;
-    const len = Math.hypot(mx, mz) || 1;
-    mx /= len;
-    mz /= len;
-    this.playerVel = { x: mx * PLAYER_SPEED, z: mz * PLAYER_SPEED };
-    const p = this.playerMesh.position;
-    p.x = clampGround(p.x + this.playerVel.x * dt);
-    p.z = clampGround(p.z + this.playerVel.z * dt);
+
+    // Stamina/gait + accel/brake speed from the existing controller.
+    this.controllerState = stepController(this.controllerState, { dir: { x: mx, z: mz }, sprint }, dt);
+    const speed = this.controllerState.speed;
+    // Keep gliding along the last heading while braking to a stop.
+    const dir = speed > 0.01 ? this.lastMoveDir : { x: 0, z: 0 };
+
+    // Ground probe (downward) feeds the pure motor core.
+    const pos = this.motorState.position;
+    const probe = this.physics.groundProbe(pos.x, pos.y, pos.z, DEFAULT_MOTOR_CONFIG.capsuleHeight + 1);
+    this.motorState = stepMotor(this.motorState, { moveDir: dir, speed }, probe, dt);
+
+    // Keep the player on the lab footprint.
+    this.motorState.position.x = clampGround(this.motorState.position.x);
+    this.motorState.position.z = clampGround(this.motorState.position.z);
+
+    this.playerMesh.position.set(this.motorState.position.x, this.motorState.position.y, this.motorState.position.z);
+    this.playerMesh.rotation.y = this.motorState.facing;
+    this.playerVel = { x: dir.x * speed, z: dir.z * speed };
+  }
+
+  private placePlayer(x: number, z: number): void {
+    this.motorState = createMotorState({ x: clampGround(x), y: PLAYER_HEIGHT / 2, z: clampGround(z) }, this.motorState.facing);
+    this.controllerState = createControllerState();
+    this.playerVel = { x: 0, z: 0 };
+    this.playerMesh.position.set(this.motorState.position.x, this.motorState.position.y, this.motorState.position.z);
   }
 
   private drainInjected(): CameraInput {
@@ -386,6 +455,7 @@ export class CameraLabScene extends GameScene {
     this.box(scene, p, 'lab-wade-bed', { w: 8, h: 0.2, d: 8 }, new Vector3(0, -0.2, 0), PALETTE.sand, 0.2);
     const water = this.box(scene, p, 'lab-water', { w: 8, h: 0.5, d: 8 }, new Vector3(0, 0.05, 0), PALETTE.sea, 0.4);
     water.visibility = 0.6;
+    water.isPickable = false; // wade on the bed, not the surface (water motor is 033)
   }
 
   private doorway(scene: Scene, p: TransformNode): void {
@@ -448,14 +518,32 @@ export class CameraLabScene extends GameScene {
       focus: (id: string): boolean => {
         const s = this.stations.find((st) => st.id === id);
         if (!s) return false;
-        this.playerMesh.position.set(s.at.x, PLAYER_HEIGHT / 2, s.at.z);
-        this.playerVel = { x: 0, z: 0 };
+        this.placePlayer(s.at.x, s.at.z);
         return true;
       },
-      player: (): { x: number; z: number } => ({ x: this.playerMesh.position.x, z: this.playerMesh.position.z }),
-      setPlayer: (x: number, z: number): void => {
-        this.playerMesh.position.set(clampGround(x), PLAYER_HEIGHT / 2, clampGround(z));
+      player: (): { x: number; z: number } => ({ x: this.motorState.position.x, z: this.motorState.position.z }),
+      setPlayer: (x: number, z: number): void => this.placePlayer(x, z),
+      /** Drop the player from a height (airborne) — exercises gravity/landing. */
+      dropPlayer: (x: number, y: number, z: number): void => {
+        this.motorState = createMotorState({ x: clampGround(x), y, z: clampGround(z) }, this.motorState.facing);
+        this.controllerState = createControllerState();
+        this.playerVel = { x: 0, z: 0 };
+        this.playerMesh.position.set(this.motorState.position.x, y, this.motorState.position.z);
       },
+      motor: (): { x: number; y: number; z: number; grounded: boolean; velocityY: number; facingDeg: number } => ({
+        x: this.motorState.position.x,
+        y: this.motorState.position.y,
+        z: this.motorState.position.z,
+        grounded: this.motorState.grounded,
+        velocityY: this.motorState.velocityY,
+        facingDeg: (this.motorState.facing * 180) / Math.PI,
+      }),
+      controller: (): { stamina: number; gait: string; speed: number } => ({
+        stamina: this.controllerState.stamina,
+        gait: this.controllerState.gait,
+        speed: this.controllerState.speed,
+      }),
+      physicsBackend: (): string => this.physics.backend,
       setPlayerVelocity: (vx: number, vz: number): void => {
         this.playerVel = { x: vx, z: vz };
       },
