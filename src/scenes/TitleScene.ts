@@ -92,6 +92,7 @@ export class TitleScene extends GameScene {
       items.push({ id: 'dev-data', label: 'Dev · Validate data', enabled: true, testId: 'title-dev-data' });
       items.push({ id: 'dev-camera-lab', label: 'Dev · Camera Lab', enabled: true, testId: 'title-dev-camera-lab' });
       items.push({ id: 'dev-streaming-lab', label: 'Dev · Streaming Lab', enabled: true, testId: 'title-dev-streaming-lab' });
+      items.push({ id: 'dev-interior-lab', label: 'Dev · Interior Lab', enabled: true, testId: 'title-dev-interior-lab' });
     }
     this.ctx.overlay.showMenu(
       'Sturdy Volley',
@@ -132,6 +133,9 @@ export class TitleScene extends GameScene {
         break;
       case 'dev-streaming-lab':
         this.goTo('StreamingLab');
+        break;
+      case 'dev-interior-lab':
+        this.goTo('InteriorLab');
         break;
     }
   }

@@ -25,7 +25,7 @@ import {
   type Planar,
 } from './orbit';
 import type { CameraInput } from './input';
-import { pickVolume, type CameraVolume } from './volumes';
+import { pickVolumeSticky, type CameraVolume } from './volumes';
 
 export interface FollowTarget {
   /** World position of the framed point (e.g. the player's chest). */
@@ -55,6 +55,8 @@ export interface CameraRigState {
   recentering: boolean;
   reducedMotion: boolean;
   obstructionMode: ObstructionMode;
+  /** Id of the authored camera volume currently selected, or null when outside all. */
+  activeVolumeId: string | null;
 }
 
 const RAD2DEG = 180 / Math.PI;
@@ -65,6 +67,8 @@ const BETA_MAX = 1.45;
 export class CameraRig {
   readonly camera: ArcRotateCamera;
   private profile: CameraProfile;
+  /** Profile actually driving the frame (base profile or a volume override). */
+  private activeProfile: CameraProfile;
   private volumes: readonly CameraVolume[] = [];
   private target: FollowTarget | null = null;
 
@@ -83,9 +87,14 @@ export class CameraRig {
   private occluder: AbstractMesh | null = null;
   private reducedMotion = false;
   private obstructionMode: ObstructionMode = 'fade';
+  /** Mode actually used this frame (a volume may override the global mode). */
+  private effectiveObstructionMode: ObstructionMode = 'fade';
+  /** Sticky-selected volume id (drives blend-boundary hysteresis). */
+  private currentVolumeId: string | null = null;
 
   constructor(scene: Scene, profile: CameraProfile, restYaw = -Math.PI / 2) {
     this.profile = profile;
+    this.activeProfile = profile;
     this.restYaw = restYaw;
     this.followPos = { x: 0, z: 0 };
     this.followY = 1.2;
@@ -112,6 +121,9 @@ export class CameraRig {
 
   setProfile(profile: CameraProfile): void {
     this.profile = profile;
+    // Reflect the new base immediately; update() re-derives it each frame and a
+    // volume override (if the target is inside one) supersedes it next frame.
+    this.activeProfile = profile;
   }
 
   /** Reduced-motion mode (Prompt 030 locks the policy): drop the look-ahead /
@@ -126,6 +138,7 @@ export class CameraRig {
     if (this.occluder) this.occluder.visibility = 1;
     if (this.occluder) this.occluder.isVisible = true;
     this.obstructionMode = mode;
+    this.effectiveObstructionMode = mode; // until a volume overrides next frame
   }
 
   getProfile(): CameraProfile {
@@ -140,18 +153,26 @@ export class CameraRig {
     if (dt <= 0) return;
 
     // Authored-volume override: while the framed target is inside a volume, use
-    // its profile (and yaw-limit override). Selection is by the smoothed point.
+    // its profile (and yaw-limit / target-offset / obstruction overrides).
+    // Selection is sticky (blend-boundary hysteresis) so adjacent volumes never
+    // oscillate at a shared edge; an unresolved profile falls back safely.
     let active = this.profile;
     let yawLimitOverride: number | null | undefined;
+    let activeVolume: CameraVolume | null = null;
     if (this.volumes.length && this.target) {
       const p = this.target.position();
-      const vol = pickVolume({ x: p.x, y: p.y, z: p.z }, this.volumes);
+      const vol = pickVolumeSticky({ x: p.x, y: p.y, z: p.z }, this.volumes, this.currentVolumeId);
+      this.currentVolumeId = vol ? vol.id : null;
       if (vol) {
-        const vp = profileById(vol.profileId);
+        activeVolume = vol;
+        const vp = profileById(vol.profileId) ?? (vol.fallbackProfileId ? profileById(vol.fallbackProfileId) : undefined);
         if (vp) active = vp;
         yawLimitOverride = vol.yawLimitDeg;
       }
     }
+    // Effective obstruction mode: a volume may override the global rule.
+    this.effectiveObstructionMode = activeVolume?.obstructionMode ?? this.obstructionMode;
+    this.activeProfile = active;
     const limitProfile =
       yawLimitOverride === undefined ? active : { ...active, yawLimitDeg: yawLimitOverride };
 
@@ -176,7 +197,9 @@ export class CameraRig {
 
     // --- Framed target + look-ahead -----------------------------------------
     if (this.target) {
-      const base = this.target.position();
+      const raw = this.target.position();
+      const off = activeVolume?.targetOffset;
+      const base = off ? new Vector3(raw.x + off.x, raw.y + off.y, raw.z + off.z) : raw;
       const lead = this.reducedMotion ? { x: 0, z: 0 } : lookAheadLead(this.target.velocity(), active);
       const desired: Planar = { x: base.x + lead.x, z: base.z + lead.z };
       // Reduced motion uses a steadier follow lag (no snappy lead/settle).
@@ -239,7 +262,7 @@ export class CameraRig {
 
   private applyOccluderFade(): void {
     if (!this.occluder) return;
-    if (this.obstructionMode === 'cutaway') {
+    if (this.effectiveObstructionMode === 'cutaway') {
       // Hard cutaway once the blocker meaningfully occludes the target.
       this.occluder.visibility = 1;
       this.occluder.isVisible = this.fade < 0.5;
@@ -251,9 +274,9 @@ export class CameraRig {
 
   getState(): CameraRigState {
     return {
-      profileId: this.profile.id,
-      context: this.profile.context,
-      variant: this.profile.variant,
+      profileId: this.activeProfile.id,
+      context: this.activeProfile.context,
+      variant: this.activeProfile.variant,
       pitchDeg: (Math.PI / 2 - this.currentBeta) * RAD2DEG,
       fovDeg: this.currentFov * RAD2DEG,
       distance: this.currentDistance,
@@ -261,7 +284,8 @@ export class CameraRig {
       fade: this.fade,
       recentering: this.timeSinceInput >= this.profile.recenterDelay && Math.abs(this.yawOffset) > 1e-3,
       reducedMotion: this.reducedMotion,
-      obstructionMode: this.obstructionMode,
+      obstructionMode: this.effectiveObstructionMode,
+      activeVolumeId: this.currentVolumeId,
     };
   }
 

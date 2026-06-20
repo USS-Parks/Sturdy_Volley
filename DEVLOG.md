@@ -5,6 +5,107 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 036 — Interior construction kit + authored camera volumes (WEF-05) (2026-06-20)
+
+Built the reusable interior construction kit (metric modules → closed-shell
+graybox rooms) and completed the authored camera-volume contract (target
+offset, obstruction-mode override, blend-boundary anti-oscillation, safe
+fallback), proven across the five interior archetypes.
+
+**Metric kit (`src/world/interior-kit.ts`).** Pure `INTERIOR_METRICS` (wall
+0.3×3.2 m, doorway 1.2×2.0 m, window 1.0×1.1 m/sill 0.9, stair rise 0.18/run
+0.28/width 1.4, counter 1.0×0.7, furniture clearance 0.8, interaction reach 1.5,
+nav corridor 1.4) reconciled with `docs/SCALE_AND_PERFORMANCE.md` §1. `RoomSpec`
+model + `validateRoomSpec` (doorway-clearance vs the ≥1.0 m doorway minimum,
+doorway-side-overflow, ceiling-height, feature-clearance vs the 0.8 m walkable
+gap) + `wallSpans` (solid wall segments after subtracting doorway/window
+openings) + `footprintExpansion` for the recorded "bigger on the inside"
+allowance.
+
+**Graybox builder (`src/render/interior-builder.ts`).** `buildRoom` →
+`BuiltRoom` (node, `wallMeshes`/`backingMeshes` split, authored `CameraVolume`,
+doorway anchors with facing-into-room, interaction anchors). Every room is a
+**closed shell** (floor + ceiling + 4 segmented walls; windows get apron +
+lintel) — the deliberate backing treatment so fading/cutting the near wall never
+reveals a void. Primitives + `flatMaterial` only.
+
+**Camera volume contract (`src/camera/volumes.ts` + `src/camera/rig.ts`).**
+`CameraVolume` gains `fallbackProfileId`, `obstructionMode`, and `blendBoundary`;
+`pickVolumeSticky` adds exit-hysteresis (retain the current volume within its
+blend margin unless a strictly-higher-priority volume contains the point) so
+adjacent volumes don't oscillate. The rig now: selects sticky, resolves the
+profile with safe fallback, applies `targetOffset`, applies the per-volume
+obstruction override (`effectiveObstructionMode`), tracks the **effective active
+profile** (`activeProfile`, seeded in `setProfile` so `getState` is correct
+synchronously and reflects a volume's profile, not just the base), and reports
+`activeVolumeId`.
+
+**Proving ground (`src/scenes/InteriorLabScene.ts`).** Five archetypes —
+small-room, corridor, stair-room, crowded-shop (counter + furniture + 3 NPC
+capsules), large-hall (`cutaway` override + windows) — each built from the kit
+with its authored volume. `seesBackingThroughNearWall` (hide the nearest wall,
+ray camera→centre, assert a backing hit), `interactionFocus` (readable primary
+target amid clutter), `playerScreen` (Pixel 5 HUD-safety), and an
+exterior↔interior `enterRoom`/`exitRoom` handoff preserving destination anchor /
+facing / camera context / clock / NPC token / return path. `window.sturdyVolleyInterior`
+debug API. Reachable via Title "Dev · Interior Lab" + `?scene=InteriorLab`;
+registry + dev-route + Title wired.
+
+**Doc (`docs/INTERIOR_KIT_AND_CAMERA_VOLUMES.md`).** Metric table, room spec +
+validation, the closed-shell backing guarantee, the full volume-field contract +
+blend-boundary anti-oscillation, the handoff contract, and the five archetypes.
+
+Files: `src/world/interior-kit.ts` (new), `src/render/interior-builder.ts`
+(new), `src/scenes/InteriorLabScene.ts` (new),
+`docs/INTERIOR_KIT_AND_CAMERA_VOLUMES.md` (new),
+`tests/unit/interior-kit.test.ts` (new), `tests/unit/camera-volumes.test.ts`
+(new), `tests/e2e/interior-lab.spec.ts` (new), `src/camera/volumes.ts`,
+`src/camera/rig.ts`, `src/scenes/registry.ts`, `src/scenes/dev-route.ts`,
+`src/scenes/TitleScene.ts`.
+
+**Acceptance criteria**
+
+- [x] Modules define wall/floor/ceiling/doorway/window/stair/counter/
+  furniture-clearance/interaction/navigation dimensions (`INTERIOR_METRICS` +
+  `RoomSpec`). Camera volumes support profile override, target offset, yaw
+  bounds, obstruction mode, blend boundary, priority, and safe fallback;
+  adjacent volumes blend without oscillation (`pickVolumeSticky` + the
+  loiter-on-boundary e2e + 8 volume unit tests).
+- [x] Wall fade/cutaway never exposes a void without a deliberate backing
+  treatment (closed shell; `seesBackingThroughNearWall` e2e across all five
+  archetypes).
+- [x] Small-room, corridor, stair, crowded-shop, large-hall tests keep
+  character + primary interaction readable on Pixel 5 (per-archetype
+  `playerScreen` + crowded-shop `interactionFocus` e2e on mobile-chromium);
+  exterior/interior handoff preserves destination anchor, facing, camera intent,
+  time, NPC state, return path (handoff e2e). (Live farmhouse wiring is Prompt
+  046 per the contract.)
+
+**Decision record**
+
+- **Doorway vs corridor thresholds split.** A doorway is a pinch point checked
+  against the ≥1.0 m doorway minimum (capsule passes); the 1.4 m nav width
+  governs open corridors, and feature clearance uses the 0.8 m furniture gap.
+  Conflating them flagged the conformant 1.2 m default doorway — fixed.
+- **Closed shell is the backing treatment.** Rather than a separate backing
+  shroud, every room is floor+ceiling+4-walls closed, so any single faded wall
+  reveals interior. Verified by ray test, not assumed.
+- **Sticky volume selection with exit-hysteresis** (not enter-hysteresis):
+  immediate enter, margin-gated exit. With `blendBoundary` 0 it reduces to the
+  prior stateless pick (no regression for existing CameraLab volumes).
+- **Rig reports the effective active profile.** `getState` switched from the
+  base `this.profile` to `activeProfile` (seeded in `setProfile`, re-derived each
+  frame, volume-overridden) so a volume's profile is observable; camera-lab
+  regression caught + fixed via the `setProfile` seed.
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **452 passed** (+19: interior-kit 11, camera-volumes 8) ·
+Playwright **181 passed + 1 skipped** (desktop-only aspect sweep) on both
+`desktop-chromium` + `mobile-chromium` (+18 interior-lab) · `validate:assets` 0 ·
+`build` 0 · GitDoctor **100/100**.
+
+---
+
 ## Prompt 035 — Exterior topology, chunks, streaming, coordinate frames (WEF-04) (2026-06-20)
 
 Stood up the exterior world container **before** any region is laid out: a
