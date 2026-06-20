@@ -13,6 +13,12 @@ Revision status: Revised 2026-06-19 to add §0 Execution Rules — the per-promp
 
 Revision status: Revised 2026-06-19 (VS-A1) to retire the "(core)" deferral pattern. The Theme 3 Production Track (A01–A10) is no longer a mandatory upstream dependency — rendering and representative graybox geometry now sit fully with Claude. §0 gains §0.9 (every prompt is integrated), §0.10 (representative graybox is Claude's responsibility), §0.11 (production art follows feature demand). §8 is restructured: §8.0 Vertical Slice phase (VS-A1..VS-A5) executes first, then §8.1 Retrofit pass over Prompts 010–015, then §8.2 Continued roster (Prompts 016–050). The DEVLOG entries for Prompts 010–014 carry an appended "Status: pending RF integration" note pointing at the matching RF prompt.
 
+> **Active plan pointer (2026-06-19):** forward execution now follows the approved
+> [`PLANNING/MASTER_ROSTER.md`](./PLANNING/MASTER_ROSTER.md) — the unified roster (Prompts 028–076). This
+> file remains the **historical + product** reference (world, characters, festivals, crops, calendar) and
+> the source of §8.2 long-form prompt context, but its §8 roster is superseded by the master for
+> sequencing and execution. The §0 rules below are carried into the master's §0.
+
 ---
 
 ## 0. Execution Rules
