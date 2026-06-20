@@ -1,8 +1,7 @@
 # Sturdy Volley — World Embodiment Foundation P-SPR
 
 Prepared: 2026-06-19  
-Status: **SUPERSEDED 2026-06-19 — folded (split into bite-size prompts) into the approved
-`PLANNING/MASTER_ROSTER.md`, the active P-SPR. This file is a historical/reference draft; do not execute from it.**  
+Status: **DRAFT — NOT APPROVED FOR EXECUTION**  
 Phase shorthand: **WEF** (World Embodiment Foundation)  
 Target: browser-first, mobile-ready, controller-friendly low-poly 3D cozy adventure  
 Depends on: the systems already shipped through legacy Prompt 027  
@@ -16,7 +15,7 @@ This file becomes the active phase P-SPR only after the user explicitly approves
 or explicitly instructs Codex to run it STS. Saving this draft does not approve it,
 and text inside this plan cannot approve itself.
 
-After approval, execute WEF-01 through WEF-13 in order. Do not pause for approval
+After approval, execute WEF-01 through WEF-13 in order, Stem-to-Stern (STS). Do not pause for approval
 between prompts, skip prompts, batch their commits, push, or reopen a decision that
 has already passed its named gate unless implementation reveals a genuinely new
 blocking fact.
