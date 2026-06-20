@@ -5,6 +5,34 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Test: stabilize inventory + shop e2e timing on desktop CI (2026-06-19)
+
+Post-Prompt-027 CI run on GitHub failed two desktop-chromium e2e tests
+(mobile-chromium green for both). Both were keyboard-input timing races
+under headless SwiftShader, which is meaningfully slower than local
+Babylon frames:
+
+- [tests/e2e/inventory.spec.ts](tests/e2e/inventory.spec.ts) — "I opens
+  the inventory panel" pressed `i` immediately after the cutscene-skip
+  flow returned, before the engine's update loop had wired keydown
+  handling and observed `pressed.has('i')`. Added a 250 ms settle wait
+  inside the shared `newGame()` helper, and bumped the `i` key hold from
+  150 ms → 350 ms so at least one update tick reliably sees the press.
+- [tests/e2e/shop.spec.ts](tests/e2e/shop.spec.ts) — "walking up to the
+  bakery counter opens the shop panel" was flaky (passed on retry on the
+  failing run). After teleporting the player to (4.0, 0.9, -1), the
+  180 ms wait wasn't always enough for InteriorScene's
+  `resolveInteraction(...)` to pick `shop-counter` as `nearest` before
+  the `e` keydown fired. Bumped that wait to 350 ms and held `e` for
+  300 ms (was 180 ms) so the update loop sees `pressed.has('e')` with
+  the correct `nearest`.
+
+No engine code touched — purely test-side robustness against slow CI
+frame budgets. Verify gate: `npx tsc --noEmit` ✓, `npm run lint` ✓,
+`npm test` (347 / 347) ✓, `npm run validate:assets` ✓, `npm run build`
+✓. Targeted Playwright run on desktop-chromium for both files: 4 / 4
+passed (each in under 3.5 s).
+
 ## Prompt 027 — Skill professions and mastery (2026-06-19)
 
 All eight skills (cultivation, husbandry, foraging, angling,

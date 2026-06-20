@@ -14,6 +14,9 @@ async function newGame(page: import('@playwright/test').Page, name = 'Crate'): P
     await skip.waitFor({ state: 'hidden', timeout: 4000 });
   } catch { /* cutscene already gone */ }
   await page.waitForFunction(() => Boolean(window.sturdyVolleyDebug?.openInventory));
+  // Settle: let the engine's render loop run a few frames after cutscene
+  // teardown so the keydown handler is wired and update() picks up `pressed`.
+  await page.waitForTimeout(250);
 }
 
 test.describe('Inventory + shipping bin', () => {
@@ -30,7 +33,9 @@ test.describe('Inventory + shipping bin', () => {
   test('I opens the inventory panel; Close returns to play', async ({ page }) => {
     await newGame(page);
     await page.keyboard.down('i');
-    await page.waitForTimeout(150);
+    // Hold long enough for the Babylon update loop to observe `pressed.has('i')`
+    // and call openInventory(); SwiftShader frames on CI are slower than local.
+    await page.waitForTimeout(350);
     await page.keyboard.up('i');
     await expect(page.getByTestId('inventory-panel')).toBeVisible();
     await expect(page.getByTestId('inventory-player')).toBeVisible();

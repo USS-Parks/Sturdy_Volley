@@ -51,9 +51,13 @@ test.describe('Prompt 016 — Shops and economy', () => {
         }
       }
     });
-    await page.waitForTimeout(180);
+    // Give InteriorScene's update loop several frames after the teleport so
+    // resolveInteraction(...) picks up `shop-counter` as `nearest` before E.
+    await page.waitForTimeout(350);
     await page.keyboard.down('e');
-    await page.waitForTimeout(180);
+    // Hold long enough that at least one update tick observes pressed.has('e')
+    // with the correct `nearest` (slow SwiftShader frames on desktop CI).
+    await page.waitForTimeout(300);
     await page.keyboard.up('e');
 
     await expect(page.getByTestId('shop-panel')).toBeVisible({ timeout: 4000 });
