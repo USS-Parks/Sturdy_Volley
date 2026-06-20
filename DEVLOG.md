@@ -5,6 +5,78 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 032 — Motor terrain handling and recovery (WEF-02b) (2026-06-20)
+
+Extended the kinematic capsule motor with full terrain handling — slope limit +
+slide, step-up/stairs, wall collide-and-slide, low-ceiling clamp, moving-platform
+contact contract, penetration recovery, and out-of-bounds recovery — all in the
+pure motor core, fed by a richer environment the physics adapter assembles.
+
+**Motor core (`src/engine/motor.ts`).** `stepMotor` now consumes a
+`MotorEnvironment` (`ground` + `wall` + `stepGround` + `ceiling`) instead of a
+bare `GroundHit`. New behaviour, in order: wall collide-and-slide (advance to the
+wall, project the remainder along its plane — no tunnel), step-up onto ledges
+≤ `stepOffset` (gated by ceiling headroom), penetration push-out, grounding +
+gravity (unchanged 031 core), downhill **slide** on ground steeper than
+`slopeLimit`, **ceiling** clamp, moving-**platform** carry (`GroundHit.platformVel`),
+facing, last-safe-pose tracking, and **out-of-bounds recovery** below
+`recoverMinY`. `GroundHit` now carries a full `normal: Vec3` (for slope/slide).
+New config: `slopeLimitDeg 50`, `stepOffset 0.4`, `slideSpeed 6`, `recoverMinY −25`.
+
+**Physics port (`src/physics/motor-physics.ts`).** Widened to a general
+`raycast(from, dir, maxDist) → RayHit` on both backends (`groundProbe` kept as a
+downward convenience). The scene builds the wall/step/ceiling probes from it.
+
+**Proving ground.** `CameraLabScene` now adds static Havok **box colliders** to
+the standable/obstacle kit meshes (stairs, slope, walls, cliff, cave, doorway,
+crate, NPC/animal — decorative + flat tiles skipped), assembles the full
+`MotorEnvironment` each frame (`buildEnvironment`), and runs a demo **moving
+platform** (oscillating slab, carried geometrically so it works on both backends).
+Debug API gains `sink()`, `platform()`, and `sliding` on `motor()`.
+
+**Art alignment.** Reviewed the full `art-production/current-direction` library
+(79 images) first — the terrain this prompt handles (terraced stairs, cliffs,
+ramps, ledge/ladder links, fords) is the world's core traversal vocabulary
+(town `sv_map_013`, quarry `018`/`053`, caverns `019`/`055`, ridge `056`), so the
+proving-ground stations are faithful. Step heights read ~0.2 m in the art →
+`stepOffset 0.4` covers them.
+
+Files: `src/engine/motor.ts`, `src/physics/motor-physics.ts`,
+`src/scenes/CameraLabScene.ts`, `tests/unit/motor.test.ts`,
+`tests/e2e/camera-lab.spec.ts`, `docs/GAMEPLAY_MOTOR.md`.
+
+**Acceptance criteria**
+
+- [x] Slopes, stairs, corners, low ceilings, moving contact, and pushing do not
+  jitter, tunnel, hover, or trap the player — collide-and-slide + step-up +
+  ceiling clamp + slope slide + platform carry + penetration push-out, each unit
+  tested; e2e proves stair climb + wall no-tunnel on both projects.
+- [x] Step height, slope limit, and recovery thresholds documented in
+  metres/seconds (`docs/GAMEPLAY_MOTOR.md` §2 Terrain + §3b).
+- [x] Deterministic unit coverage for each case (`tests/unit/motor.test.ts`, 17
+  cases incl. slope-slide, step-up, wall-slide, ceiling, platform, penetration,
+  OOB) + proving-ground Playwright on both projects (stairs, wall, OOB, platform).
+
+**Decision record**
+
+- The motor core stays pure: it consumes probe *results* (`MotorEnvironment`),
+  the scene/adapter does the casting. Keeps jsdom unit-testability + backend
+  independence.
+- Collide-and-slide is single-pass per frame (advance-then-slide). Per-frame
+  steps are small (~0.07 m at jog), so it never tunnels; corner jitter is
+  acceptable for the foundation and can be refined later.
+- Moving-platform contact is detected **geometrically** by the scene, not via a
+  Havok kinematic body — backend-independent and far simpler for 032's needs.
+- Havok box colliders (not MESH) on the kit meshes for cheap static collision;
+  the ground stays a MESH collider.
+
+**Verify gate** — `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest 381 passed (42 files; +8 terrain) · Playwright 139 passed +
+1 skipped (desktop-only aspect sweep; +4 new terrain cases across projects) ·
+`validate:assets` 0 · `build` 0 · GitDoctor 100/100, `--fail-on high` exit 0.
+
+---
+
 ## Prompt 031 — Havok adapter + kinematic capsule motor core (WEF-02a) (2026-06-20)
 
 Integrated **Havok inside Babylon.js** behind a narrow adapter and built one

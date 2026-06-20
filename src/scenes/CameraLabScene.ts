@@ -17,6 +17,11 @@ import {
   createMotorState,
   stepMotor,
   DEFAULT_MOTOR_CONFIG,
+  NO_WALL,
+  NO_CEILING,
+  NO_GROUND,
+  type GroundHit,
+  type MotorEnvironment,
   type MotorState,
 } from '../engine/motor';
 import { createControllerState, stepController, type ControllerState } from '../engine/controller';
@@ -96,7 +101,14 @@ export class CameraLabScene extends GameScene {
   private physics!: MotorPhysics;
   private lastMoveDir: Planar = { x: 0, z: 1 };
   private groundBody: PhysicsAggregate | null = null;
+  private readonly colliderBodies: PhysicsAggregate[] = [];
   private disposed = false;
+
+  // Moving-platform demo (032): a low slab oscillating along X. Detected
+  // geometrically (backend-independent) so the contact contract works on Havok
+  // and ray-pick alike.
+  private platformMesh: Mesh | null = null;
+  private readonly platform = { cx: 12, cz: -16, hx: 2, hz: 1.5, topY: 0.3, amp: 4, vel: 0, t: 0 };
 
   build(): Scene {
     const scene = makeScene(this.ctx.engine, PALETTE.sky);
@@ -110,6 +122,13 @@ export class CameraLabScene extends GameScene {
     this.groundMesh = ground;
 
     this.buildKit(scene);
+
+    // Moving-platform demo slab (032).
+    const plat = MeshBuilder.CreateBox('lab-platform', { width: this.platform.hx * 2, height: this.platform.topY, depth: this.platform.hz * 2 }, scene);
+    plat.position.set(this.platform.cx, this.platform.topY / 2, this.platform.cz);
+    plat.material = flatMaterial(scene, 'lab-platform', PALETTE.accent, 0.35);
+    plat.isPickable = false; // grounded geometrically, not by raycast
+    this.platformMesh = plat;
 
     // Data-driven camera rig (029), framing the movable reference player. The
     // locked exterior baseline (030) is the starting profile.
@@ -151,8 +170,15 @@ export class CameraLabScene extends GameScene {
     const plugin = await initHavok();
     if (!plugin || this.disposed) return;
     enableScenePhysics(this.scene, plugin);
-    // 031 grounds on the flat ground plane (per-obstacle colliders are 032).
+    // Ground plane (MESH) + static box colliders on the standable/obstacle kit
+    // meshes so the Havok wall/step/ground rays hit terrain (032). Decorative +
+    // flat tile meshes are skipped to keep the collider count modest.
     this.groundBody = new PhysicsAggregate(this.groundMesh, PhysicsShapeType.MESH, { mass: 0 }, this.scene);
+    for (const m of this.scene.meshes) {
+      if (m.getClassName() !== 'Mesh') continue;
+      if (!isColliderMesh(m.name)) continue;
+      this.colliderBodies.push(new PhysicsAggregate(m as Mesh, PhysicsShapeType.BOX, { mass: 0 }, this.scene));
+    }
     this.physics = new HavokMotorPhysics(this.scene);
   }
 
@@ -171,6 +197,7 @@ export class CameraLabScene extends GameScene {
     this.input?.dispose();
     this.physics?.dispose();
     this.groundBody?.dispose();
+    for (const b of this.colliderBodies) b.dispose();
     this.rig?.dispose();
     delete (window as unknown as { sturdyVolleyLab?: unknown }).sturdyVolleyLab;
     super.dispose();
@@ -241,16 +268,18 @@ export class CameraLabScene extends GameScene {
       this.lastMoveDir = { x: mx, z: mz };
     }
 
+    this.advancePlatform(dt);
+
     // Stamina/gait + accel/brake speed from the existing controller.
     this.controllerState = stepController(this.controllerState, { dir: { x: mx, z: mz }, sprint }, dt);
     const speed = this.controllerState.speed;
     // Keep gliding along the last heading while braking to a stop.
     const dir = speed > 0.01 ? this.lastMoveDir : { x: 0, z: 0 };
 
-    // Ground probe (downward) feeds the pure motor core.
-    const pos = this.motorState.position;
-    const probe = this.physics.groundProbe(pos.x, pos.y, pos.z, DEFAULT_MOTOR_CONFIG.capsuleHeight + 1);
-    this.motorState = stepMotor(this.motorState, { moveDir: dir, speed }, probe, dt);
+    // Assemble the full terrain environment (ground + wall + step + ceiling),
+    // then advance the pure motor core.
+    const env = this.buildEnvironment(dir, speed * dt);
+    this.motorState = stepMotor(this.motorState, { moveDir: dir, speed }, env, dt);
 
     // Keep the player on the lab footprint.
     this.motorState.position.x = clampGround(this.motorState.position.x);
@@ -266,6 +295,75 @@ export class CameraLabScene extends GameScene {
     this.controllerState = createControllerState();
     this.playerVel = { x: 0, z: 0 };
     this.playerMesh.position.set(this.motorState.position.x, this.motorState.position.y, this.motorState.position.z);
+  }
+
+  /** Oscillate the demo platform along X and record its velocity. */
+  private advancePlatform(dt: number): void {
+    if (!this.platformMesh) return;
+    const p = this.platform;
+    p.t += dt;
+    const prevX = p.cx;
+    p.cx = 12 + Math.sin(p.t * 0.6) * p.amp;
+    p.vel = dt > 0 ? (p.cx - prevX) / dt : 0;
+    this.platformMesh.position.x = p.cx;
+  }
+
+  /** Assemble the ground/wall/step/ceiling probes the motor core consumes. */
+  private buildEnvironment(moveDir: Planar, mag: number): MotorEnvironment {
+    const cfg = DEFAULT_MOTOR_CONFIG;
+    const half = cfg.capsuleHeight / 2;
+    const r = cfg.capsuleRadius;
+    const pos = this.motorState.position;
+    const feetY = pos.y - half;
+
+    // Ground straight down (with the moving-platform override).
+    const ground = this.platformGround(
+      this.physics.groundProbe(pos.x, pos.y, pos.z, cfg.capsuleHeight + 1),
+      pos,
+    );
+
+    // Wall in the move direction, cast above the step height so low steps are
+    // not seen as walls; plus the step-ground probe just beyond it.
+    let wall = NO_WALL;
+    let stepGround: GroundHit = NO_GROUND;
+    if (mag > 1e-4) {
+      const wallFromY = feetY + cfg.stepOffset + 0.1;
+      const wallLen = r + mag + cfg.skinOffset + 0.05;
+      const wr = this.physics.raycast({ x: pos.x, y: wallFromY, z: pos.z }, { x: moveDir.x, y: 0, z: moveDir.z }, wallLen);
+      if (wr.hit) {
+        wall = { hit: true, distance: wr.distance - r, normal: wr.normal };
+        const ahead = r + 0.15;
+        const sx = pos.x + moveDir.x * ahead;
+        const sz = pos.z + moveDir.z * ahead;
+        const sr = this.physics.raycast({ x: sx, y: feetY + cfg.stepOffset + 0.3, z: sz }, { x: 0, y: -1, z: 0 }, cfg.stepOffset + 0.5);
+        if (sr.hit) stepGround = { hit: true, groundY: sr.point.y, normal: sr.normal };
+      }
+    }
+
+    // Ceiling above the head.
+    let ceiling = NO_CEILING;
+    const cr = this.physics.raycast({ x: pos.x, y: pos.y + half - 0.05, z: pos.z }, { x: 0, y: 1, z: 0 }, cfg.stepOffset + 0.4);
+    if (cr.hit) ceiling = { hit: true, ceilingY: cr.point.y };
+
+    return { ground, wall, stepGround, ceiling };
+  }
+
+  /** Override the ground hit with the moving platform when the player is over it. */
+  private platformGround(ground: GroundHit, pos: { x: number; y: number; z: number }): GroundHit {
+    const p = this.platform;
+    const half = DEFAULT_MOTOR_CONFIG.capsuleHeight / 2;
+    const feetY = pos.y - half;
+    if (
+      pos.x >= p.cx - p.hx &&
+      pos.x <= p.cx + p.hx &&
+      pos.z >= p.cz - p.hz &&
+      pos.z <= p.cz + p.hz &&
+      feetY <= p.topY + 0.5 &&
+      feetY >= p.topY - 0.6
+    ) {
+      return { hit: true, groundY: p.topY, normal: { x: 0, y: 1, z: 0 }, platformVel: { x: p.vel, z: 0 } };
+    }
+    return ground;
   }
 
   private drainInjected(): CameraInput {
@@ -530,11 +628,12 @@ export class CameraLabScene extends GameScene {
         this.playerVel = { x: 0, z: 0 };
         this.playerMesh.position.set(this.motorState.position.x, y, this.motorState.position.z);
       },
-      motor: (): { x: number; y: number; z: number; grounded: boolean; velocityY: number; facingDeg: number } => ({
+      motor: (): { x: number; y: number; z: number; grounded: boolean; sliding: boolean; velocityY: number; facingDeg: number } => ({
         x: this.motorState.position.x,
         y: this.motorState.position.y,
         z: this.motorState.position.z,
         grounded: this.motorState.grounded,
+        sliding: this.motorState.sliding,
         velocityY: this.motorState.velocityY,
         facingDeg: (this.motorState.facing * 180) / Math.PI,
       }),
@@ -544,6 +643,16 @@ export class CameraLabScene extends GameScene {
         speed: this.controllerState.speed,
       }),
       physicsBackend: (): string => this.physics.backend,
+      /** Force the player below the out-of-bounds floor (keeps lastSafe). */
+      sink: (): void => {
+        this.motorState.position.y = DEFAULT_MOTOR_CONFIG.recoverMinY - 10;
+      },
+      platform: (): { x: number; z: number; topY: number; vel: number } => ({
+        x: this.platform.cx,
+        z: this.platform.cz,
+        topY: this.platform.topY,
+        vel: this.platform.vel,
+      }),
       setPlayerVelocity: (vx: number, vz: number): void => {
         this.playerVel = { x: vx, z: vz };
       },
@@ -601,4 +710,24 @@ function vol(
 
 function clampGround(v: number): number {
   return Math.max(-GROUND_HALF, Math.min(GROUND_HALF, v));
+}
+
+/** Kit meshes that get a static Havok box collider (032): standable surfaces +
+ *  obstacles, skipping decorative meshes + the flat farm tiles + special meshes. */
+const COLLIDER_SKIP = new Set([
+  'lab-ground',
+  'lab-player',
+  'lab-water',
+  'lab-platform',
+  'lab-canopy',
+  'lab-roof',
+  'lab-trunk',
+  'lab-npc-head',
+  'lab-open-ref',
+]);
+function isColliderMesh(name: string): boolean {
+  if (!name.startsWith('lab-')) return false;
+  if (COLLIDER_SKIP.has(name)) return false;
+  if (name.startsWith('lab-cell-')) return false; // flat farm tiles
+  return true;
 }

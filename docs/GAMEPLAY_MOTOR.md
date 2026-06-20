@@ -1,6 +1,6 @@
 # Gameplay Motor and Physics — Sturdy Volley
 
-Last revised: 2026-06-20 (Prompt 031, WEF-02a).
+Last revised: 2026-06-20 (Prompt 032, WEF-02b).
 Normative for the player kinematic-capsule motor. Units: **metres and seconds**.
 
 ## 1. Architecture
@@ -10,16 +10,19 @@ swappable behind a narrow port:
 
 - `src/engine/motor.ts` — the **pure kinematic capsule motor core**
   (`stepMotor`). No Babylon, no physics-engine import. Owns gravity, grounding,
-  ground-snap, and facing turn. Deterministic given the same inputs + `dt`.
+  ground-snap, slope limit/slide, step-up, wall collide-and-slide, ceiling
+  clamp, moving-platform carry, penetration recovery, out-of-bounds recovery,
+  and facing turn. Deterministic given the same inputs + `dt`. It consumes a
+  `MotorEnvironment` (ground + wall + step-ground + ceiling probes).
 - `src/engine/controller.ts` — the existing locomotion controller (unchanged):
   turns input into a speed with acceleration/braking, a gait, and stamina. The
   motor consumes its `speed`, so **stamina + gait stay authoritative** through
   the motor.
-- `src/physics/motor-physics.ts` — the narrow `MotorPhysics` port. Its only job
-  is to answer "what ground is beneath the capsule?" (`groundProbe`). Two
-  backends:
-  - `HavokMotorPhysics` — a downward ray through the Havok physics world. The
-    **primary** backend when the Havok WASM loaded.
+- `src/physics/motor-physics.ts` — the narrow `MotorPhysics` port. It exposes a
+  general `raycast` (and a `groundProbe` convenience); the scene assembles the
+  ground/wall/step/ceiling probes into the `MotorEnvironment`. Two backends:
+  - `HavokMotorPhysics` — rays through the Havok physics world (static colliders
+    on the ground + standable/obstacle meshes). **Primary** when Havok loaded.
   - `RaypickMotorPhysics` — `scene.pickWithRay` fallback (no physics engine).
 - `src/physics/havok.ts` — loads Havok (`@babylonjs/havok` 1.3.12) and builds the
   `HavokPlugin`; returns `null` on failure so the caller falls back to ray-pick.
@@ -29,10 +32,9 @@ Verified against the pinned packages **@babylonjs/core 7.54.3** +
 headless production-preview build (the Playwright environment), so the primary
 backend is exercised, not only the fallback.
 
-Terrain handling — slope limit, sliding, step-up, stairs, low ceilings, pushing,
-penetration recovery — is **Prompt 032**. Water + traversal links are **033**.
-For 031 the motor grounds on the flat proving-ground plane (the Havok static
-collider added in 031); per-obstacle colliders arrive with 032.
+The moving-platform contact contract is detected geometrically by the scene
+(`GroundHit.platformVel`), so it is backend-independent (no Havok kinematic body
+needed). Water + authored traversal links (vault/climb/swim) are **Prompt 033**.
 
 ## 2. Locked tuning
 
@@ -51,6 +53,14 @@ collider added in 031); per-obstacle colliders arrive with 032.
 | Terminal fall speed | **−45 m/s** |
 | Ground-snap distance | **0.35 m** (feet snap down to small steps without leaving the ground) |
 | World gravity (Havok) | (0, −22, 0) m/s² — matches the motor |
+
+### Terrain (WEF-02b)
+| Property | Value |
+|---|---|
+| Slope limit | **50°** — steeper ground is not standable; the player slides down it |
+| Slide speed | **6 m/s** (scaled by steepness above the limit) |
+| Step offset | **0.4 m** — max ledge the capsule climbs without jumping |
+| Out-of-bounds floor | **−25 m** — below this the player recovers to the last safe grounded pose |
 
 ### Horizontal (from `controller.ts`, consumed by the motor)
 | Property | Value |
@@ -89,12 +99,34 @@ This produces stable rest on flat ground (no sink, no hover), free-fall + landin
 at the capsule rest height, small-step snap-down, and a fall-off on drops beyond
 the snap band — all covered by `tests/unit/motor.test.ts`.
 
+## 3b. Terrain handling (WEF-02b)
+
+The scene assembles a `MotorEnvironment` each step from `MotorPhysics.raycast`:
+
+- **Ground** (down from the centre) — as above, plus the moving-platform override.
+- **Wall** (in the move direction, cast *above* the step height so low steps are
+  not seen as walls) — its gap-to-surface drives collide-and-slide.
+- **Step-ground** (down, just beyond the wall) — a standable surface ≤ `stepOffset`
+  above the feet triggers a **step-up**; otherwise the move **slides** along the
+  wall plane (no tunnel, no trap).
+- **Ceiling** (up from the head) — clamps upward motion and blocks a step-up that
+  has no headroom.
+
+On top of grounding: ground steeper than **`slopeLimit`** makes the player
+**slide** downhill (`slideSpeed`, scaled by steepness); a moving platform's
+velocity is **carried** while grounded on it; a wall reporting negative gap
+(penetration) **pushes the capsule out** along its normal; and falling below
+**`recoverMinY`** **recovers** the player to the last stably-grounded pose. Each
+case has deterministic unit coverage in `tests/unit/motor.test.ts`.
+
 ## 4. Proving ground + debug
 
 `CameraLabScene` drives the motor with camera-relative WASD/arrows (Shift =
-sprint), grounded through the active backend. `window.sturdyVolleyLab` exposes
-`motor()` (position / grounded / velocityY / facing), `controller()` (stamina /
-gait / speed), `physicsBackend()`, `dropPlayer(x,y,z)`, and `setPlayer(x,z)`.
-`tests/e2e/camera-lab.spec.ts` asserts gravity + landing and that keyboard
-movement keeps the capsule grounded while sprint drains stamina, on both
-Playwright projects.
+sprint), grounded through the active backend, against the kit's slope / stairs /
+walls / cliff / cave / doorway stations (static Havok box colliders) and a demo
+moving platform. `window.sturdyVolleyLab` exposes `motor()` (position / grounded
+/ sliding / velocityY / facing), `controller()` (stamina / gait / speed),
+`physicsBackend()`, `dropPlayer(x,y,z)`, `setPlayer(x,z)`, `sink()`, and
+`platform()`. `tests/e2e/camera-lab.spec.ts` asserts gravity + landing, grounded
+keyboard movement + sprint stamina, stair climbing, wall no-tunnel, out-of-bounds
+recovery, and platform carry — on both Playwright projects.

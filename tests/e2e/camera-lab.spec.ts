@@ -35,9 +35,11 @@ declare global {
       baselines: () => Record<string, string>;
       playerScreen: () => { x: number; y: number; onScreen: boolean };
       dropPlayer: (x: number, y: number, z: number) => void;
-      motor: () => { x: number; y: number; z: number; grounded: boolean; velocityY: number; facingDeg: number };
+      motor: () => { x: number; y: number; z: number; grounded: boolean; sliding: boolean; velocityY: number; facingDeg: number };
       controller: () => { stamina: number; gait: string; speed: number };
       physicsBackend: () => string;
+      sink: () => void;
+      platform: () => { x: number; z: number; topY: number; vel: number };
     };
   }
 }
@@ -272,6 +274,61 @@ test.describe('Camera Lab proving ground (WEF-01a)', () => {
     expect(dist, `player moved (${dist.toFixed(2)} m)`).toBeGreaterThan(0.5);
     expect(after.grounded, 'stayed grounded while walking').toBe(true);
     expect(staminaAfter, `sprint drained stamina (before ${staminaBefore}, after ${staminaAfter})`).toBeLessThan(staminaBefore);
+  });
+
+  test('terrain: the player climbs the stairs station (WEF-02b)', async ({ page }) => {
+    await page.goto('/?scene=CameraLab');
+    await page.waitForFunction(() => Boolean(window.sturdyVolleyLab?.motor));
+    // Place at the base of the stairs (station at -12,12; steps run from z≈10).
+    await page.evaluate(() => window.sturdyVolleyLab!.setPlayer(-12, 9));
+    await page.waitForTimeout(200);
+    const before = await page.evaluate(() => window.sturdyVolleyLab!.motor());
+    await page.keyboard.down('w');
+    await page.waitForTimeout(900);
+    await page.keyboard.up('w');
+    await page.waitForTimeout(500); // settle on the step
+    const after = await page.evaluate(() => window.sturdyVolleyLab!.motor());
+    expect(after.y, `climbed the stairs (y ${before.y.toFixed(2)} -> ${after.y.toFixed(2)})`).toBeGreaterThan(before.y + 0.5);
+    expect(after.grounded, 'grounded on the stairs').toBe(true);
+  });
+
+  test('terrain: the player does not tunnel through a wall', async ({ page }) => {
+    await page.goto('/?scene=CameraLab');
+    await page.waitForFunction(() => Boolean(window.sturdyVolleyLab?.motor));
+    // Narrow-lane station at (8,-24); right wall at world x≈9.0–9.4.
+    await page.evaluate(() => window.sturdyVolleyLab!.setPlayer(8, -24));
+    await page.waitForTimeout(150);
+    await page.keyboard.down('d'); // strafe +x into the wall
+    await page.waitForTimeout(1500);
+    await page.keyboard.up('d');
+    const after = await page.evaluate(() => window.sturdyVolleyLab!.motor());
+    expect(after.x, `stopped at the lane wall (x=${after.x.toFixed(2)})`).toBeLessThan(9.0);
+  });
+
+  test('terrain: out-of-bounds recovers to the last safe pose', async ({ page }) => {
+    await page.goto('/?scene=CameraLab');
+    await page.waitForFunction(() => Boolean(window.sturdyVolleyLab?.motor));
+    await page.evaluate(() => window.sturdyVolleyLab!.setPlayer(3, 3));
+    await page.waitForTimeout(300); // let it settle grounded (records lastSafe)
+    await page.evaluate(() => window.sturdyVolleyLab!.sink());
+    await page.waitForTimeout(200);
+    const after = await page.evaluate(() => window.sturdyVolleyLab!.motor());
+    expect(after.grounded, 'recovered grounded').toBe(true);
+    expect(after.y, 'recovered to a valid height').toBeGreaterThan(-5);
+    expect(Math.hypot(after.x - 3, after.z - 3), 'recovered near the safe pose').toBeLessThan(1.5);
+  });
+
+  test('terrain: a moving platform carries the player', async ({ page }) => {
+    await page.goto('/?scene=CameraLab');
+    await page.waitForFunction(() => Boolean(window.sturdyVolleyLab?.motor));
+    const plat0 = await page.evaluate(() => window.sturdyVolleyLab!.platform());
+    await page.evaluate((px) => window.sturdyVolleyLab!.setPlayer(px, -16), plat0.x);
+    await page.waitForTimeout(900); // platform slides; player should ride along
+    const motor = await page.evaluate(() => window.sturdyVolleyLab!.motor());
+    const plat = await page.evaluate(() => window.sturdyVolleyLab!.platform());
+    // Still standing on the platform (carried), not left behind at the start.
+    expect(Math.abs(motor.x - plat.x), 'player rode the platform').toBeLessThan(2.2);
+    expect(motor.y, 'standing on the platform top').toBeGreaterThan(0.9);
   });
 
   test('keeps the full player HUD-safe across tablet / ultrawide / tall-phone aspect ratios', async ({ page }, testInfo) => {
