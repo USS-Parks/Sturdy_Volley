@@ -13,6 +13,9 @@ test-results/
 blob-report/
 .playwright/
 
+# Local GitDoctor scan scratch dir (see tools/local_gitdoctor_scan.py + PSPR §0.2 step 7)
+.tmp/
+
 # Editor / OS
 .DS_Store
 *.local

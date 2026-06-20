@@ -35,6 +35,7 @@ Every prompt must pass all of the following before it can be marked complete and
 4. `npm run validate:assets` exits 0
 5. `npm run build` produces `dist/` without errors
 6. `npm run test:e2e` passes for every prompt that touches behavior the Playwright suite covers (title, save flow, farm walk, time/sleep/collapse, future suites added by §8 prompts)
+7. `python tools/local_gitdoctor_scan.py --fail-on high` exits 0 — local GitDoctor-style static audit (security, performance anti-patterns, code quality, configuration/devops, testing, review integrity, project hygiene). HIGH/CRITICAL findings block the commit. MEDIUM/LOW findings are advisory; address opportunistically. False positives must be closed with evidence in the §0.3 DEVLOG entry or commit body, never silently ignored. The scanner is stdlib-only, offline, and re-runnable.
 
 A prompt that fails any gate stays open. Diagnose the root cause; do not bypass with `--no-verify`, skip flags, or sandbox-disable shortcuts.
 
