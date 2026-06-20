@@ -5,6 +5,75 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 041 — Avoidance, schedules, offscreen sim, recovery, performance (WEF-07b) (2026-06-20)
+
+Layered local avoidance, sim tiers + a mobile throttle, deterministic recovery
+policies, and abstract offscreen simulation on top of the Prompt 040 navigation
+service, and proved them with a representative town population in NavLab.
+
+**Avoidance (`src/engine/nav-avoidance.ts`).** Pure `steerAvoid` (separation
+push + consistent perpendicular bias to break head-on deadlock; the player gets
+extra yield weight so NPCs never shove the player), `shouldWaitForLink` (door
+queue — serialises link crossings so doorways don't jam), `wouldOverlap`.
+
+**Sim tiers + recovery (`src/engine/npc-sim.ts`).** `tierFor`/`assignTiers`
+(nearest-first active assignment under a mobile `activeCap`), `trackProgress`
+(stuck detection over a window, never flags idle/waiting NPCs), `recoverToMesh`
+(off-mesh → nearest patch; empty mesh → navmesh-loss; stuck → re-path point),
+`abstractAnchor` + `catchUpIndex` (schedule authority — abstract NPCs hold their
+scheduled semantic anchor; catch up after missed time).
+
+**Integration (`src/scenes/NavLabScene.ts`).** Scaled to 20 NPCs (4 pinned
+always-active named NPCs + a 16-strong throttled crowd). Each active NPC runs
+nav-heading → door-queue → local avoidance → shared motor, with off-mesh + stuck
+recovery (latched `lastRecovery` for race-free inspection); abstract NPCs snap to
+their scheduled anchor with no physics body and rejoin a valid anchor on
+reactivation. Debug API exposes tier, recovery reason, desired/avoid speeds,
+active count, min inter-NPC + min-player separation, and a `displace` helper.
+
+Files: `src/engine/nav-avoidance.ts` (new), `src/engine/npc-sim.ts` (new),
+`tests/unit/nav-avoidance.test.ts` (new), `tests/unit/npc-sim.test.ts` (new),
+`src/scenes/NavLabScene.ts`, `tests/e2e/nav-lab.spec.ts`.
+
+**Acceptance criteria**
+
+- [x] NPCs avoid the player and each other without deadlock, doorway dancing, or
+  pushing the player into invalid space (e2e: `minActiveSeparation > 0.3`,
+  `minPlayerDistance > 0.3`, crowd still moving; `steerAvoid` perpendicular bias
+  + player yield unit-tested); door queues, blockages, missed schedule time,
+  navmesh loss, and stuck recovery have explicit policies (`shouldWaitForLink`,
+  `recoverToMesh` reasons, `catchUpIndex`, `trackProgress` — all unit-tested).
+- [x] Offscreen simulation consumes no active character physics body and rejoins
+  at a valid semantic anchor; schedule pause/resume correct (abstract NPCs hold
+  `abstractAnchor` with zero desired speed and no motor step; e2e abstracts a
+  subset then rejoins).
+- [x] Navigation debug adds desired velocity, avoidance, active/abstract state,
+  and recovery reason; performance tests cover representative town population +
+  mobile throttling (debug API surfaces all; throttle e2e: 20 NPCs, active ≤ 12).
+
+**Decision record**
+
+- **Pinned named NPCs, throttled crowd.** The four story NPCs always simulate
+  actively (so their authored traversal + schedule always run); the crowd fills
+  the remaining active budget nearest-first, the rest abstract. Total active is
+  capped at `activeCap` (12) — the mobile throttle — while named NPCs are never
+  dropped.
+- **Latched `lastRecovery`.** The per-frame recovery reason is transient (the
+  render loop steps between test calls and resets it). A latched last-reason
+  makes the policy race-free to observe in the debug API + e2e, while the live
+  per-frame value still drives the overlay.
+- **Avoidance steers, the motor moves.** `steerAvoid` adjusts the nav heading
+  into a velocity; its unit direction feeds `stepMotor`. The player is a
+  high-weight obstacle that is never displaced (NPCs yield, never push).
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **528 passed** (+19: nav-avoidance 8, npc-sim 11) ·
+Playwright **197 passed + 1 skipped** (desktop-only aspect sweep) on both
+`desktop-chromium` + `mobile-chromium` (+8 nav-lab WEF-07b) · `validate:assets` 0
+· `build` 0 · GitDoctor **100/100**.
+
+---
+
 ## Prompt 040 — NPC navigation service core (WEF-07a) (2026-06-20)
 
 Replaced the straight-line `liveStep` waypoint interpolation with a real

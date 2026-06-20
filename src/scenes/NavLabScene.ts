@@ -21,6 +21,7 @@ import {
   setNavGoal,
   navDesiredDir,
   navAdvance,
+  currentWaypoint,
   currentKind,
   navActive,
   patchAt,
@@ -29,6 +30,24 @@ import {
   type NavPoint,
   type NavLinkKind,
 } from '../engine/navigation';
+import {
+  steerAvoid,
+  shouldWaitForLink,
+  DEFAULT_AVOID_CONFIG,
+  type Obstacle,
+} from '../engine/nav-avoidance';
+import {
+  assignTiers,
+  activeCount,
+  createStuckTracker,
+  trackProgress,
+  recoverToMesh,
+  abstractAnchor,
+  DEFAULT_SIM_CONFIG,
+  type SimTier,
+  type StuckTracker,
+  type RecoveryReason,
+} from '../engine/npc-sim';
 
 /**
  * NPC navigation proving ground (WEF-07a, master Prompt 040).
@@ -95,6 +114,17 @@ interface NpcAgent {
   traversed: Set<NavLinkKind>;
   visited: Set<string>;
   arrivals: number;
+  // WEF-07b
+  tier: SimTier;
+  stuck: StuckTracker;
+  recoveryReason: RecoveryReason;
+  desiredVel: NavPoint;
+  avoidVel: NavPoint;
+  waiting: boolean;
+  /** Latched last recovery reason (race-free for inspection; never auto-cleared). */
+  lastRecovery: RecoveryReason;
+  /** Named story NPCs always simulate actively; the crowd is throttled. */
+  pinned: boolean;
 }
 
 const NPC_DEFS: Array<{ id: string; name: string; start: NavPoint; cycle: (keyof typeof GOAL)[] }> = [
@@ -104,9 +134,23 @@ const NPC_DEFS: Array<{ id: string; name: string; start: NavPoint; cycle: (keyof
   { id: 'cas', name: 'Cas', start: { x: 10, z: -10 }, cycle: ['yard', 'upper', 'yard'] },
 ];
 
+/** Yard roam anchors for the townsfolk crowd (avoidance + throttle density). */
+const ROAM: NavPoint[] = [
+  { x: -14, z: -2 },
+  { x: -4, z: 2 },
+  { x: 6, z: -2 },
+  { x: -8, z: -14 },
+  { x: 2, z: -10 },
+  { x: -2, z: -4 },
+];
+
+/** Population beyond the four named NPCs — a representative town crowd. */
+const TOWNSFOLK_COUNT = 16;
+
 export class NavLabScene extends GameScene {
   private readonly agents: NpcAgent[] = [];
   private playerPos = new Vector3(-16, NPC_HEIGHT / 2, -16);
+  private playerMesh: Mesh | null = null;
   private navDebug: Mesh[] = [];
   private pathDebug: Mesh[] = [];
 
@@ -125,6 +169,7 @@ export class NavLabScene extends GameScene {
     const player = MeshBuilder.CreateCapsule('nav-player', { height: NPC_HEIGHT, radius: NPC_RADIUS }, scene);
     player.material = flatMaterial(scene, 'nav-player', PALETTE.player, 0.35);
     player.position.copyFrom(this.playerPos);
+    this.playerMesh = player;
 
     return scene;
   }
@@ -188,70 +233,162 @@ export class NavLabScene extends GameScene {
   }
 
   private buildAgents(scene: Scene): void {
-    for (const def of NPC_DEFS) {
-      const cap = MeshBuilder.CreateCapsule(`nav-npc-${def.id}`, { height: NPC_HEIGHT, radius: NPC_RADIUS }, scene);
-      cap.material = flatMaterial(scene, `nav-npc-${def.id}`, PALETTE.accent, 0.3);
-      cap.position.set(def.start.x, NPC_HEIGHT / 2, def.start.z);
-      const cycle = def.cycle.map((k) => GOAL[k]);
-      const agent: NpcAgent = {
-        id: def.id,
-        name: def.name,
+    const make = (id: string, name: string, start: NavPoint, cycle: NavPoint[], color = PALETTE.accent, pinned = false): void => {
+      const cap = MeshBuilder.CreateCapsule(`nav-npc-${id}`, { height: NPC_HEIGHT, radius: NPC_RADIUS }, scene);
+      cap.material = flatMaterial(scene, `nav-npc-${id}`, color, 0.3);
+      cap.position.set(start.x, NPC_HEIGHT / 2, start.z);
+      this.agents.push({
+        id,
+        name,
         mesh: cap,
-        motor: createMotorState({ x: def.start.x, y: NPC_HEIGHT / 2, z: def.start.z }),
-        nav: setNavGoal(NAV_MESH, def.start, cycle[0]),
+        motor: createMotorState({ x: start.x, y: NPC_HEIGHT / 2, z: start.z }),
+        nav: setNavGoal(NAV_MESH, start, cycle[0]),
         goalCycle: cycle,
         goalIndex: 0,
         facing: 0,
         traversed: new Set(),
         visited: new Set(['exterior']),
         arrivals: 0,
-      };
-      this.agents.push(agent);
+        tier: 'active',
+        stuck: createStuckTracker(start),
+        recoveryReason: 'none',
+        desiredVel: { x: 0, z: 0 },
+        avoidVel: { x: 0, z: 0 },
+        waiting: false,
+        lastRecovery: 'none',
+        pinned,
+      });
+    };
+
+    for (const def of NPC_DEFS) make(def.id, def.name, def.start, def.cycle.map((k) => GOAL[k]), PALETTE.accent, true);
+
+    // Townsfolk crowd roaming the yard — density for avoidance + the throttle.
+    for (let i = 0; i < TOWNSFOLK_COUNT; i++) {
+      const start = ROAM[i % ROAM.length];
+      const offset: NavPoint = { x: start.x + (i % 3) - 1, z: start.z + (Math.floor(i / 3) % 3) - 1 };
+      const cycle = [ROAM[i % ROAM.length], ROAM[(i + 2) % ROAM.length], ROAM[(i + 4) % ROAM.length]];
+      make(`folk-${i}`, `Townsfolk ${i}`, offset, cycle, PALETTE.warmLight);
     }
   }
 
-  // --- Per-frame NPC nav + motor -------------------------------------------
+  // --- Per-frame NPC nav + motor (WEF-07a) + tiers/avoidance/recovery (07b) --
   private stepAgents(dt: number): void {
+    // 1. Tier assignment: named story NPCs are always active; the crowd is
+    //    throttled — nearest-to-player simulate actively up to the remaining
+    //    active budget, the rest advance abstractly (no motor body).
+    const pinnedCount = this.agents.filter((a) => a.pinned).length;
+    const crowd = this.agents
+      .filter((a) => !a.pinned)
+      .map((a) => ({ id: a.id, distance: Math.hypot(a.motor.position.x - this.playerPos.x, a.motor.position.z - this.playerPos.z) }));
+    const crowdTiers = assignTiers(crowd, {
+      activationRadius: DEFAULT_SIM_CONFIG.activationRadius,
+      activeCap: Math.max(0, DEFAULT_SIM_CONFIG.activeCap - pinnedCount),
+    });
+
     for (const a of this.agents) {
-      const flat = { x: a.motor.position.x, z: a.motor.position.z };
-      const dir = navDesiredDir(a.nav, flat);
-
-      // Shared motor: flat ground (locomotion); navigation supplies the heading.
-      const env: MotorEnvironment = {
-        ground: { hit: true, groundY: 0, normal: { x: 0, y: 1, z: 0 } },
-        wall: NO_WALL,
-        stepGround: NO_GROUND,
-        ceiling: NO_CEILING,
-      };
-      const speed = dir.x === 0 && dir.z === 0 ? 0 : NPC_SPEED;
-      a.motor = stepMotor(a.motor, { moveDir: dir, speed }, env, dt);
-
-      // Record the link kind being crossed + the area visited.
-      const kind = currentKind(a.nav);
-      if (kind && kind !== 'walk' && kind !== 'portal') a.traversed.add(kind);
-      const patch = patchAt(NAV_MESH, { x: a.motor.position.x, z: a.motor.position.z });
-      if (patch?.area) a.visited.add(patch.area);
-
-      // Advance the path; on full arrival, pick the next scheduled goal (a
-      // schedule transition that re-routes through the service).
-      const adv = navAdvance(a.nav, { x: a.motor.position.x, z: a.motor.position.z });
-      a.nav = adv.agent;
-      if (adv.arrived && !navActive(a.nav)) {
-        a.arrivals++;
-        a.goalIndex = (a.goalIndex + 1) % a.goalCycle.length;
-        a.nav = setNavGoal(NAV_MESH, { x: a.motor.position.x, z: a.motor.position.z }, a.goalCycle[a.goalIndex]);
-      }
-
-      // Cosmetic elevation: lerp the mesh Y toward the current patch's display height.
-      const targetY = NPC_HEIGHT / 2 + (patch ? AREA_DISPLAY_Y[patch.id] ?? 0 : 0);
-      const y = a.mesh.position.y + (targetY - a.mesh.position.y) * Math.min(1, dt * 4);
-      a.mesh.position.set(a.motor.position.x, y, a.motor.position.z);
-      if (a.motor.facing !== undefined) {
-        a.facing = a.motor.facing;
-        a.mesh.rotation.y = a.facing;
-      }
+      a.tier = a.pinned ? 'active' : crowdTiers.get(a.id) ?? 'abstract';
+      if (a.tier === 'abstract') this.stepAbstract(a, dt);
+      else this.stepActive(a, dt);
     }
     this.refreshPathDebug();
+  }
+
+  /** Abstract advance: hold the scheduled semantic anchor, no motor/avoidance. */
+  private stepAbstract(a: NpcAgent, dt: number): void {
+    const anchor = abstractAnchor(a.goalCycle, a.goalIndex) ?? { x: a.motor.position.x, z: a.motor.position.z };
+    a.motor.position.x = anchor.x;
+    a.motor.position.z = anchor.z;
+    a.desiredVel = { x: 0, z: 0 };
+    a.avoidVel = { x: 0, z: 0 };
+    a.waiting = false;
+    a.recoveryReason = 'none';
+    const patch = patchAt(NAV_MESH, anchor);
+    const targetY = NPC_HEIGHT / 2 + (patch ? AREA_DISPLAY_Y[patch.id] ?? 0 : 0);
+    const y = a.mesh.position.y + (targetY - a.mesh.position.y) * Math.min(1, dt * 8);
+    a.mesh.position.set(anchor.x, y, anchor.z);
+  }
+
+  /** Active advance: nav heading → avoidance → shared motor, with recovery. */
+  private stepActive(a: NpcAgent, dt: number): void {
+    const pos = { x: a.motor.position.x, z: a.motor.position.z };
+
+    // Off-mesh recovery (rejoin a valid anchor on the navmesh).
+    const offMesh = recoverToMesh(NAV_MESH, pos);
+    if (offMesh.recovered) {
+      a.motor.position.x = offMesh.point.x;
+      a.motor.position.z = offMesh.point.z;
+      a.recoveryReason = offMesh.reason;
+      a.lastRecovery = offMesh.reason;
+      a.nav = setNavGoal(NAV_MESH, offMesh.point, a.goalCycle[a.goalIndex]);
+    }
+
+    const dir = navDesiredDir(a.nav, pos);
+    a.desiredVel = { x: dir.x * NPC_SPEED, z: dir.z * NPC_SPEED };
+
+    // Door-queue: yield if another NPC is crossing the next link.
+    const wp = currentWaypoint(a.nav);
+    a.waiting = false;
+    if (wp && wp.kind !== 'walk') {
+      const occ = this.agents
+        .filter((o) => o.id !== a.id && o.tier === 'active')
+        .map((o) => ({ id: o.id, x: o.motor.position.x, z: o.motor.position.z }));
+      if (shouldWaitForLink(wp.point, a.id, occ)) a.waiting = true;
+    }
+
+    // Local avoidance against nearby active NPCs + the player.
+    const obstacles: Obstacle[] = [{ x: this.playerPos.x, z: this.playerPos.z, radius: NPC_RADIUS, isPlayer: true }];
+    for (const o of this.agents) {
+      if (o.id === a.id || o.tier !== 'active') continue;
+      if (Math.hypot(o.motor.position.x - pos.x, o.motor.position.z - pos.z) < 3) {
+        obstacles.push({ x: o.motor.position.x, z: o.motor.position.z, radius: NPC_RADIUS });
+      }
+    }
+    const vel = a.waiting ? { x: 0, z: 0 } : steerAvoid(pos, dir, NPC_SPEED, obstacles, DEFAULT_AVOID_CONFIG);
+    a.avoidVel = vel;
+    const speed = Math.hypot(vel.x, vel.z);
+    const moveDir = speed > 1e-4 ? { x: vel.x / speed, z: vel.z / speed } : { x: 0, z: 0 };
+
+    const env: MotorEnvironment = {
+      ground: { hit: true, groundY: 0, normal: { x: 0, y: 1, z: 0 } },
+      wall: NO_WALL,
+      stepGround: NO_GROUND,
+      ceiling: NO_CEILING,
+    };
+    a.motor = stepMotor(a.motor, { moveDir, speed }, env, dt);
+
+    // Stuck detection → recover + re-path.
+    const intent = !a.waiting && (dir.x !== 0 || dir.z !== 0);
+    const prog = trackProgress(a.stuck, { x: a.motor.position.x, z: a.motor.position.z }, dt, intent);
+    a.stuck = prog.tracker;
+    if (prog.stuck) {
+      const rec = recoverToMesh(NAV_MESH, { x: a.motor.position.x, z: a.motor.position.z }, true);
+      a.recoveryReason = rec.reason;
+      a.lastRecovery = rec.reason;
+      a.nav = setNavGoal(NAV_MESH, rec.point, a.goalCycle[a.goalIndex]);
+    } else if (!offMesh.recovered) {
+      a.recoveryReason = 'none';
+    }
+
+    // Record link kind + visited area.
+    const kind = currentKind(a.nav);
+    if (kind && kind !== 'walk' && kind !== 'portal') a.traversed.add(kind);
+    const patch = patchAt(NAV_MESH, { x: a.motor.position.x, z: a.motor.position.z });
+    if (patch?.area) a.visited.add(patch.area);
+
+    // Advance the path; on arrival, take the next scheduled goal (re-routes).
+    const adv = navAdvance(a.nav, { x: a.motor.position.x, z: a.motor.position.z });
+    a.nav = adv.agent;
+    if (adv.arrived && !navActive(a.nav)) {
+      a.arrivals++;
+      a.goalIndex = (a.goalIndex + 1) % a.goalCycle.length;
+      a.nav = setNavGoal(NAV_MESH, { x: a.motor.position.x, z: a.motor.position.z }, a.goalCycle[a.goalIndex]);
+    }
+
+    const targetY = NPC_HEIGHT / 2 + (patch ? AREA_DISPLAY_Y[patch.id] ?? 0 : 0);
+    const y = a.mesh.position.y + (targetY - a.mesh.position.y) * Math.min(1, dt * 4);
+    a.mesh.position.set(a.motor.position.x, y, a.motor.position.z);
+    a.facing = a.motor.facing;
+    a.mesh.rotation.y = a.facing;
   }
 
   // --- Conversation alignment ----------------------------------------------
@@ -311,9 +448,25 @@ export class NavLabScene extends GameScene {
   private installDebugApi(): void {
     const api = {
       meshCount: (): number => this.scene.meshes.length,
+      population: (): number => this.agents.length,
       navPatches: (): string[] => NAV_MESH.patches.map((p) => p.id),
       navLinks: (): Array<{ id: string; kind: string }> => NAV_MESH.links.map((l) => ({ id: l.id, kind: l.kind })),
-      npcs: (): Array<{ id: string; area: string | null; currentKind: string | null; traversed: string[]; visited: string[]; arrivals: number; pathLen: number }> =>
+      npcs: (): Array<{
+        id: string;
+        area: string | null;
+        currentKind: string | null;
+        traversed: string[];
+        visited: string[];
+        arrivals: number;
+        pathLen: number;
+        tier: SimTier;
+        recoveryReason: RecoveryReason;
+        lastRecovery: RecoveryReason;
+        waiting: boolean;
+        pos: { x: number; z: number };
+        desiredSpeed: number;
+        avoidSpeed: number;
+      }> =>
         this.agents.map((a) => ({
           id: a.id,
           area: patchAt(NAV_MESH, { x: a.motor.position.x, z: a.motor.position.z })?.area ?? null,
@@ -322,7 +475,48 @@ export class NavLabScene extends GameScene {
           visited: [...a.visited],
           arrivals: a.arrivals,
           pathLen: a.nav.path?.waypoints.length ?? 0,
+          tier: a.tier,
+          recoveryReason: a.recoveryReason,
+          lastRecovery: a.lastRecovery,
+          waiting: a.waiting,
+          pos: { x: a.motor.position.x, z: a.motor.position.z },
+          desiredSpeed: Math.hypot(a.desiredVel.x, a.desiredVel.z),
+          avoidSpeed: Math.hypot(a.avoidVel.x, a.avoidVel.z),
         })),
+      activeCount: (): number => activeCount(new Map(this.agents.map((a) => [a.id, a.tier]))),
+      /** Min centre-distance between any two ACTIVE NPCs (avoidance keeps it > 0). */
+      minActiveSeparation: (): number => {
+        const act = this.agents.filter((a) => a.tier === 'active');
+        let min = Infinity;
+        for (let i = 0; i < act.length; i++) {
+          for (let j = i + 1; j < act.length; j++) {
+            min = Math.min(min, Math.hypot(act[i].motor.position.x - act[j].motor.position.x, act[i].motor.position.z - act[j].motor.position.z));
+          }
+        }
+        return min === Infinity ? 99 : min;
+      },
+      /** Closest any active NPC gets to the player (must stay clear). */
+      minPlayerDistance: (): number => {
+        let min = Infinity;
+        for (const a of this.agents) {
+          if (a.tier !== 'active') continue;
+          min = Math.min(min, Math.hypot(a.motor.position.x - this.playerPos.x, a.motor.position.z - this.playerPos.z));
+        }
+        return min === Infinity ? 99 : min;
+      },
+      player: (): { x: number; z: number } => ({ x: this.playerPos.x, z: this.playerPos.z }),
+      setPlayer: (x: number, z: number): void => {
+        this.playerPos.set(x, NPC_HEIGHT / 2, z);
+        this.playerMesh?.position.copyFrom(this.playerPos);
+      },
+      /** Shove an NPC to an arbitrary (possibly off-mesh) point to exercise recovery. */
+      displace: (npcId: string, x: number, z: number): boolean => {
+        const a = this.agents.find((n) => n.id === npcId);
+        if (!a) return false;
+        a.motor.position.x = x;
+        a.motor.position.z = z;
+        return true;
+      },
       /** Advance `n` deterministic fixed-dt frames (e2e driver). */
       tick: (n = 1): void => {
         for (let i = 0; i < n; i++) this.stepAgents(FIXED_DT);
