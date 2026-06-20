@@ -1,17 +1,27 @@
 import {
   Scene,
-  ArcRotateCamera,
   MeshBuilder,
   TransformNode,
   Vector3,
   Color3,
+  type AbstractMesh,
   type Mesh,
 } from '@babylonjs/core';
 import { GameScene } from './GameScene';
 import { makeScene, addFog, addLights, flatMaterial, PALETTE } from '../render/scene-helpers';
+import { CameraRig, type FollowTarget } from '../camera/rig';
+import {
+  CAMERA_CONTEXTS,
+  variantsForContext,
+  type CameraContextId,
+  type CameraProfile,
+} from '../camera/profiles';
+import { CameraInputController, mergeInput, ZERO_INPUT, type CameraInput } from '../camera/input';
+import type { CameraVolume } from '../camera/volumes';
+import type { Planar } from '../camera/orbit';
 
 /**
- * Camera proving ground (WEF-01a, master Prompt 028).
+ * Camera proving ground (WEF-01a/01b, master Prompts 028–029).
  *
  * A single scene holding the full camera/motor test-geometry kit at true meter
  * scale (1 unit = 1 m, per docs/SCALE_AND_PERFORMANCE.md). It is the fixed stage
@@ -21,8 +31,11 @@ import { makeScene, addFog, addLights, flatMaterial, PALETTE } from '../render/s
  * frame. Reachable via the Title "Dev · Camera Lab" item (dev builds) or the
  * `?scene=CameraLab` direct-boot route (works in the production preview build).
  *
- * The camera here is a plain orbit camera for inspection only; the authored
- * camera rig + profiles land in Prompt 029.
+ * Prompt 029 wires the data-driven CameraRig here: a camera-relative movable
+ * reference player drives look-ahead, manual orbit comes from mouse/touch drag +
+ * the controller right-stick, and number keys + `[`/`]` switch context/variant
+ * live (≥3 variants per §2 context). A few demo camera volumes auto-swap the
+ * profile when the player walks into the interior / water / cave stations.
  */
 
 /** One labelled station in the kit. Stations are spaced on a grid so each
@@ -40,9 +53,21 @@ const WALL_HEIGHT = 3.4; // mid-band of the 3.0–4.0 m wall convention
 const DOOR_W = 1.2; // ≥ 1.0 m
 const DOOR_H = 1.9; // ≥ 1.8 m
 
+const PLAYER_SPEED = 5; // m/s — proxy driver to exercise the camera; real motor is 031.
+const GROUND_HALF = 38;
+
 export class CameraLabScene extends GameScene {
-  private camera!: ArcRotateCamera;
   private readonly stations: KitStation[] = [];
+  private rig!: CameraRig;
+  private input: CameraInputController | null = null;
+  private playerMesh!: Mesh;
+  private playerVel: Planar = { x: 0, z: 0 };
+  private contextIndex = 0; // exterior
+  private variantIndex = 1; // 'standard'
+  private readonly held = new Set<string>();
+  private injected: CameraInput = { ...ZERO_INPUT };
+  private onKeyDown!: (e: KeyboardEvent) => void;
+  private onKeyUp!: (e: KeyboardEvent) => void;
 
   build(): Scene {
     const scene = makeScene(this.ctx.engine, PALETTE.sky);
@@ -56,36 +81,125 @@ export class CameraLabScene extends GameScene {
 
     this.buildKit(scene);
 
-    // Inspection camera: orbit, framed on the kit centre. Authored rig is 029.
-    this.camera = new ArcRotateCamera(
-      'lab-cam',
-      -Math.PI / 2 + 0.7,
-      Math.PI / 3.1,
-      34,
-      new Vector3(0, 1.2, 0),
-      scene,
-    );
-    this.camera.fov = 0.8;
-    this.camera.minZ = 0.1;
-    this.camera.lowerRadiusLimit = 4;
-    this.camera.upperRadiusLimit = 60;
-    this.camera.wheelDeltaPercentage = 0.02;
-    const canvas = this.ctx.engine.getRenderingCanvas();
-    if (canvas) this.camera.attachControl(canvas, true);
+    // Data-driven camera rig (029), framing the movable reference player.
+    this.rig = new CameraRig(scene, this.currentProfile(), -Math.PI / 2);
+    const follow: FollowTarget = {
+      position: () => new Vector3(this.playerMesh.position.x, this.playerMesh.position.y + 0.6, this.playerMesh.position.z),
+      velocity: () => this.playerVel,
+      ignore: (): readonly AbstractMesh[] => [this.playerMesh],
+    };
+    this.rig.setTarget(follow);
+    this.rig.setVolumes(this.demoVolumes());
 
-    this.scene = scene;
     return scene;
   }
 
   override enter(): void {
-    // Reference-player capsule the camera kit is sized around, parked at origin.
+    const canvas = this.ctx.engine.getRenderingCanvas();
+    if (canvas) this.input = new CameraInputController(canvas);
+
+    // Camera-relative WASD/arrow driver for the reference player + the
+    // number-key context / `[` `]` variant switches.
+    this.onKeyDown = (e) => {
+      this.held.add(e.key.toLowerCase());
+      this.handleSwitchKey(e.key);
+    };
+    this.onKeyUp = (e) => this.held.delete(e.key.toLowerCase());
+    window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('keyup', this.onKeyUp);
+
     this.installDebugApi();
   }
 
+  override update(dt: number): void {
+    if (dt <= 0) return;
+    this.drivePlayer(dt);
+    const camInput = this.input ? this.input.consume(dt) : { ...ZERO_INPUT };
+    const merged = mergeInput(camInput, this.drainInjected());
+    this.rig.update(dt, merged);
+  }
+
   override dispose(): void {
-    this.camera?.detachControl();
+    window.removeEventListener('keydown', this.onKeyDown);
+    window.removeEventListener('keyup', this.onKeyUp);
+    this.input?.dispose();
+    this.rig?.dispose();
     delete (window as unknown as { sturdyVolleyLab?: unknown }).sturdyVolleyLab;
     super.dispose();
+  }
+
+  // --- Camera profile / switching ------------------------------------------
+  private currentProfile(): CameraProfile {
+    const ctx = CAMERA_CONTEXTS[this.contextIndex];
+    const variants = variantsForContext(ctx);
+    return variants[Math.min(this.variantIndex, variants.length - 1)];
+  }
+
+  private applyProfile(): void {
+    this.rig.setProfile(this.currentProfile());
+  }
+
+  private setContext(id: CameraContextId): void {
+    const idx = CAMERA_CONTEXTS.indexOf(id);
+    if (idx < 0) return;
+    this.contextIndex = idx;
+    this.applyProfile();
+  }
+
+  private cycleVariant(): string {
+    const variants = variantsForContext(CAMERA_CONTEXTS[this.contextIndex]);
+    this.variantIndex = (this.variantIndex + 1) % variants.length;
+    this.applyProfile();
+    return this.currentProfile().id;
+  }
+
+  private handleSwitchKey(key: string): void {
+    const n = Number(key);
+    if (n >= 1 && n <= CAMERA_CONTEXTS.length) {
+      this.contextIndex = n - 1;
+      this.applyProfile();
+    } else if (key === '[' || key === ']') {
+      this.cycleVariant();
+    }
+  }
+
+  // --- Reference player driver (camera-relative) ----------------------------
+  private drivePlayer(dt: number): void {
+    const fwd = (this.held.has('w') || this.held.has('arrowup') ? 1 : 0) - (this.held.has('s') || this.held.has('arrowdown') ? 1 : 0);
+    const str = (this.held.has('d') || this.held.has('arrowright') ? 1 : 0) - (this.held.has('a') || this.held.has('arrowleft') ? 1 : 0);
+    if (fwd === 0 && str === 0) {
+      this.playerVel = { x: 0, z: 0 };
+      return;
+    }
+    const alpha = this.rig.camera.alpha;
+    // Planar forward = from camera toward target (into the screen).
+    const forward: Planar = { x: -Math.cos(alpha), z: -Math.sin(alpha) };
+    const right: Planar = { x: -Math.sin(alpha), z: Math.cos(alpha) };
+    let mx = right.x * str + forward.x * fwd;
+    let mz = right.z * str + forward.z * fwd;
+    const len = Math.hypot(mx, mz) || 1;
+    mx /= len;
+    mz /= len;
+    this.playerVel = { x: mx * PLAYER_SPEED, z: mz * PLAYER_SPEED };
+    const p = this.playerMesh.position;
+    p.x = clampGround(p.x + this.playerVel.x * dt);
+    p.z = clampGround(p.z + this.playerVel.z * dt);
+  }
+
+  private drainInjected(): CameraInput {
+    const out = this.injected;
+    this.injected = { ...ZERO_INPUT };
+    return out;
+  }
+
+  /** A handful of authored volumes proving the volume override (full kit: 036). */
+  private demoVolumes(): CameraVolume[] {
+    return [
+      vol('v-small-room', 26, -24, 2.5, 2, 'smallInterior:standard', 10, 30),
+      vol('v-large-room', -28, -6, 6, 4.5, 'largeInterior:standard', 10, 60),
+      vol('v-water', 22, 12, 4, 4, 'water:standard', 5),
+      vol('v-cave', 26, 28, 2, 4, 'cave:standard', 10, 45),
+    ];
   }
 
   /** Builds every kit station as a parented group with a stable id. */
@@ -143,6 +257,8 @@ export class CameraLabScene extends GameScene {
     const cap = MeshBuilder.CreateCapsule('lab-player', { height: PLAYER_HEIGHT, radius: PLAYER_RADIUS }, scene);
     cap.position.set(at.x, PLAYER_HEIGHT / 2, at.z);
     cap.material = flatMaterial(scene, 'lab-player', PALETTE.player, 0.35);
+    cap.isPickable = false; // never an occluder for its own camera
+    this.playerMesh = cap;
   }
 
   // --- Kit stations ---------------------------------------------------------
@@ -309,19 +425,64 @@ export class CameraLabScene extends GameScene {
     this.box(scene, p, 'lab-cave-room', { w: 7, h: 0.3, d: 6 }, new Vector3(0, 0.15, 6.5), PALETTE.quarry, 0.14);
   }
 
-  /** Debug/e2e introspection: confirms the kit built and lets a test frame any
-   *  station. Mirrors the `window.sturdyVolleyDebug` pattern of the play scenes. */
+  /** Debug/e2e introspection: confirms the kit built and exercises the camera
+   *  rig deterministically. Mirrors `window.sturdyVolleyDebug` of the play scenes. */
   private installDebugApi(): void {
     const api = {
       kit: (): string[] => this.stations.map((s) => s.id),
       meshCount: (): number => this.scene.meshes.length,
+      /** Teleport the framed player to a station (camera follows it there). */
       focus: (id: string): boolean => {
         const s = this.stations.find((st) => st.id === id);
         if (!s) return false;
-        this.camera.setTarget(new Vector3(s.at.x, 1.2, s.at.z));
+        this.playerMesh.position.set(s.at.x, PLAYER_HEIGHT / 2, s.at.z);
+        this.playerVel = { x: 0, z: 0 };
         return true;
       },
+      player: (): { x: number; z: number } => ({ x: this.playerMesh.position.x, z: this.playerMesh.position.z }),
+      setPlayer: (x: number, z: number): void => {
+        this.playerMesh.position.set(clampGround(x), PLAYER_HEIGHT / 2, clampGround(z));
+      },
+      setPlayerVelocity: (vx: number, vz: number): void => {
+        this.playerVel = { x: vx, z: vz };
+      },
+      cameraState: () => this.rig.getState(),
+      contexts: (): readonly string[] => CAMERA_CONTEXTS,
+      variants: (ctx: string): string[] => variantsForContext(ctx as CameraContextId).map((p) => p.id),
+      setContext: (ctx: string): void => this.setContext(ctx as CameraContextId),
+      cycleVariant: (): string => this.cycleVariant(),
+      /** Inject a manual orbit yaw delta (rad) for the next frame. */
+      nudgeYaw: (rad: number): void => {
+        this.injected = mergeInput(this.injected, { yawDelta: rad, pitchDelta: 0, recenter: false });
+      },
+      recenter: (): void => this.rig.requestRecenter(),
+      setReducedMotion: (on: boolean): void => this.rig.setReducedMotion(on),
     };
     (window as unknown as { sturdyVolleyLab?: typeof api }).sturdyVolleyLab = api;
   }
+}
+
+/** Authored demo volume centred at (cx,cz) with XZ half-extents hx,hz. */
+function vol(
+  id: string,
+  cx: number,
+  cz: number,
+  hx: number,
+  hz: number,
+  profileId: string,
+  priority: number,
+  yawLimitDeg?: number,
+): CameraVolume {
+  return {
+    id,
+    min: { x: cx - hx, y: 0, z: cz - hz },
+    max: { x: cx + hx, y: 5, z: cz + hz },
+    profileId,
+    priority,
+    ...(yawLimitDeg === undefined ? {} : { yawLimitDeg }),
+  };
+}
+
+function clampGround(v: number): number {
+  return Math.max(-GROUND_HALF, Math.min(GROUND_HALF, v));
 }

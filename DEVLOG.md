@@ -5,6 +5,94 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 029 — Data-driven camera profiles, rig, obstruction, and input (WEF-01b) (2026-06-19)
+
+Stood up the `src/camera/` system the rest of the foundation frames against: a
+data-driven profile catalogue, a Babylon rig that holds no tuning of its own, an
+obstruction probe, camera volumes, and the three input paths — all wired into
+the Prompt 028 proving ground with a movable camera-relative reference player
+and live context/variant switching.
+
+**Pure math (unit-tested).** `src/camera/profiles.ts` defines `CameraProfile`
+and `CAMERA_PROFILES` — **three variants per §2 context** (21 profiles across
+exterior / farm / smallInterior / largeInterior / cave / water / mounted), every
+behavioural knob (downward view, follow distance, FOV, orbit yaw limit, recenter
+delay/speed, look-ahead gain/max, follow lag, obstruction config) is data.
+`src/camera/orbit.ts` is the deterministic per-frame math: `wrapAngle`,
+`clampYawOffset`/`applyYawInput` (constrained orbit), `stepRecenter` (grace then
+sign-stable decay to rest), `lookAheadLead` (velocity-direction lead, clamped),
+`dampToward`/`dampPlanar` (frame-rate-independent smoothing), and
+`stepObstruction` (pull-in never below `minDistance` + occluder-fade ramp).
+`src/camera/input.ts` adds `applyDeadzone`, `stickToYaw`/`stickToPitch`,
+`mergeInput`, and the `CameraInputController` (pointer drag = mouse **and**
+touch, right-stick poll, `R` / stick-click recenter). `src/camera/volumes.ts`
+is the authored-region override model (`containsPoint`, `pickVolume` by
+priority).
+
+**Rig (Babylon binding).** `src/camera/rig.ts` `CameraRig` drives an
+ArcRotateCamera from a profile each frame using only the pure functions:
+manual-orbit clamp, recenter grace, look-ahead, follow smoothing, beta/FOV blend
+on profile switch, and an obstruction raycast (target→camera, skipping the
+player) that pulls the camera in and fades the occluding mesh. `getState()`
+exposes live telemetry (effective pitch/FOV/distance/yaw-offset/fade/recentering)
+and `setReducedMotion()` drops the look-ahead + recenter impulses (Prompt 030
+locks that policy). No `attachControl` — the rig owns alpha/beta/radius so the
+constraints actually apply.
+
+**Proving-ground integration.** `CameraLabScene` now frames a WASD/arrow
+**camera-relative** reference player (proxy driver; the real motor is 031),
+manual orbit via drag + right-stick, number keys 1–7 to switch context, `[`/`]`
+to cycle variant, and four demo camera volumes that swap the profile when the
+player walks into the small-room / large-room / water / cave stations. The
+`window.sturdyVolleyLab` debug API gains `cameraState`, `contexts`, `variants`,
+`setContext`, `cycleVariant`, `nudgeYaw`, `recenter`, `setReducedMotion`,
+`player`, `setPlayer`, and `setPlayerVelocity`.
+
+Files: `src/camera/profiles.ts` (new), `src/camera/orbit.ts` (new),
+`src/camera/input.ts` (new), `src/camera/volumes.ts` (new), `src/camera/rig.ts`
+(new), `src/scenes/CameraLabScene.ts`, `tests/unit/camera.test.ts` (new),
+`tests/e2e/camera-lab.spec.ts`.
+
+**Acceptance criteria**
+
+- [x] The §1.1 hybrid doctrine is visible and playable with keyboard/mouse,
+  controller, and touch (pointer drag covers mouse + touch; right-stick poll +
+  recenter button cover the controller; camera-relative player movement).
+- [x] Constrained orbit, recenter grace, look-ahead, and collision/occlusion
+  response are deterministic and tunable purely from profile data (all logic in
+  the pure `orbit`/`profiles` modules driven by `CameraProfile`; 16 unit tests
+  cover clamp/recenter/look-ahead/damp/obstruction; the rig holds no constants
+  beyond beta limits).
+- [x] At least three variants per context are switchable at runtime in the
+  proving ground (`variantsForContext` ≥3 for all 7 contexts; e2e switches
+  context + cycles variant live and asserts the change).
+
+**Decision record**
+
+- Angle convention locked: profiles store the §2 **downward-view** degrees;
+  `betaFromPitchDeg` maps to Babylon beta = 90° − pitch. Recorded so Prompt 030
+  can publish both representations.
+- Split pure math (`profiles`/`orbit`/`input` reducers/`volumes`) from the
+  Babylon rig so the behaviour is unit-testable in jsdom and the engine-purity
+  intent holds; `src/camera/` is deliberately outside `src/engine/` because the
+  rig must import Babylon.
+- Three variants per context named near / standard / far, spanning each §2
+  range; `standard` is the default. Prompt 030 selects + locks one baseline per
+  context from these — they are intentionally all live until then.
+- Look-ahead is velocity-driven (not facing-driven) for now because the real
+  motor + player facing arrive in 031; the gait-scaled mounted gains are already
+  the largest per §2.
+- Rejected: Babylon's built-in `attachControl` orbit (cannot enforce the profile
+  yaw limit / recenter grace) and per-context bespoke camera classes (the single
+  data-driven rig is the §2 "tunable from data" requirement).
+
+**Verify gate** — `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest 363 passed (41 files; +16 camera) · Playwright 120 passed
+(desktop-chromium + mobile-chromium; +4 new camera-rig cases) · `validate:assets`
+0 · `build` 0 · GitDoctor 100/100, `--fail-on high` exit 0.
+
+---
+
 ## Prompt 028 — TypeScript config split + camera proving-ground shell (WEF-01a) (2026-06-19)
 
 First prompt of the World Embodiment Foundation block, executed under the
