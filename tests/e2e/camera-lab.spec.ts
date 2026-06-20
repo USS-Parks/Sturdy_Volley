@@ -42,6 +42,10 @@ declare global {
       platform: () => { x: number; z: number; topY: number; vel: number };
       triggerTraversal: () => boolean;
       reload: () => void;
+      interaction: () => { chosenId: string | null; heldTool: string | null; actionPhase: string; lastImpactId: string | null };
+      setHeldTool: (tool: string | null) => void;
+      act: () => boolean;
+      cancelAct: () => boolean;
     };
   }
 }
@@ -375,6 +379,41 @@ test.describe('Camera Lab proving ground (WEF-01a)', () => {
     expect(after.grounded, 'recovered grounded').toBe(true);
     expect(after.y, 'valid grounded height').toBeGreaterThan(0.5);
     expect(Math.hypot(after.x - 6, after.z + 4), 'restored to the same anchor').toBeLessThan(1.0);
+  });
+
+  test('interaction: focus resolves to the nearest target and one-button commit fires the effect (WEF-03)', async ({ page }) => {
+    await page.goto('/?scene=CameraLab');
+    await page.waitForFunction(() => Boolean(window.sturdyVolleyLab?.interaction));
+
+    // Far from every station → nothing in reach.
+    await page.evaluate(() => window.sturdyVolleyLab!.setPlayer(0, -2));
+    await page.waitForTimeout(200);
+    expect((await page.evaluate(() => window.sturdyVolleyLab!.interaction())).chosenId, 'no target when far').toBeNull();
+
+    // Walk up to the interaction-prop crate station (10, 28).
+    await page.evaluate(() => window.sturdyVolleyLab!.setPlayer(10, 26));
+    await page.waitForTimeout(250);
+    const focus = await page.evaluate(() => window.sturdyVolleyLab!.interaction());
+    expect(focus.chosenId, 'crate is the focus target').toBe('crate');
+
+    // One-button commit fires the effect once (anticipation → impact).
+    const began = await page.evaluate(() => window.sturdyVolleyLab!.act());
+    expect(began, 'action committed').toBe(true);
+    await page.waitForTimeout(500); // past impact + recovery
+    const done = await page.evaluate(() => window.sturdyVolleyLab!.interaction());
+    expect(done.lastImpactId, 'effect executed on the crate').toBe('crate');
+    expect(done.actionPhase, 'returned to idle').toBe('idle');
+  });
+
+  test('interaction: held tool selection is reflected in the resolver context', async ({ page }) => {
+    await page.goto('/?scene=CameraLab');
+    await page.waitForFunction(() => Boolean(window.sturdyVolleyLab?.interaction));
+    await page.evaluate(() => window.sturdyVolleyLab!.setHeldTool('hoe'));
+    await page.waitForTimeout(100);
+    expect((await page.evaluate(() => window.sturdyVolleyLab!.interaction())).heldTool).toBe('hoe');
+    await page.evaluate(() => window.sturdyVolleyLab!.setHeldTool(null));
+    await page.waitForTimeout(100);
+    expect((await page.evaluate(() => window.sturdyVolleyLab!.interaction())).heldTool).toBeNull();
   });
 
   test('keeps the full player HUD-safe across tablet / ultrawide / tall-phone aspect ratios', async ({ page }, testInfo) => {

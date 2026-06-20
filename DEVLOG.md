@@ -5,6 +5,79 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 034 — Interaction, facing, and tool-targeting model (WEF-03) (2026-06-20)
+
+Built the shared 3D interaction resolver: a pure, deterministic, input-agnostic
+pipeline (discovery → scoring → selection → facing → action commitment) with a
+visible focus treatment, wired into the proving ground over the kit's
+interactable stations.
+
+**Resolver (`src/engine/interaction-targeting.ts`).** `resolveTarget` scores
+candidates by **action priority, facing relevance** (cos of the heading error),
+**distance, reachability** (`reach + maxReachSlack`), **held-tool match,
+obstruction**, and **sticky-target hysteresis** (bonus to the previously-chosen
+target — stops flicker), returning the chosen id + the full scored list for the
+focus preview. Facing: `headingTo`, `turnInPlaceNeeded` (0.9 rad ≈ 50°),
+`faceTarget` (reuses the motor's shortest-arc turn). Action lifecycle:
+`beginAction` → `stepAction` (anticipation 0.18 → impact 0.08, fires the effect
+once → recovery 0.22) → idle, with `canCancel`/`cancelAction` inside a 0.12 s
+cancel window. Farming stays on the **1 m logical grid** — a `farm-cell`
+candidate carries `{col,row}`, never a mesh name. The legacy `resolveInteraction`
+(Prompt 005) is untouched (FarmScene migrates in 053).
+
+**Proving ground.** Eight kit candidates (crate/prop, doorway/door, NPC, animal,
+soil/farm-cell `requiresTool:'hoe'`, ore/`pick`, water-entry, climb link). Each
+frame resolves the focus target (with hysteresis) and snaps a **ground-preview
+ring** to it; `f` commits the one-button action (faces the target, fires on
+impact), `x` cancels, `t` cycles the held tool. Debug API gains `interaction()`,
+`setHeldTool`, `act`, `cancelAct`.
+
+**Input parity.** All input methods build the same `PlayerContext` and call the
+same resolver, so they pick the same target — covered by crowded-cluster +
+tool-flip unit tests and proving-ground e2e.
+
+Files: `src/engine/interaction-targeting.ts` (new), `src/scenes/CameraLabScene.ts`,
+`tests/unit/interaction-targeting.test.ts` (new), `tests/e2e/camera-lab.spec.ts`,
+`docs/GAMEPLAY_INTERACTION.md` (new).
+
+**Acceptance criteria**
+
+- [x] Scoring includes distance, view/facing relevance, action priority,
+  reachability, obstruction, held tool, and sticky-target hysteresis; a visible
+  focus treatment + optional ground preview shows the exact target before
+  commitment (the focus ring; resolver returns the scored list).
+- [x] Facing, turn-in-place threshold, hand/tool alignment, anticipation, impact,
+  recovery, and cancel window documented (`docs/GAMEPLAY_INTERACTION.md` §3–§4).
+- [x] Touch tap, virtual stick + action, keyboard, and controller choose the same
+  target for equivalent situations (same `PlayerContext` → same `resolveTarget`,
+  asserted input-agnostic + crowded NPC/animal/door + crop/forage/tool cases in
+  unit tests).
+- [x] Current inventory, tool hardness, stamina, dialogue, animal, machine, and
+  forage outcomes intact (the resolver only selects + commits; the legacy effect
+  systems are unchanged and wired per scene in the 053 migration).
+
+**Decision record**
+
+- New module rather than rewriting `resolveInteraction`: the legacy one is live in
+  FarmScene; the foundation resolver is additive until 053 migrates consumers.
+- Priority dominates, then facing, then distance (weights 100 / 30 / 10) so a
+  high-priority target in front is chosen even if a low-priority one is marginally
+  closer; hysteresis (15) is deliberately small — enough to hold a near-tie, not
+  to override a clearly better target.
+- Action is a pure phase machine; the scene executes the real effect on
+  `impactFired`. Keeps timing unit-testable and the effect systems decoupled.
+- Live obstruction is supported by the resolver (unit tested) but left unwired in
+  the lab to keep the e2e deterministic; scenes supply `obstructed` from their LOS
+  probe.
+
+**Verify gate** — `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest 401 passed (43 files; +13 interaction) · Playwright 149
+passed + 1 skipped (desktop-only aspect sweep; +4 new interaction cases across
+projects) · `validate:assets` 0 · `build` 0 · GitDoctor 100/100, `--fail-on high`
+exit 0.
+
+---
+
 ## Prompt 033 — Water, contextual traversal links, and save recovery (WEF-02c) (2026-06-20)
 
 Closed the motor block (WEF-02): added wading + swimming, an authored

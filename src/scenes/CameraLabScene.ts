@@ -27,6 +27,18 @@ import {
   type MotorState,
 } from '../engine/motor';
 import { createControllerState, stepController, type ControllerState } from '../engine/controller';
+import {
+  resolveTarget,
+  beginAction,
+  stepAction,
+  canCancel,
+  cancelAction,
+  faceTarget,
+  headingTo,
+  IDLE_ACTION,
+  type ActionState,
+  type TargetCandidate,
+} from '../engine/interaction-targeting';
 import { initHavok, enableScenePhysics } from '../physics/havok';
 import {
   HavokMotorPhysics,
@@ -120,6 +132,15 @@ export class CameraLabScene extends GameScene {
   ];
   private readonly climbLink = { x: 16, z: -12.2, range: 1.9, to: { x: 16, y: 2 + PLAYER_HEIGHT / 2, z: -9.5 }, duration: 0.8 };
 
+  // Interaction targeting (034): one-button resolver over kit candidates, a
+  // visible focus ring, and the anticipation→impact→recovery action lifecycle.
+  private static readonly TOOL_CYCLE: (string | undefined)[] = [undefined, 'hoe', 'pick', 'watering-can'];
+  private heldToolIndex = 0;
+  private chosenTargetId: string | null = null;
+  private action: ActionState = { ...IDLE_ACTION };
+  private lastImpactId: string | null = null;
+  private focusRing: Mesh | null = null;
+
   build(): Scene {
     const scene = makeScene(this.ctx.engine, PALETTE.sky);
     this.scene = scene; // station()/box() build against this.scene below
@@ -141,6 +162,14 @@ export class CameraLabScene extends GameScene {
     this.platformMesh = plat;
 
     this.buildWaterAndLinks(scene);
+
+    // Interaction focus ring (034): a ground preview that snaps to the chosen
+    // target, hidden when nothing is in reach.
+    const ring = MeshBuilder.CreateTorus('lab-focus-ring', { diameter: 1.1, thickness: 0.12, tessellation: 16 }, scene);
+    ring.material = flatMaterial(scene, 'lab-focus-ring', PALETTE.warmLight, 0.7);
+    ring.isPickable = false;
+    ring.visibility = 0;
+    this.focusRing = ring;
 
     // Data-driven camera rig (029), framing the movable reference player. The
     // locked exterior baseline (030) is the starting profile.
@@ -197,6 +226,7 @@ export class CameraLabScene extends GameScene {
   override update(dt: number): void {
     if (dt <= 0) return;
     this.stepMotorFrame(dt);
+    this.stepInteraction(dt);
     const camInput = this.input ? this.input.consume(dt) : { ...ZERO_INPUT };
     const merged = mergeInput(camInput, this.drainInjected());
     this.rig.update(dt, merged);
@@ -258,6 +288,12 @@ export class CameraLabScene extends GameScene {
       this.rig.setObstructionMode(this.obstructionMode);
     } else if (key === 'e' || key === 'E') {
       this.tryTraversal(); // contextual climb link (no free jump)
+    } else if (key === 'f' || key === 'F') {
+      this.commitAction(); // one-button interact
+    } else if (key === 'x' || key === 'X') {
+      this.cancelCurrentAction();
+    } else if (key === 't' || key === 'T') {
+      this.heldToolIndex = (this.heldToolIndex + 1) % CameraLabScene.TOOL_CYCLE.length;
     }
   }
 
@@ -309,6 +345,66 @@ export class CameraLabScene extends GameScene {
     this.controllerState = createControllerState();
     this.playerVel = { x: 0, z: 0 };
     this.playerMesh.position.set(this.motorState.position.x, this.motorState.position.y, this.motorState.position.z);
+  }
+
+  private heldTool(): string | undefined {
+    return CameraLabScene.TOOL_CYCLE[this.heldToolIndex];
+  }
+
+  /** Interaction candidates drawn from the kit stations (034). */
+  private interactionCandidates(): TargetCandidate[] {
+    return [
+      { id: 'crate', kind: 'prop', position: { x: 10, y: 0.5, z: 28 }, priority: 1, reach: 2.5 },
+      { id: 'door', kind: 'door', position: { x: -28, y: 1, z: 28 }, priority: 2, reach: 2.5 },
+      { id: 'npc', kind: 'npc', position: { x: -14, y: 1, z: 28 }, priority: 2, reach: 2.5 },
+      { id: 'animal', kind: 'animal', position: { x: -2, y: 0.5, z: 28 }, priority: 2, reach: 2.5 },
+      { id: 'soil', kind: 'farm-cell', position: { x: -10, y: 0, z: -24 }, priority: 1, reach: 2.5, requiresTool: 'hoe', cell: { col: 0, row: 0 } },
+      { id: 'ore', kind: 'ore-node', position: { x: 4, y: 1, z: 12 }, priority: 1, reach: 2.5, requiresTool: 'pick' },
+      { id: 'water', kind: 'water-entry', position: { x: 22, y: 0, z: 12 }, priority: 1, reach: 3 },
+      { id: 'climb', kind: 'climb', position: { x: 16, y: 0, z: -12.2 }, priority: 1, reach: 2.5 },
+    ];
+  }
+
+  /** Resolve the focus target + advance the action lifecycle (034). */
+  private stepInteraction(dt: number): void {
+    const ctx = { position: this.motorState.position, facing: this.motorState.facing, heldTool: this.heldTool() };
+    const cands = this.interactionCandidates();
+    const res = resolveTarget(cands, ctx, this.chosenTargetId);
+    this.chosenTargetId = res.chosenId;
+
+    const chosen = res.chosenId ? cands.find((c) => c.id === res.chosenId) : undefined;
+    if (this.focusRing) {
+      if (chosen) {
+        this.focusRing.visibility = 1;
+        this.focusRing.position.set(chosen.position.x, 0.06, chosen.position.z);
+      } else {
+        this.focusRing.visibility = 0;
+      }
+    }
+
+    if (this.action.phase !== 'idle') {
+      const target = cands.find((c) => c.id === this.action.targetId);
+      if (target) {
+        this.motorState.facing = faceTarget(this.motorState.facing, headingTo(ctx.position, target.position), 14, dt);
+        this.playerMesh.rotation.y = this.motorState.facing;
+      }
+      const targetId = this.action.targetId;
+      const r = stepAction(this.action, dt);
+      this.action = r.state;
+      if (r.impactFired) this.lastImpactId = targetId;
+    }
+  }
+
+  private commitAction(): boolean {
+    if (this.action.phase !== 'idle' || !this.chosenTargetId) return false;
+    this.action = beginAction(this.chosenTargetId);
+    return true;
+  }
+
+  private cancelCurrentAction(): boolean {
+    if (!canCancel(this.action)) return false;
+    this.action = cancelAction();
+    return true;
   }
 
   /** Oscillate the demo platform along X and record its velocity. */
@@ -696,6 +792,18 @@ export class CameraLabScene extends GameScene {
       }),
       /** Begin the contextual climb traversal if in range (no free jump). */
       triggerTraversal: (): boolean => this.tryTraversal(),
+      interaction: (): { chosenId: string | null; heldTool: string | null; actionPhase: string; lastImpactId: string | null } => ({
+        chosenId: this.chosenTargetId,
+        heldTool: this.heldTool() ?? null,
+        actionPhase: this.action.phase,
+        lastImpactId: this.lastImpactId,
+      }),
+      setHeldTool: (tool: string | null): void => {
+        const idx = CameraLabScene.TOOL_CYCLE.indexOf(tool ?? undefined);
+        if (idx >= 0) this.heldToolIndex = idx;
+      },
+      act: (): boolean => this.commitAction(),
+      cancelAct: (): boolean => this.cancelCurrentAction(),
       /** Simulate a save→load / region entry: recover to a grounded pose + anchor. */
       reload: (): void => {
         const p = this.motorState.position;
@@ -789,6 +897,7 @@ const COLLIDER_SKIP = new Set([
   'lab-platform',
   'lab-swim-water',
   'lab-swim-bed',
+  'lab-focus-ring',
   'lab-canopy',
   'lab-roof',
   'lab-trunk',
