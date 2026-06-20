@@ -8,6 +8,7 @@ import { TownScene } from './TownScene';
 import { InteriorScene } from './InteriorScene';
 import { BeachScene } from './BeachScene';
 import { MineScene } from './MineScene';
+import { CameraLabScene } from './CameraLabScene';
 
 /** All game scenes, keyed by the names used in save.location.sceneKey + transitions. */
 export const SCENE_FACTORIES: Record<string, SceneFactory> = {
@@ -20,4 +21,7 @@ export const SCENE_FACTORIES: Record<string, SceneFactory> = {
   Interior: (ctx) => new InteriorScene(ctx),
   Beach: (ctx) => new BeachScene(ctx),
   Mine: (ctx) => new MineScene(ctx),
+  // Dev-only proving ground (WEF-01a). Entered via the Title dev menu or the
+  // `?scene=CameraLab` direct-boot route; never part of normal play.
+  CameraLab: (ctx) => new CameraLabScene(ctx),
 };

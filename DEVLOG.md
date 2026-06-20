@@ -5,6 +5,90 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 028 — TypeScript config split + camera proving-ground shell (WEF-01a) (2026-06-19)
+
+First prompt of the World Embodiment Foundation block, executed under the
+unified [MASTER_ROSTER.md](PLANNING/MASTER_ROSTER.md). Split the single
+`tsconfig.json` into a shared strict base plus a game config and a Node/tooling
+config, and stood up the camera proving-ground scene that the camera-profile
+(029) and motor (031+) work will be tuned against.
+
+**TS config split.** New `tsconfig.base.json` holds every strict flag verbatim
+from the old combined config (`strict`, `noUnusedLocals/Parameters`,
+`noImplicitReturns`, `noFallthroughCasesInSwitch`, `noImplicitOverride`,
+`forceConsistentCasingInFileNames`, `isolatedModules`, `useDefineForClassFields`,
+…). `tsconfig.json` (the config Vite reads) extends it and includes `src` with
+the DOM libs + `vite/client` types — the **game** config. New
+`tsconfig.node.json` extends the same base and includes `tests` + the Vite/
+Vitest/Playwright config files with `node` + `vite/client` types — the
+**Node/tooling** config. No strictness flag was weakened or moved out of the
+shared base. `npm run typecheck` now runs both (`tsc -p tsconfig.json && tsc -p
+tsconfig.node.json`); `npm run build` runs typecheck then `vite build`.
+
+**Proving ground.** New `src/scenes/CameraLabScene.ts` builds the full
+camera/motor test-geometry kit at true meter scale (1 u = 1 m): open ground,
+6×6 1 m farm grid, narrow lane, small + large rooms (with doorway gaps),
+pitched roof, tree canopy, wall corner, ~22° slope, 8-step stairs, 4 m cliff,
+shallow water, free-standing doorway (1.2 m × 1.9 m clearance), NPC capsule,
+grazing-animal body proxy, interaction crate, and a tight cave corridor into an
+open chamber — a reference 1.8 m player capsule at origin sizes every station.
+Each station is a parented group with a stable id; primitive construction is
+grouped per station so a future `.glb` swap is local. An orbit camera (rig +
+profiles land in 029) frames the kit.
+
+**Reachability + screenshots.** Registered `CameraLab` in the scene registry.
+New `src/scenes/dev-route.ts` exposes a `?scene=CameraLab` direct-boot route
+(allow-listed, mirrors the `?debug=` overlay gating) consumed by `PreloadScene`
+— works in the production preview build the e2e suite runs against. `TitleScene`
+gains a dev-only "Dev · Camera Lab" menu item. `window.sturdyVolleyLab`
+(`kit()`, `meshCount()`, `focus(id)`) lets e2e assert the kit and reframe
+stations. New `tests/e2e/camera-lab.spec.ts` boots the route, asserts all 17
+kit stations + a non-blank canvas, and attaches one screenshot per Playwright
+project (desktop-chromium + mobile-chromium / Pixel 5).
+
+**Tooling.** `tools/local_gitdoctor_scan.py` PKG-002 (TS strict) now follows one
+level of `extends`, so strictness living in `tsconfig.base.json` is recognised.
+
+Files: `tsconfig.base.json` (new), `tsconfig.json`, `tsconfig.node.json` (new),
+`package.json`, `src/scenes/CameraLabScene.ts` (new), `src/scenes/dev-route.ts`
+(new), `src/scenes/registry.ts`, `src/scenes/PreloadScene.ts`,
+`src/scenes/TitleScene.ts`, `tests/e2e/camera-lab.spec.ts` (new),
+`tools/local_gitdoctor_scan.py`.
+
+**Acceptance criteria**
+
+- [x] Two strict TS configs run in the verify gate; every prior strictness rule
+  preserved (all flags moved unchanged into `tsconfig.base.json`, inherited by
+  both configs; both `tsc -p` invocations exit 0).
+- [x] The proving-ground scene is reachable via debug nav (Title "Dev · Camera
+  Lab" item + `?scene=CameraLab` route) and renders the full geometry kit at
+  scale (e2e asserts 17 stations + non-blank canvas on both projects).
+- [x] A reproducible screenshot route exists for the proving ground on desktop
+  and Pixel 5 (`camera-lab.spec.ts` attaches one capture per project).
+
+**Decision record**
+
+- Strict flags centralised in `tsconfig.base.json` (single source of truth)
+  rather than duplicated across the two leaf configs — prevents game/tooling
+  strictness drift, which was the explicit §0.2.1 risk.
+- `tsconfig.json` kept as the game config (not a bare references root) so Vite's
+  esbuild transform still finds `target`/`useDefineForClassFields` without a
+  separate Vite tsconfig override.
+- Dev scenes gated by an explicit `?scene=` allow-list + URL param rather than a
+  dev-only build flag, because the e2e suite runs the **production** preview
+  build where `import.meta.env.DEV` is false — a dev-only menu item alone could
+  not provide a reproducible screenshot route. Rejected: shipping the lab in the
+  normal Title flow (pollutes player-facing menu).
+- The lab camera is a plain inspection orbit camera; the authored rig +
+  data-driven profiles are deferred to Prompt 029 as the roster specifies.
+
+**Verify gate** — `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest 347 passed (40 files) · Playwright 116 passed
+(desktop-chromium + mobile-chromium; +4 new camera-lab cases) · `validate:assets`
+0 · `build` 0 (dist produced) · GitDoctor 100/100, `--fail-on high` exit 0.
+
+---
+
 ## Tooling: rewrite local audit scanner for Sturdy Volley invariants (2026-06-19)
 
 The previous [tools/local_gitdoctor_scan.py](tools/local_gitdoctor_scan.py)

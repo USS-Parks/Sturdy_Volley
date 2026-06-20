@@ -777,12 +777,23 @@ def pkg_verify_scripts_present(defn: CheckDef, ctx: ScanContext) -> list[Finding
 
 
 def pkg_tsconfig_strict(defn: CheckDef, ctx: ScanContext) -> list[Finding]:
+    # Strict mode may live in tsconfig.json directly or in a base config it
+    # `extends` (Prompt 028 split the strict flags into tsconfig.base.json so the
+    # game + Node/tooling configs can never drift). Follow one level of extends.
     tsc = ctx.root / "tsconfig.json"
     if not tsc.exists():
         return [finding(defn, ["tsconfig.json  not found"])]
+    chain = [tsc]
     text = tsc.read_text(encoding="utf-8", errors="replace")
-    if '"strict"' in text and not re.search(r'"strict"\s*:\s*false', text):
-        return []
+    ext = re.search(r'"extends"\s*:\s*"([^"]+)"', text)
+    if ext:
+        base = (ctx.root / ext.group(1)).resolve()
+        if base.exists():
+            chain.append(base)
+    for cfg in chain:
+        body = cfg.read_text(encoding="utf-8", errors="replace")
+        if '"strict"' in body and not re.search(r'"strict"\s*:\s*false', body):
+            return []
     return [finding(defn, ["tsconfig.json  strict mode missing or set to false"])]
 
 

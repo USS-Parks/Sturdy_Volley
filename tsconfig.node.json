@@ -1,0 +1,12 @@
+{
+  // Node / tooling sources: the Vite/Vitest/Playwright config files and the
+  // test suites (unit specs run under jsdom; e2e specs run under the Playwright
+  // node runner but type page.evaluate callbacks against the DOM). Shares every
+  // strict flag with the game config via tsconfig.base.json — no weakened rules.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node", "vite/client"]
+  },
+  "include": ["tests", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"]
+}

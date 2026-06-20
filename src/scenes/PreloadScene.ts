@@ -2,6 +2,7 @@ import type { Scene } from '@babylonjs/core';
 import { GameScene } from './GameScene';
 import { makeScene, addThreeQuarterCamera } from '../render/scene-helpers';
 import { loadGameContent } from '../data/content';
+import { requestedDevScene } from './dev-route';
 
 /**
  * Validates + loads bundled content (fail-fast). Real .glb asset loading will be
@@ -23,6 +24,10 @@ export class PreloadScene extends GameScene {
           `${content.crops.length} crops, ${content.npcs.length} NPCs.`,
       );
     }
-    queueMicrotask(() => this.goTo('Title', undefined, false));
+    // Direct-boot route for dev proving-ground scenes (e.g. `?scene=CameraLab`).
+    // Works in the production preview build, so reproducible screenshots don't
+    // depend on a dev-only Title menu item.
+    const dev = requestedDevScene();
+    queueMicrotask(() => this.goTo(dev ?? 'Title', undefined, false));
   }
 }

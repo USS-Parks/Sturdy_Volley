@@ -1,23 +1,11 @@
 {
+  // Game / browser-runtime sources. This is the config Vite picks up by default
+  // for esbuild transform options. Strictness lives in tsconfig.base.json so the
+  // game and Node/tooling configs (tsconfig.node.json) can never drift apart.
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitOverride": true,
-    "forceConsistentCasingInFileNames": true,
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "skipLibCheck": true,
-    "useDefineForClassFields": true,
-    "noEmit": true
+    "types": ["vite/client"]
   },
-  "include": ["src", "tests"]
+  "include": ["src"]
 }

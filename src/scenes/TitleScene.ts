@@ -90,6 +90,7 @@ export class TitleScene extends GameScene {
     const items = buildTitleMenu(hasSaveGame());
     if (import.meta.env.DEV) {
       items.push({ id: 'dev-data', label: 'Dev · Validate data', enabled: true, testId: 'title-dev-data' });
+      items.push({ id: 'dev-camera-lab', label: 'Dev · Camera Lab', enabled: true, testId: 'title-dev-camera-lab' });
     }
     this.ctx.overlay.showMenu(
       'Sturdy Volley',
@@ -124,6 +125,9 @@ export class TitleScene extends GameScene {
         break;
       case 'dev-data':
         this.showDataReport();
+        break;
+      case 'dev-camera-lab':
+        this.goTo('CameraLab');
         break;
     }
   }
