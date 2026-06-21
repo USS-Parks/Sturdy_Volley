@@ -428,13 +428,53 @@ export const dialogueSchema = z
   .strict();
 export type Dialogue = z.infer<typeof dialogueSchema>;
 
+/**
+ * Mail (Prompt 058). A letter is delivered to the farm mailbox when its trigger
+ * fires, and reading it grants its attachments (items / recipes / story flags /
+ * relationship bumps via `questRewardSchema`) and optionally starts a quest.
+ * Triggers: `arrival` (first farm visit), `date` (a calendar day, optionally
+ * recurring yearly), or `flag` (a save flag or a `civic:<id>` completion flag —
+ * the basis for restoration "progress notes" and lost-and-found returns).
+ */
+export const mailTriggerSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('arrival') }).strict(),
+  z
+    .object({
+      kind: z.literal('date'),
+      season: seasonSchema,
+      day: z.number().int().min(1).max(28),
+      /** Re-delivered each year on this date when true. */
+      recurring: z.boolean().default(false),
+    })
+    .strict(),
+  z.object({ kind: z.literal('flag'), flag: z.string().min(1) }).strict(),
+]);
+export type MailTrigger = z.infer<typeof mailTriggerSchema>;
+
+export const mailSchema = z
+  .object({
+    id: idSchema,
+    /** Display name of the sender (e.g. "Aunt Nessa", "Ballast Bay Town"). */
+    sender: z.string().min(1),
+    /** Optional NPC id for the sender — drives the portrait + a content-gate ref check. */
+    senderNpcId: idSchema.nullable().default(null),
+    subject: z.string().min(1),
+    body: z.string().min(1),
+    trigger: mailTriggerSchema,
+    /** Granted when the letter is read (item / recipe / relationship / flag = "story"). */
+    attachments: z.array(questRewardSchema).default([]),
+    /** When read, offers/activates this quest (mail can deliver quests). */
+    startsQuestId: idSchema.nullable().default(null),
+  })
+  .strict();
+export type Mail = z.infer<typeof mailSchema>;
+
 export interface GameContent {
   items: Item[];
   crops: Crop[];
   animals: Animal[];
   recipes: Recipe[];
   npcs: Npc[];
-  skills: Skill[];
   weather: Weather[];
   festivals: Festival[];
   quests: Quest[];
@@ -442,4 +482,6 @@ export interface GameContent {
   projects: CivicProject[];
   maps: GameMap[];
   dialogue: Dialogue[];
+  skills: Skill[];
+  mail: Mail[];
 }

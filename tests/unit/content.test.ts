@@ -21,6 +21,7 @@ const EMPTY_RAW: RawContent = {
   projects: [],
   maps: [],
   dialogue: [],
+  mail: [],
 };
 
 describe('content pipeline', () => {
@@ -143,5 +144,28 @@ describe('content validation errors are useful', () => {
     expect(content).toBeNull();
     expect(issues.some((i) => i.collection === 'festivals' && i.message.includes('no-such-item'))).toBe(true);
     expect(issues.some((i) => i.collection === 'festivals' && i.message.includes('no-such-npc'))).toBe(true);
+  });
+
+  it('flags a mail sender / attachment / quest reference that does not resolve (Prompt 058)', () => {
+    const raw: RawContent = {
+      ...EMPTY_RAW,
+      mail: [
+        {
+          id: 'bad-letter',
+          sender: 'Nobody',
+          senderNpcId: 'no-such-npc',
+          subject: 'x',
+          body: 'y',
+          trigger: { kind: 'arrival' },
+          attachments: [{ kind: 'item', itemId: 'no-such-item', qty: 1 }],
+          startsQuestId: 'no-such-quest',
+        },
+      ],
+    };
+    const { content, issues } = validateContent(raw);
+    expect(content).toBeNull();
+    expect(issues.some((i) => i.collection === 'mail' && i.message.includes('no-such-npc'))).toBe(true);
+    expect(issues.some((i) => i.collection === 'mail' && i.message.includes('no-such-item'))).toBe(true);
+    expect(issues.some((i) => i.collection === 'mail' && i.message.includes('no-such-quest'))).toBe(true);
   });
 });

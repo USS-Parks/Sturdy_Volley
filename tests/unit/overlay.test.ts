@@ -538,4 +538,54 @@ describe('UIOverlay', () => {
     expect(document.querySelector('[data-testid="festival-minigame-reward"]')?.textContent).toContain('150 g');
     expect(document.querySelector('[data-testid="festival-slots"]')).toBeNull();
   });
+
+  it('Prompt 058: showMailboxPanel lists letters and wires Open', () => {
+    const overlay = new UIOverlay();
+    const opened: string[] = [];
+    overlay.showMailboxPanel({
+      summary: '1 unread · 2 letters',
+      rows: [
+        { id: 'welcome', sender: 'Aunt Nessa', subject: 'Welcome', read: false, hasAttachments: true },
+        { id: 'dated', sender: 'Town', subject: 'Note', read: true, hasAttachments: false },
+      ],
+      onOpen: (id) => opened.push(id),
+      onClose: () => {},
+    });
+    expect(document.querySelector('[data-testid="mailbox-panel"]')).toBeTruthy();
+    expect(document.querySelectorAll('[data-testid^="mail-row-"]')).toHaveLength(2);
+    document.querySelector<HTMLButtonElement>('[data-testid="mail-open-welcome"]')?.click();
+    expect(opened).toEqual(['welcome']);
+  });
+
+  it('Prompt 058: showLetterPanel shows the body + the received attachments', () => {
+    const overlay = new UIOverlay();
+    let backed = false;
+    overlay.showLetterPanel({
+      sender: 'Mara Vale',
+      subject: 'The beacon burns again',
+      body: "It's lit.",
+      attachmentSummary: '200 g · +10 with Mara Vale',
+      startsQuest: null,
+      onBack: () => { backed = true; },
+    });
+    expect(document.querySelector('[data-testid="letter-body"]')?.textContent).toContain("It's lit.");
+    expect(document.querySelector('[data-testid="letter-attachment"]')?.textContent).toContain('200 g');
+    document.querySelector<HTMLButtonElement>('[data-testid="letter-back"]')?.click();
+    expect(backed).toBe(true);
+  });
+
+  it('Prompt 058: showNoticeBoardPanel renders the three sections', () => {
+    const overlay = new UIOverlay();
+    overlay.showNoticeBoardPanel({
+      summary: '1 reason to visit · 2 notices',
+      forecast: ['Today: Clear · tide low.'],
+      requests: ['Help wanted: Mullet Market (Jun Park)'],
+      news: ['Today is the Seed Blessing — come down to the common!', 'Restored: The Netlight Beacon.'],
+      onClose: () => {},
+    });
+    expect(document.querySelector('[data-testid="notice-panel"]')).toBeTruthy();
+    expect(document.querySelectorAll('[data-testid="notice-forecast"] li')).toHaveLength(1);
+    expect(document.querySelectorAll('[data-testid="notice-requests"] li')).toHaveLength(1);
+    expect(document.querySelectorAll('[data-testid="notice-news"] li')).toHaveLength(2);
+  });
 });

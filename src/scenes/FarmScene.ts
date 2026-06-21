@@ -59,6 +59,12 @@ import {
   cancelActiveQuest,
   activeQuestJournalRows,
 } from '../engine/quest-tracking';
+import {
+  activeMailboxRows,
+  activeUnreadMailCount,
+  deliverActiveMail,
+  readActiveMail,
+} from '../engine/mail-tracking';
 import type { QuestPanelRow } from '../ui/overlay';
 import type { QuestJournalRow } from '../engine/quests';
 import {
@@ -147,6 +153,13 @@ interface DebugApi {
   recordQuestEvent: (kind: string, target: string | null, qty?: number) => string[];
   acceptQuest: (id: string) => void;
   cancelQuest: (id: string) => void;
+  // Prompt 058 — mail.
+  mailUnread: () => number;
+  mailRows: () => Array<{ id: string; sender: string; subject: string; read: boolean }>;
+  openMailbox: () => void;
+  readMail: (id: string) => { read: boolean; attachmentSummary: string; startedQuestId: string | null };
+  deliverMail: () => string[];
+  setFlag: (flag: string, value: boolean) => void;
 }
 
 type PartnerKind = 'chest' | 'shipping-bin' | null;
@@ -177,6 +190,8 @@ export class FarmScene extends GameScene {
   private iPrev = false;
   private menuOpen = false;
   private inventoryOpen = false;
+  /** Prompt 058: the mailbox flag mesh, raised while unread mail waits. */
+  private mailFlag: import('@babylonjs/core').AbstractMesh | null = null;
   private clock!: TimeClockState;
   private weather: Weather | null = null;
   private tide: TideState = 'low';
@@ -350,6 +365,20 @@ export class FarmScene extends GameScene {
     const bowl = MeshBuilder.CreateCylinder('pet-bowl', { height: 0.12, diameter: 0.36 }, scene);
     bowl.position.set(-9.2, 0.06, -6.0);
     bowl.material = flatMaterial(scene, 'pet-bowl', PALETTE.stone, 0.25);
+
+    // Prompt 058: the farm mailbox — a post + box out by the west path, clear of
+    // the tilled plot's interaction radius (centred at (-6,-4), r=4) so it never
+    // intercepts a planting/gathering press.
+    const mailPost = MeshBuilder.CreateCylinder('mailbox-post', { height: 1.1, diameter: 0.12 }, scene);
+    mailPost.position.set(-14, 0.55, -2);
+    mailPost.material = flatMaterial(scene, 'mailbox-post', PALETTE.wood, 0.2);
+    const mailBox = MeshBuilder.CreateBox('mailbox-box', { width: 0.5, depth: 0.7, height: 0.4 }, scene);
+    mailBox.position.set(-14, 1.2, -2);
+    mailBox.material = flatMaterial(scene, 'mailbox-box', PALETTE.accent, 0.25);
+    const mailFlag = MeshBuilder.CreateBox('mailbox-flag', { width: 0.06, depth: 0.22, height: 0.22 }, scene);
+    mailFlag.position.set(-13.65, 1.32, -2);
+    mailFlag.material = flatMaterial(scene, 'mailbox-flag', PALETTE.roof, 0.3);
+    this.mailFlag = mailFlag;
   }
 
   private buildBounds(scene: Scene): void {
@@ -424,6 +453,9 @@ export class FarmScene extends GameScene {
     // refresh standing objectives) and flash any quest completed off-screen.
     this.flashQuestOutcomes(reconcileActiveQuests());
     this.questsPanelOpen = false;
+
+    // Prompt 058: deliver any due mail to the box, flash a note, and raise the flag.
+    this.deliverMailAndNotify();
 
     (window as unknown as { sturdyVolleyDebug?: DebugApi }).sturdyVolleyDebug = {
       player: () => ({ x: this.player.position.x, z: this.player.position.z }),
@@ -577,7 +609,86 @@ export class FarmScene extends GameScene {
       cancelQuest: (id: string) => {
         cancelActiveQuest(id);
       },
+      // Prompt 058 — mail.
+      mailUnread: () => activeUnreadMailCount(),
+      mailRows: () => activeMailboxRows().map((r) => ({ id: r.id, sender: r.sender, subject: r.subject, read: r.read })),
+      openMailbox: () => this.openMailbox(),
+      readMail: (id: string) => readActiveMail(id),
+      deliverMail: () => {
+        const ids = deliverActiveMail();
+        this.updateMailFlag();
+        this.rebuildInteractionTargets();
+        return ids;
+      },
+      setFlag: (flag: string, value: boolean) => {
+        this.save.flags[flag] = value;
+        persistActiveSave();
+      },
     };
+  }
+
+  /* Prompt 058 — mailbox -------------------------------------------- */
+
+  /** Deliver any due mail, flash a HUD note for new letters, and raise the flag. */
+  private deliverMailAndNotify(): void {
+    const delivered = deliverActiveMail();
+    if (delivered.length > 0) {
+      this.actionLabel = `${delivered.length} new letter${delivered.length === 1 ? '' : 's'} in the mailbox`;
+      this.actionTimer = 2.4;
+    }
+    this.updateMailFlag();
+  }
+
+  /** Raise the mailbox flag while unread mail waits; lower it when the box is read. */
+  private updateMailFlag(): void {
+    if (this.mailFlag) this.mailFlag.isVisible = activeUnreadMailCount() > 0;
+  }
+
+  private mailboxLabel(): string {
+    const unread = activeUnreadMailCount();
+    return unread > 0 ? `Read the mail (${unread} new)` : 'Check the mailbox';
+  }
+
+  private openMailbox(): void {
+    this.menuOpen = true;
+    this.renderMailbox();
+  }
+
+  private renderMailbox(): void {
+    const rows = activeMailboxRows();
+    this.ctx.overlay.showMailboxPanel({
+      rows: rows.map((r) => ({ id: r.id, sender: r.sender, subject: r.subject, read: r.read, hasAttachments: r.hasAttachments })),
+      summary: `${activeUnreadMailCount()} unread · ${rows.length} letter${rows.length === 1 ? '' : 's'}`,
+      onOpen: (id) => this.openLetter(id),
+      onClose: () => {
+        this.menuOpen = false;
+        this.updateMailFlag();
+        this.rebuildInteractionTargets();
+        this.refreshHud();
+        this.refreshHotbar();
+      },
+    });
+  }
+
+  private openLetter(id: string): void {
+    const before = activeMailboxRows().find((r) => r.id === id);
+    if (!before) {
+      this.renderMailbox();
+      return;
+    }
+    // Reading grants attachments (once) + starts any quest.
+    const result = readActiveMail(id);
+    if (result.startedQuestId) this.flashQuestOutcomes(reconcileActiveQuests());
+    const letter = activeMailboxRows().find((r) => r.id === id) ?? before;
+    this.ctx.overlay.showLetterPanel({
+      sender: letter.sender,
+      subject: letter.subject,
+      body: letter.body,
+      attachmentSummary: result.read ? result.attachmentSummary : letter.attachmentSummary,
+      startsQuest: letter.startsQuest,
+      onBack: () => this.renderMailbox(),
+    });
+    this.updateMailFlag();
   }
 
   override update(dt: number): void {
@@ -636,6 +747,8 @@ export class FarmScene extends GameScene {
       } else if (this.nearest.id.startsWith('animal:')) {
         this.handleAnimalInteract(this.nearest.id.slice('animal:'.length));
         this.rebuildInteractionTargets();
+      } else if (this.nearest.id === 'mailbox') {
+        this.openMailbox();
       } else if (this.nearest.id === 'pet-bowl') {
         this.handleFillBowl();
       } else if (this.nearest.id === 'pet') {
@@ -1202,6 +1315,7 @@ export class FarmScene extends GameScene {
       { id: 'farmhouse-door', kind: 'door', label: 'Enter the farmhouse', x: -10, z: -5.6, radius: 2.6, priority: 5 },
       { id: 'shipping-bin', kind: 'prop', label: 'Open the shipping bin', x: -6.2, z: -7.6, radius: 2.2, priority: 4 },
       { id: 'porch-chest', kind: 'prop', label: 'Open the porch chest', x: -12, z: -6, radius: 2.2, priority: 4 },
+      { id: 'mailbox', kind: 'prop', label: this.mailboxLabel(), x: -14, z: -2, radius: 2.0, priority: 4 },
       { id: 'tilled-plot', kind: 'farm-cell', label: 'Tend the soil', x: -6, z: -4, radius: 4, priority: 3 },
       { id: 'tide-pond', kind: 'water-entry', label: 'Check the tide pond', x: 10, z: -2, radius: 4.4, priority: 2 },
     ];

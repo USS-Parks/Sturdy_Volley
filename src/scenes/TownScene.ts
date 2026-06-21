@@ -43,6 +43,7 @@ import {
   type FestivalMinigameState,
 } from '../engine/festival';
 import { playFestivalChime } from '../audio/cues';
+import { buildActiveNoticeBoard } from '../engine/notice-tracking';
 import type { CivicProject, Festival, Season } from '../data/schemas';
 import { formatWorldStatus } from '../engine/format';
 import { computeMoveVector, type MoveInput } from '../engine/movement';
@@ -260,6 +261,7 @@ export class TownScene extends GameScene {
     this.buildCivicBoard(scene);
     this.buildCivicAssets(scene);
     this.buildFestivalDressing(scene);
+    this.buildNoticeBoard(scene);
 
     const player = MeshBuilder.CreateCapsule('player', { height: 1.8, radius: 0.4 }, scene);
     player.position.set(0, 0.9, 8);
@@ -344,6 +346,19 @@ export class TownScene extends GameScene {
       lamp.position.set(x, 3.05, z);
       lamp.material = flatMaterial(scene, `lantern-lamp-${i}`, PALETTE.warmLight, 0.45);
     });
+  }
+
+  /** Prompt 058: a public notice board by the lane — forecast, requests, and town news. */
+  private buildNoticeBoard(scene: Scene): void {
+    const post = MeshBuilder.CreateBox('notice-board-post', { width: 0.16, depth: 0.16, height: 1.5 }, scene);
+    post.position.set(-9, 0.75, 3.6);
+    post.material = flatMaterial(scene, 'notice-board-post', PALETTE.cliff, 0.2);
+    const board = MeshBuilder.CreateBox('notice-board', { width: 1.6, depth: 0.12, height: 1.1 }, scene);
+    board.position.set(-9, 1.55, 3.6);
+    board.material = flatMaterial(scene, 'notice-board', PALETTE.sand, 0.2);
+    const cap = MeshBuilder.CreateBox('notice-board-cap', { width: 1.8, depth: 0.2, height: 0.18 }, scene);
+    cap.position.set(-9, 2.2, 3.6);
+    cap.material = flatMaterial(scene, 'notice-board-cap', PALETTE.roof, 0.2);
   }
 
   /** Prompt 055: a rope-bound notice board near the market lane — opens the civic project board. */
@@ -536,6 +551,9 @@ export class TownScene extends GameScene {
         festivalYearTwoDressingVisible: () => boolean;
         completeRestoration: () => void;
         setYear: (year: number) => void;
+        // Prompt 058 — notice board.
+        openNoticeBoard: () => void;
+        noticeBoard: () => { forecast: string[]; requests: string[]; news: string[]; summary: string } | null;
       };
     }).sturdyVolleyTown = {
       npcs: () => {
@@ -611,6 +629,13 @@ export class TownScene extends GameScene {
         persistActiveSave();
         this.refreshFestival(false);
         this.rebuildTargets();
+      },
+      openNoticeBoard: () => this.openNoticeBoard(),
+      noticeBoard: () => {
+        const b = buildActiveNoticeBoard();
+        return b
+          ? { forecast: b.forecast.map((r) => r.text), requests: b.requests.map((r) => r.text), news: b.news.map((r) => r.text), summary: b.summary }
+          : null;
       },
     };
   }
@@ -694,6 +719,23 @@ export class TownScene extends GameScene {
   private openCivicBoard(): void {
     this.menuOpen = true;
     this.renderCivicBoard();
+  }
+
+  /** Prompt 058: the town notice board — forecast, reasons to visit, and town news. */
+  private openNoticeBoard(): void {
+    const board = buildActiveNoticeBoard();
+    if (!board) return;
+    this.menuOpen = true;
+    this.ctx.overlay.showNoticeBoardPanel({
+      forecast: board.forecast.map((r) => r.text),
+      requests: board.requests.map((r) => r.text),
+      news: board.news.map((r) => r.text),
+      summary: board.summary,
+      onClose: () => {
+        this.menuOpen = false;
+        this.refreshHud();
+      },
+    });
   }
 
   private renderCivicBoard(): void {
@@ -971,6 +1013,16 @@ export class TownScene extends GameScene {
       radius: 1.5,
       priority: 3,
     });
+    // Prompt 058: the town notice board.
+    base.push({
+      id: 'notice-board',
+      kind: 'prop',
+      label: 'Read the notice board',
+      x: -9,
+      z: 4.2,
+      radius: 1.6,
+      priority: 3,
+    });
     // Prompt 056: the festival stage anchor (only present on a festival day).
     if (this.festival) {
       base.push({
@@ -1041,6 +1093,7 @@ export class TownScene extends GameScene {
       if (this.nearest.id.startsWith('npc:')) this.openNpcGreeting(this.nearest.id.slice('npc:'.length));
       else if (this.nearest.id.startsWith('door:')) this.handleDoor(this.nearest.id.slice('door:'.length));
       else if (this.nearest.id === 'civic-board') this.openCivicBoard();
+      else if (this.nearest.id === 'notice-board') this.openNoticeBoard();
       else if (this.nearest.id === 'festival-stage') this.openFestival();
       else {
         this.actionLabel = this.nearest.label;

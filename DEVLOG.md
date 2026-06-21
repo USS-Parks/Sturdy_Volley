@@ -5,6 +5,110 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 058 — Mail, news, and world reactivity (legacy 032) (2026-06-21)
+
+A **mail system** (a farm mailbox) and a **town notice board** that make the
+world feel reactive. Letters arrive by trigger and deliver items, recipes,
+quests, and story flags; the notice board surfaces a weather/tide forecast,
+daily/weekly "reasons to visit town" (help-wanted requests + birthdays), and
+dynamic news that reacts to restoration progress, festivals, and milestones.
+Mirrors the 054–057 architecture (rich schema in the validated content pipeline +
+pure engines + defaulted save state + overlay panels + scene wiring + unit & e2e).
+
+**Schema + content.** `mailSchema` (new `mail` content collection): sender +
+optional `senderNpcId`, subject, body, a `trigger` discriminated union
+(`arrival` / `date` (+`recurring`) / `flag`), `attachments` (reused
+`questRewardSchema` — item/recipe/relationship/flag = "story"), and an optional
+`startsQuestId`. `mail.json` ships **8 letters** covering every trigger +
+attachment kind (welcome-on-arrival that grants seeds + starts `first-harvest`,
+a recurring seasonal seed gift, a recipe delivery, civic-completion thank-yous,
+a lost-and-found return, a quest invite). `content.ts` validates every sender,
+attachment, and started-quest reference.
+
+**Engines (pure, unit-tested).** `src/engine/mail.ts` — trigger evaluation,
+`deliverMail` (recurring date letters re-deliver once per year, reset to unread),
+`markMailRead`, `unreadCount`, `mailboxRows` (unread-first). `src/engine/news.ts`
+— `buildNoticeBoard` turns a world-state snapshot into forecast / requests /
+news sections + `nextUpcomingFestival`. Runtime glue: `mail-tracking.ts` (deliver
++ read-grants-once + start-quest on the active save) and `notice-tracking.ts`
+(assembles the snapshot from weather/tide/civic/festivals/birthdays/requests).
+
+**Save.** `saveModel.ts` gains a defaulted `mail` record (`mailStateSchema`:
+delivered / deliveredYear / read), no `SAVE_VERSION` bump.
+
+**UI.** `overlay.ts` `showMailboxPanel` (touch-friendly letter list, unread-first
+with a 📎 marker) + `showLetterPanel` (read view + "Received:" attachments + any
+started quest) + `showNoticeBoardPanel` (three sections). Styled in `styles.css`.
+
+**Integration.** `FarmScene` builds a **mailbox prop** (post + box + a flag mesh
+raised while unread mail waits), delivers due mail on enter with a HUD note, and
+opens the mailbox → letter flow; reading grants attachments + starts the quest +
+flashes quest outcomes. `TownScene` builds a **notice board prop** that opens the
+reactive board. Debug hooks on both scenes (`mailUnread`/`readMail`/`deliverMail`/
+`setFlag`; `openNoticeBoard`/`noticeBoard`).
+
+Files: `src/data/schemas.ts`, `src/data/content.ts`,
+`src/data/content/mail.json` (new), `src/engine/saveModel.ts`,
+`src/engine/mail.ts` (new), `src/engine/mail-tracking.ts` (new),
+`src/engine/news.ts` (new), `src/engine/notice-tracking.ts` (new),
+`src/ui/overlay.ts`, `src/styles.css`, `src/scenes/FarmScene.ts`,
+`src/scenes/TownScene.ts`, `tests/unit/mail.test.ts` (new),
+`tests/unit/news.test.ts` (new), `tests/unit/content.test.ts`,
+`tests/unit/overlay.test.ts`, `tests/e2e/mail.spec.ts` (new).
+
+**Acceptance criteria**
+
+- [x] **Mail can deliver items, recipes, quests, and story** — letters attach
+  items, recipes, relationship bumps, and story flags (via `questRewardSchema`)
+  and can start a quest (`startsQuestId`); the e2e reads the welcome letter and
+  asserts the seeds grant + `first-harvest` starts, and a lost-and-found letter
+  returns the dropped shell.
+- [x] **Notice board creates daily and weekly reasons to visit town** — the
+  board surfaces available help-wanted requests + upcoming birthdays alongside
+  the forecast; reachable via the TownScene notice-board prop.
+- [x] **News reacts to projects, festivals, and restoration milestones** —
+  `buildNoticeBoard` emits restoration completions + a `N/M restored` milestone
+  (or "whole again"), today's + upcoming festivals, all from live world state
+  (unit-locked in `news.test.ts`, e2e-asserted on the live board).
+- [x] Visible in the running game + Playwright-verified (§0.8) — mailbox at the
+  farm + notice board in town, desktop + Pixel 5.
+
+**Decision record**
+
+- **Mail at the farm, news in town.** The mailbox is the morning ritual at
+  Breakpoint Farm (delivered on `enter`, flag raised while unread); the notice
+  board lives in town as the reactive bulletin — matching cozy-sim convention and
+  the "reasons to visit town" acceptance.
+- **Triggers, not a queue.** A letter delivers when its trigger fires against the
+  current date / first-visit / flag set; recurring date letters re-deliver once
+  per year. `civic:<id>` completion flags drive the restoration progress notes.
+- **News is computed, not stored.** `buildNoticeBoard` is a pure projection of
+  world state, so it can never drift from the actual town; only mail (which has
+  read-once side effects) is persisted.
+- **No `SAVE_VERSION` bump** — defaulted `mail` record; versioning is Prompt 067.
+
+**Verify gate** — `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **712 passed** (+23) · `validate:assets` 0 · `build` 0 ·
+Playwright mail suite **8 passed** on `desktop-chromium` + `mobile-chromium`; full
+suite **331 passed + 1 skipped** (`--retries=2`, exit 0) · GitDoctor **100/100**.
+
+> Note: the first full-suite run caught a real regression — the farm mailbox prop
+> was placed inside the tilled-plot interaction radius and hijacked a planting
+> press in `slice-gate.spec.ts` (mobile), removing the HUD. Fixed by relocating
+> the mailbox to the west path, clear of the plot; re-run is green.
+
+**Honest gaps / deferred.** "Shipping progress notes" live in the existing bedtime
+day-summary ("Yesterday's shipment earned N g"), so the notice board passes
+`lastShipmentGold: 0` rather than duplicating it (the wiring is present for a
+later pass). Mail/notice surfaces are hosted in the legacy `FarmScene` /
+`TownScene`; the WEF production scenes don't host them yet. Quest-delivery starts
+the quest via `acceptActiveQuest` (only promotes an already-available quest);
+a mail-delivered quest that's still locked by prerequisites is offered, not
+force-activated. Town interaction remains keyboard/`E` only (Prompt-068 touch
+follow-up).
+
+---
+
 ## Prompt 057 — Festivals phase two (legacy 031) (2026-06-21)
 
 The second festival wave on the Prompt-056 framework: the **Frostlight Festival**

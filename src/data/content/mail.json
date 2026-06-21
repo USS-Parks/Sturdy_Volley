@@ -1,0 +1,83 @@
+[
+  {
+    "id": "welcome-to-breakpoint",
+    "sender": "Aunt Nessa",
+    "senderNpcId": null,
+    "subject": "Welcome to Breakpoint Farm",
+    "body": "Dear one — the farm's yours now. The soil's tired and the fences lean, but the bluff still catches the morning right. I left a few seeds in the mailbox to start you off. Write when you can. — Nessa",
+    "trigger": { "kind": "arrival" },
+    "attachments": [
+      { "kind": "flag", "flag": "aunt-nessa-letter-read", "value": true },
+      { "kind": "item", "itemId": "bell-pea-seeds", "qty": 3 }
+    ],
+    "startsQuestId": "first-harvest"
+  },
+  {
+    "id": "beacon-introduction",
+    "sender": "Mara Vale",
+    "senderNpcId": "mara-vale",
+    "subject": "The harbor beacon",
+    "body": "Neighbor — when you have a spare hour, come find me about the lighthouse beacon. The whole harbor schedule hangs on getting it lit again. No rush. Bring questions. — Mara",
+    "trigger": { "kind": "date", "season": "spring", "day": 5, "recurring": false },
+    "attachments": [{ "kind": "relationship", "npcId": "mara-vale", "delta": 20 }],
+    "startsQuestId": "relight-the-netlight"
+  },
+  {
+    "id": "seasonal-seed-note",
+    "sender": "Ballast Bay Seed Co-op",
+    "senderNpcId": null,
+    "subject": "Spring seed gift",
+    "body": "The co-op sends every farmer a handful of seeds at the turn of spring. Plant them deep — the tide flats run cold this time of year.",
+    "trigger": { "kind": "date", "season": "spring", "day": 1, "recurring": true },
+    "attachments": [{ "kind": "item", "itemId": "tide-turnip-seeds", "qty": 3 }]
+  },
+  {
+    "id": "juns-recipe",
+    "sender": "Jun Park",
+    "senderNpcId": "jun-park",
+    "subject": "A recipe for you",
+    "body": "You liked the tart at the bakery, so here's how it's done. Harborlime, a little honey, a hot oven. Don't tell the clinic how much butter goes in. — Jun",
+    "trigger": { "kind": "date", "season": "spring", "day": 8, "recurring": false },
+    "attachments": [{ "kind": "recipe", "recipeId": "harborlime-tart" }]
+  },
+  {
+    "id": "beacon-thanks",
+    "sender": "Mara Vale",
+    "senderNpcId": "mara-vale",
+    "subject": "The beacon burns again",
+    "body": "It's lit. First time in years the whole harbor's on the same clock. The boats are already running easier. This is for the crews' thanks — they insisted. — Mara",
+    "trigger": { "kind": "flag", "flag": "civic:netlight-beacon" },
+    "attachments": [
+      { "kind": "gold", "amount": 200 },
+      { "kind": "relationship", "npcId": "mara-vale", "delta": 10 }
+    ]
+  },
+  {
+    "id": "market-thanks",
+    "sender": "Market Lane Sellers",
+    "senderNpcId": null,
+    "subject": "Dry stalls at last",
+    "body": "The canopies held through the first squall — produce stayed dry, and we sold out by noon. A little something from the lane's takings, with our thanks.",
+    "trigger": { "kind": "flag", "flag": "civic:market-canopies" },
+    "attachments": [{ "kind": "gold", "amount": 150 }]
+  },
+  {
+    "id": "lost-and-found-shell",
+    "sender": "Ballast Bay Lost & Found",
+    "senderNpcId": null,
+    "subject": "We found something of yours",
+    "body": "A tide-shell turned up on the boardwalk with your initials scratched in it. Figured you'd want it back. Mind your pockets near the rail. — the Harbormaster",
+    "trigger": { "kind": "flag", "flag": "lost-and-found-shell" },
+    "attachments": [{ "kind": "item", "itemId": "tide-shell", "qty": 1 }]
+  },
+  {
+    "id": "harbor-friends-invite",
+    "sender": "Lio Marin",
+    "senderNpcId": "lio-marin",
+    "subject": "Come down to the pier",
+    "body": "Summer's the season the Brine Club actually talks to newcomers. Come down to the pier some evening — I'll introduce you. Bring nothing but patience for tall tales. — Lio",
+    "trigger": { "kind": "date", "season": "summer", "day": 2, "recurring": false },
+    "attachments": [],
+    "startsQuestId": "harbor-friends"
+  }
+]

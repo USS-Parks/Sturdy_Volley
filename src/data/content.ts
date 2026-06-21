@@ -13,6 +13,7 @@ import {
   projectSchema,
   mapSchema,
   dialogueSchema,
+  mailSchema,
   type GameContent,
   type QuestReward,
 } from './schemas';
@@ -30,6 +31,7 @@ import shopsJson from './content/shops.json';
 import projectsJson from './content/projects.json';
 import mapsJson from './content/maps.json';
 import dialogueJson from './content/dialogue.json';
+import mailJson from './content/mail.json';
 
 const SCHEMAS = {
   items: itemSchema,
@@ -45,6 +47,7 @@ const SCHEMAS = {
   projects: projectSchema,
   maps: mapSchema,
   dialogue: dialogueSchema,
+  mail: mailSchema,
 } as const;
 
 export type CollectionName = keyof typeof SCHEMAS;
@@ -82,6 +85,7 @@ const BUNDLED = {
   projects: projectsJson,
   maps: mapsJson,
   dialogue: dialogueJson,
+  mail: mailJson,
 } as unknown as RawContent;
 
 export class ContentValidationError extends Error {
@@ -313,6 +317,28 @@ function checkReferences(content: GameContent, issues: ValidationIssue[]): void 
     });
     if (festival.yearTwo?.bonusReward) {
       validateRewardRefs([festival.yearTwo.bonusReward], `[${i}].yearTwo.bonusReward`);
+    }
+  });
+
+  // Mail (Prompt 058): validate the sender NPC, attachment rewards, and the quest
+  // a letter can start, so a typo fails the content gate instead of an
+  // ungrantable attachment or a letter that starts a non-existent quest.
+  content.mail.forEach((letter, i) => {
+    if (letter.senderNpcId !== null && !npcIds.has(letter.senderNpcId)) {
+      issues.push({ collection: 'mail', path: `[${i}].senderNpcId`, message: `senderNpcId "${letter.senderNpcId}" does not match any NPC` });
+    }
+    letter.attachments.forEach((reward, j) => {
+      const path = `[${i}].attachments[${j}]`;
+      if (reward.kind === 'item') {
+        requireItem('mail', `${path}.itemId`, reward.itemId, 'attachment itemId');
+      } else if (reward.kind === 'recipe' && !recipeIds.has(reward.recipeId)) {
+        issues.push({ collection: 'mail', path: `${path}.recipeId`, message: `attachment recipeId "${reward.recipeId}" does not match any recipe` });
+      } else if (reward.kind === 'relationship' && !npcIds.has(reward.npcId)) {
+        issues.push({ collection: 'mail', path: `${path}.npcId`, message: `attachment npcId "${reward.npcId}" does not match any NPC` });
+      }
+    });
+    if (letter.startsQuestId !== null && !questIds.has(letter.startsQuestId)) {
+      issues.push({ collection: 'mail', path: `[${i}].startsQuestId`, message: `startsQuestId "${letter.startsQuestId}" does not match any quest` });
     }
   });
 }

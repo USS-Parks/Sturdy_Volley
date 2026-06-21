@@ -233,6 +233,42 @@ export interface FestivalMinigameOptions {
   onClose: () => void;
 }
 
+export interface MailboxPanelRow {
+  id: string;
+  sender: string;
+  subject: string;
+  read: boolean;
+  hasAttachments: boolean;
+}
+
+export interface MailboxPanelOptions {
+  rows: MailboxPanelRow[];
+  /** Summary line, e.g. "2 unread · 6 letters". */
+  summary: string;
+  onOpen: (id: string) => void;
+  onClose: () => void;
+}
+
+export interface LetterPanelOptions {
+  sender: string;
+  subject: string;
+  body: string;
+  /** Summary of granted attachments ("3× Bell Pea Seeds · Town progress"), or empty. */
+  attachmentSummary: string;
+  /** Display name of a quest the letter started, if any. */
+  startsQuest?: string | null;
+  onBack: () => void;
+}
+
+export interface NoticeBoardPanelOptions {
+  forecast: string[];
+  /** Help-wanted + birthday lines (the "reasons to visit town"). */
+  requests: string[];
+  news: string[];
+  summary: string;
+  onClose: () => void;
+}
+
 export interface ElevatorPanelOption {
   level: number;
   name: string;
@@ -1415,6 +1451,148 @@ export class UIOverlay {
     close.className = 'menu-button menu-button-secondary';
     close.textContent = 'Back';
     close.dataset.testid = 'festival-minigame-close';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /**
+   * Mailbox panel (Prompt 058). A touch-friendly list of delivered letters,
+   * unread first, each opening into the letter read view. Letters with unopened
+   * attachments show an "unopened" dot.
+   */
+  showMailboxPanel(opts: MailboxPanelOptions): void {
+    this.clear();
+    const panel = this.createPanel('Mailbox', opts.summary);
+    panel.classList.add('mailbox-panel');
+    panel.dataset.testid = 'mailbox-panel';
+
+    if (opts.rows.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'panel-body';
+      empty.textContent = 'The mailbox is empty. Letters arrive with the day.';
+      panel.appendChild(empty);
+    } else {
+      const list = document.createElement('ul');
+      list.className = 'mailbox-list';
+      list.dataset.testid = 'mailbox-list';
+      for (const row of opts.rows) {
+        const li = document.createElement('li');
+        li.className = `mailbox-row${row.read ? ' mailbox-row-read' : ''}`;
+        li.dataset.testid = `mail-row-${row.id}`;
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'mailbox-open';
+        btn.dataset.testid = `mail-open-${row.id}`;
+        const dot = row.read ? '' : '● ';
+        const clip = row.hasAttachments && !row.read ? ' 📎' : '';
+        btn.textContent = `${dot}${row.sender} — ${row.subject}${clip}`;
+        btn.addEventListener('click', () => opts.onOpen(row.id));
+        li.appendChild(btn);
+        list.appendChild(li);
+      }
+      panel.appendChild(list);
+    }
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'menu-button';
+    close.textContent = 'Close';
+    close.dataset.testid = 'mailbox-close';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /** Letter read view (Prompt 058): sender + subject + body + what it delivered. */
+  showLetterPanel(opts: LetterPanelOptions): void {
+    this.clear();
+    const panel = this.createPanel(opts.subject, `From ${opts.sender}`);
+    panel.classList.add('letter-panel');
+    panel.dataset.testid = 'letter-panel';
+
+    const body = document.createElement('p');
+    body.className = 'letter-body';
+    body.dataset.testid = 'letter-body';
+    body.textContent = opts.body;
+    panel.appendChild(body);
+
+    if (opts.attachmentSummary) {
+      const attach = document.createElement('div');
+      attach.className = 'letter-attachment';
+      attach.dataset.testid = 'letter-attachment';
+      attach.textContent = `📎 Received: ${opts.attachmentSummary}`;
+      panel.appendChild(attach);
+    }
+    if (opts.startsQuest) {
+      const quest = document.createElement('div');
+      quest.className = 'letter-attachment';
+      quest.dataset.testid = 'letter-quest';
+      quest.textContent = `🗒 New quest: ${opts.startsQuest}`;
+      panel.appendChild(quest);
+    }
+
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'menu-button';
+    back.textContent = 'Back to mailbox';
+    back.dataset.testid = 'letter-back';
+    back.addEventListener('click', opts.onBack);
+    panel.appendChild(back);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /**
+   * Town notice board (Prompt 058). Three read-only sections: a weather/tide
+   * forecast, the "reasons to visit town" (help-wanted + birthdays), and dynamic
+   * news that reacts to restoration, festivals, and shipments.
+   */
+  showNoticeBoardPanel(opts: NoticeBoardPanelOptions): void {
+    this.clear();
+    const panel = this.createPanel('Town Notice Board', opts.summary);
+    panel.classList.add('notice-panel');
+    panel.dataset.testid = 'notice-panel';
+
+    const section = (title: string, lines: string[], testid: string): void => {
+      const heading = document.createElement('div');
+      heading.className = 'notice-heading';
+      heading.textContent = title;
+      panel.appendChild(heading);
+      const ul = document.createElement('ul');
+      ul.className = 'notice-list';
+      ul.dataset.testid = testid;
+      if (lines.length === 0) {
+        const li = document.createElement('li');
+        li.className = 'notice-row notice-row-empty';
+        li.textContent = '—';
+        ul.appendChild(li);
+      } else {
+        for (const line of lines) {
+          const li = document.createElement('li');
+          li.className = 'notice-row';
+          li.textContent = line;
+          ul.appendChild(li);
+        }
+      }
+      panel.appendChild(ul);
+    };
+
+    section('Forecast', opts.forecast, 'notice-forecast');
+    section('Around the Bay', opts.requests, 'notice-requests');
+    section('News', opts.news, 'notice-news');
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'menu-button';
+    close.textContent = 'Close';
+    close.dataset.testid = 'notice-close';
     close.addEventListener('click', opts.onClose);
     panel.appendChild(close);
 

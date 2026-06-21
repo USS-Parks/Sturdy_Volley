@@ -95,6 +95,22 @@ export const festivalStateSchema = z
 export type FestivalState = z.infer<typeof festivalStateSchema>;
 export type FestivalRecord = Record<string, FestivalState>;
 
+/**
+ * Per-letter mail state (Prompt 058). A letter is `delivered` to the mailbox when
+ * its trigger fires (the year stamps recurring date letters so they re-deliver
+ * each year), then `read` once the player opens it. Defaulted field, no
+ * `SAVE_VERSION` bump — pre-mail saves parse to `{}`.
+ */
+export const mailStateSchema = z
+  .object({
+    delivered: z.boolean(),
+    deliveredYear: z.number().int().positive().nullable().default(null),
+    read: z.boolean().default(false),
+  })
+  .strict();
+export type MailState = z.infer<typeof mailStateSchema>;
+export type MailRecord = Record<string, MailState>;
+
 export const saveSchema = z
   .object({
     version: z.literal(SAVE_VERSION),
@@ -152,6 +168,7 @@ export const saveSchema = z
     quests: z.record(z.string(), questStateSchema).default({}),
     projects: z.record(z.string(), projectStateSchema).default({}),
     festivals: z.record(z.string(), festivalStateSchema).default({}),
+    mail: z.record(z.string(), mailStateSchema).default({}),
     mapState: z.record(z.string(), z.unknown()),
     machines: z
       .record(
@@ -334,6 +351,7 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
     quests: {},
     projects: {},
     festivals: {},
+    mail: {},
     mapState: {},
     machines: defaultFarmMachines(),
     animals: defaultFarmAnimals(),
