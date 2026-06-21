@@ -81,6 +81,14 @@ body {
   gap: 12px;
   width: min(360px, 86vw);
   padding: 22px;
+  /* Never taller than the viewport: a long menu (e.g. the dev-scene list, or a
+     packed pause menu) scrolls inside the panel instead of pushing its first
+     buttons off-screen. Without this, the dev title menu centred 20 buttons in
+     the window and "Start" landed above the top edge. */
+  max-height: 92vh;
+  max-height: 92dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   color: var(--sv-text);
   background: linear-gradient(180deg, #284058 0%, #1d3144 100%);
   border: 3px solid var(--sv-wood);
