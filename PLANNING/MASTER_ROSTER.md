@@ -2,8 +2,10 @@
 
 Prepared: 2026-06-19
 Status: **APPROVED 2026-06-19 — this is the active P-SPR. STS in progress.** The **WEF foundation block
-(Prompts 028–053) is COMPLETE** (closed 2026-06-21, WEF-13); gameplay continuation resumes at **Prompt
-054**. Per-prompt commit SHAs + verify gates are in `DEVLOG.md`.
+(Prompts 028–053) is COMPLETE** (closed 2026-06-21, WEF-13). The **gameplay continuation is underway:
+Prompts 054–059 are shipped** (quests · civic restoration · festivals I+II · mail/news · cooking/buffs);
+execution resumes at **Prompt 060** (home, decor & customization). Per-prompt commit SHAs + verify gates
+are in `DEVLOG.md`.
 Supersedes (now active): the standalone `PLANNING/WORLD_EMBODIMENT_FOUNDATION_PSPR.md` draft and the
 roster halves of `STURDY_VOLLEY_PSPR.md`. Both remain valid **historical + product** references.
 Target: browser-first, mobile-ready, controller-friendly low-poly 3D cozy life sim (Theme 3).
