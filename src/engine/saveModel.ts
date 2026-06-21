@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { seasonSchema, buffEffectSchema } from '../data/schemas';
+import { appearanceStateSchema, DEFAULT_APPEARANCE } from './appearance';
+import { homeSceneStateSchema } from './home';
 
 /**
  * The save model. Versioned for future migrations (Prompt 041). Validated with
@@ -135,6 +137,12 @@ export const saveSchema = z
         name: z.string().min(1).max(40),
         farmName: z.string().min(1).max(40),
         farmType: z.string().min(1),
+        /**
+         * Player appearance / wardrobe (Prompt 060). Defaulted, so pre-060 saves
+         * (which had no appearance) parse cleanly to the canonical default with no
+         * `SAVE_VERSION` bump.
+         */
+        appearance: appearanceStateSchema.default(DEFAULT_APPEARANCE),
       })
       .strict(),
     calendar: z
@@ -184,6 +192,12 @@ export const saveSchema = z
     festivals: z.record(z.string(), festivalStateSchema).default({}),
     mail: z.record(z.string(), mailStateSchema).default({}),
     activeBuffs: z.array(activeBuffSchema).default([]),
+    /**
+     * Per-scene home customization (Prompt 060): wallpaper + flooring + bought
+     * renovations, keyed by sceneKey. Kept separate from `mapState[...].placements`
+     * so neither write clobbers the other. Defaulted field, no `SAVE_VERSION` bump.
+     */
+    home: z.record(z.string(), homeSceneStateSchema).default({}),
     mapState: z.record(z.string(), z.unknown()),
     machines: z
       .record(
@@ -310,6 +324,7 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
       name: opts.name.trim() || 'Coast Keeper',
       farmName: opts.farmName.trim() || 'Breakpoint Farm',
       farmType: opts.farmType ?? 'open-meadow',
+      appearance: { ...DEFAULT_APPEARANCE },
     },
     calendar: { year: 1, season: 'spring', day: 1, timeMinutes: 6 * 60 },
     location: { sceneKey: 'Farm' },
@@ -368,6 +383,7 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
     festivals: {},
     mail: {},
     activeBuffs: [],
+    home: {},
     mapState: {},
     machines: defaultFarmMachines(),
     animals: defaultFarmAnimals(),

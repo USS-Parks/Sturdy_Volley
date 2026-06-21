@@ -23,6 +23,31 @@ describe('save model', () => {
     expect(save.chests['farm-porch-chest']?.capacity).toBe(24);
   });
 
+  it('a fresh save carries the default appearance + empty home state (Prompt 060)', () => {
+    const save = createNewSave({ name: 'Wren', farmName: 'Saltbreak' }, 1000);
+    expect(save.player.appearance).toEqual({
+      body: 'harbor-blue',
+      beanie: 'red-knit',
+      accent: 'rust-suspenders',
+    });
+    expect(save.home).toEqual({});
+  });
+
+  it('a pre-060 save (no appearance / home) parses to the defaults', () => {
+    const save = createNewSave({ name: 'Wren', farmName: 'Saltbreak' }, 1000);
+    // Strip the Prompt-060 fields the way an older save on disk would lack them.
+    const legacy = JSON.parse(serializeSave(save)) as Record<string, unknown>;
+    delete (legacy.player as Record<string, unknown>).appearance;
+    delete legacy.home;
+    const parsed = parseSave(JSON.stringify(legacy));
+    expect(parsed.player.appearance).toEqual({
+      body: 'harbor-blue',
+      beanie: 'red-knit',
+      accent: 'rust-suspenders',
+    });
+    expect(parsed.home).toEqual({});
+  });
+
   it('falls back to defaults for blank names', () => {
     const save = createNewSave({ name: '   ', farmName: '' }, 1000);
     expect(save.player.name).toBe('Coast Keeper');

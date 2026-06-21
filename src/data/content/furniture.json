@@ -1,0 +1,14 @@
+[
+  { "id": "rush-stool", "name": "Rush Stool", "description": "A woven three-legged stool, light enough to drag anywhere.", "category": "seat", "price": 90, "footprint": { "w": 0.6, "d": 0.6, "h": 0.55 } },
+  { "id": "driftwood-armchair", "name": "Driftwood Armchair", "description": "A deep chair built from sea-smoothed timber and a quilted cushion.", "category": "seat", "price": 320, "footprint": { "w": 0.9, "d": 0.9, "h": 0.95 } },
+  { "id": "round-tea-table", "name": "Round Tea Table", "description": "A little round table just big enough for two cups and a pot.", "category": "table", "price": 180, "footprint": { "w": 1.0, "d": 1.0, "h": 0.7 } },
+  { "id": "cedar-bookshelf", "name": "Cedar Bookshelf", "description": "A tall shelf for almanacs, jars, and finds from the tide line.", "category": "shelf", "price": 260, "footprint": { "w": 1.2, "d": 0.4, "h": 1.8 } },
+  { "id": "tide-wool-rug", "name": "Tide-Wool Rug", "description": "A flat woven rug in sea-glass greens that warms a bare floor.", "category": "rug", "price": 140, "footprint": { "w": 2.2, "d": 1.6, "h": 0.04 } },
+  { "id": "lantern-stand", "name": "Lantern Stand", "description": "A wrought stand with a warm lantern that glows after dark.", "category": "lamp", "price": 210, "footprint": { "w": 0.45, "d": 0.45, "h": 1.5 } },
+  { "id": "potted-fern", "name": "Potted Fern", "description": "A redwood-forest fern in a hand-thrown ceramic pot.", "category": "plant", "price": 110, "footprint": { "w": 0.6, "d": 0.6, "h": 1.1 } },
+  { "id": "harvest-banner", "name": "Harvest Banner", "description": "A pressed-flower banner that hangs proudly along the wall.", "category": "banner", "price": 160, "footprint": { "w": 1.6, "d": 0.12, "h": 1.0 }, "mount": "wall" },
+  { "id": "festival-bunting", "name": "Festival Bunting", "description": "A string of bright triangular flags saved from a fair.", "category": "banner", "price": 130, "footprint": { "w": 2.0, "d": 0.1, "h": 0.5 }, "mount": "wall" },
+  { "id": "trophy-shelf", "name": "Trophy Shelf", "description": "A display shelf that fills with keepsakes as you reach milestones.", "category": "trophy-shelf", "price": 400, "footprint": { "w": 1.4, "d": 0.4, "h": 1.0 } },
+  { "id": "curio-cabinet", "name": "Curio Cabinet", "description": "A glass-front cabinet for shells, geodes, and small wonders.", "category": "curio", "price": 360, "footprint": { "w": 1.0, "d": 0.5, "h": 1.6 } },
+  { "id": "window-planter", "name": "Window Planter", "description": "A low box of herbs and blooms that brightens any corner.", "category": "plant", "price": 95, "footprint": { "w": 1.0, "d": 0.4, "h": 0.5 } }
+]

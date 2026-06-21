@@ -14,6 +14,7 @@ import {
   mapSchema,
   dialogueSchema,
   mailSchema,
+  furnitureSchema,
   type GameContent,
   type QuestReward,
 } from './schemas';
@@ -32,6 +33,7 @@ import projectsJson from './content/projects.json';
 import mapsJson from './content/maps.json';
 import dialogueJson from './content/dialogue.json';
 import mailJson from './content/mail.json';
+import furnitureJson from './content/furniture.json';
 
 const SCHEMAS = {
   items: itemSchema,
@@ -48,6 +50,7 @@ const SCHEMAS = {
   maps: mapSchema,
   dialogue: dialogueSchema,
   mail: mailSchema,
+  furniture: furnitureSchema,
 } as const;
 
 export type CollectionName = keyof typeof SCHEMAS;
@@ -86,6 +89,7 @@ const BUNDLED = {
   maps: mapsJson,
   dialogue: dialogueJson,
   mail: mailJson,
+  furniture: furnitureJson,
 } as unknown as RawContent;
 
 export class ContentValidationError extends Error {

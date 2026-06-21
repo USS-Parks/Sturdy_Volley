@@ -15,6 +15,7 @@ import {
   resetDayLedger,
 } from '../engine/gameState';
 import { writeSave } from '../engine/save';
+import { applyPlayerAppearance } from '../render/player-appearance';
 import { formatWorldStatus } from '../engine/format';
 import { computeMoveVector, type MoveInput } from '../engine/movement';
 import { FarmGrid, FARM_CELL_SIZE } from '../engine/farmGrid';
@@ -412,6 +413,9 @@ export class FarmScene extends GameScene {
     this.save = save;
     save.location.sceneKey = 'Farm';
     writeSave(save);
+
+    // Prompt 060: reflect the player's wardrobe choices on the outdoor capsule.
+    if (this.scene) applyPlayerAppearance(this.scene, this.player, save.player.appearance);
 
     const content = loadGameContent();
     this.catalog = buildItemCatalog(content.items, content.npcs);

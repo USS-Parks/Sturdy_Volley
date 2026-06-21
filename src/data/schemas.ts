@@ -114,6 +114,46 @@ export const recipeSchema = z
   .strict();
 export type Recipe = z.infer<typeof recipeSchema>;
 
+/**
+ * Placeable home furniture (Prompt 060). A bought-with-gold catalog the player
+ * drops freely in the farmhouse (the placement engine lives in `crafting.ts`;
+ * per-scene home cosmetics in `engine/home.ts`). `category` drives the graybox
+ * silhouette + colour, `footprint` its size in metres, and `mount` whether it
+ * sits on the floor (most) or reads as a wall hanging (banners). Standalone — no
+ * cross-collection references, so it needs no `checkReferences` pass.
+ */
+export const furnitureCategorySchema = z.enum([
+  'seat',
+  'table',
+  'shelf',
+  'rug',
+  'lamp',
+  'plant',
+  'banner',
+  'trophy-shelf',
+  'curio',
+]);
+export type FurnitureCategory = z.infer<typeof furnitureCategorySchema>;
+
+export const furnitureSchema = z
+  .object({
+    id: idSchema,
+    name: z.string().min(1),
+    description: z.string().min(1),
+    category: furnitureCategorySchema,
+    price: z.number().int().nonnegative(),
+    footprint: z
+      .object({
+        w: z.number().positive(),
+        d: z.number().positive(),
+        h: z.number().positive(),
+      })
+      .strict(),
+    mount: z.enum(['floor', 'wall']).default('floor'),
+  })
+  .strict();
+export type Furniture = z.infer<typeof furnitureSchema>;
+
 export const npcSchema = z
   .object({
     id: idSchema,
@@ -515,4 +555,5 @@ export interface GameContent {
   dialogue: Dialogue[];
   skills: Skill[];
   mail: Mail[];
+  furniture: Furniture[];
 }

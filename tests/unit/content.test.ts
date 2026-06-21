@@ -22,6 +22,7 @@ const EMPTY_RAW: RawContent = {
   maps: [],
   dialogue: [],
   mail: [],
+  furniture: [],
 };
 
 describe('content pipeline', () => {

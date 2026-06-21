@@ -305,6 +305,83 @@ export interface CookingPanelOptions {
   onClose: () => void;
 }
 
+/* Home / decor / customization (Prompt 060) ------------------------------- */
+
+export type HomeTab = 'decorate' | 'surfaces' | 'renovate' | 'wardrobe';
+
+export interface HomeDecorateRow {
+  id: string;
+  name: string;
+  categoryLabel: string;
+  price: number;
+  affordable: boolean;
+}
+export interface HomePlacedRow {
+  id: string;
+  name: string;
+}
+export interface HomeSurfaceRow {
+  id: string;
+  name: string;
+  active: boolean;
+}
+export interface HomeRenovationRow {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  owned: boolean;
+  affordable: boolean;
+}
+export interface HomeWardrobeSwatch {
+  id: string;
+  name: string;
+  active: boolean;
+}
+export interface HomeWardrobePart {
+  part: string;
+  label: string;
+  swatches: HomeWardrobeSwatch[];
+}
+
+export interface HomePanelOptions {
+  activeTab: HomeTab;
+  gold: number;
+  onTab: (tab: HomeTab) => void;
+  onPhotoMode: () => void;
+  onClose: () => void;
+  // Decorate
+  furniture: HomeDecorateRow[];
+  placed: HomePlacedRow[];
+  onPlace: (furnitureId: string) => void;
+  onPickUp: (placementId: string) => void;
+  // Surfaces
+  wallpapers: HomeSurfaceRow[];
+  floorings: HomeSurfaceRow[];
+  onWallpaper: (id: string) => void;
+  onFlooring: (id: string) => void;
+  // Renovate
+  renovations: HomeRenovationRow[];
+  onRenovate: (id: string) => void;
+  // Wardrobe
+  wardrobe: HomeWardrobePart[];
+  onSwatch: (part: string, swatchId: string) => void;
+}
+
+export interface PlacementBarOptions {
+  /** Name of the piece being placed. */
+  label: string;
+  onRotate: () => void;
+  onPlace: () => void;
+  onCancel: () => void;
+}
+
+export interface PhotoModeBarOptions {
+  note: string;
+  onCapture: () => void;
+  onExit: () => void;
+}
+
 export interface ElevatorPanelOption {
   level: number;
   name: string;
@@ -1748,6 +1825,300 @@ export class UIOverlay {
 
     this.root.appendChild(panel);
     this.focusFirstEnabled(panel);
+  }
+
+  /**
+   * Home / decor / customization panel (Prompt 060). A tabbed panel: Decorate
+   * (buy + place furniture, pick up placed pieces), Surfaces (wallpaper +
+   * flooring), Renovate (one-time gold upgrades), Wardrobe (change appearance).
+   * The hosting scene keeps the active tab and re-renders on every action.
+   */
+  showHomePanel(opts: HomePanelOptions): void {
+    this.clear();
+    const panel = this.createPanel('Home', `${opts.gold} g`);
+    panel.classList.add('home-panel');
+    panel.dataset.testid = 'home-panel';
+
+    // Tab strip.
+    const tabs = document.createElement('div');
+    tabs.className = 'home-tabs';
+    const TAB_LABELS: Array<[HomeTab, string]> = [
+      ['decorate', 'Decorate'],
+      ['surfaces', 'Surfaces'],
+      ['renovate', 'Renovate'],
+      ['wardrobe', 'Wardrobe'],
+    ];
+    for (const [tab, label] of TAB_LABELS) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'menu-button home-tab';
+      if (tab === opts.activeTab) btn.classList.add('home-tab-active');
+      btn.textContent = label;
+      btn.dataset.testid = `home-tab-${tab}`;
+      btn.addEventListener('click', () => opts.onTab(tab));
+      tabs.appendChild(btn);
+    }
+    panel.appendChild(tabs);
+
+    const body = document.createElement('div');
+    body.className = 'home-body';
+    body.dataset.testid = 'home-body';
+    if (opts.activeTab === 'decorate') this.renderHomeDecorate(body, opts);
+    else if (opts.activeTab === 'surfaces') this.renderHomeSurfaces(body, opts);
+    else if (opts.activeTab === 'renovate') this.renderHomeRenovate(body, opts);
+    else this.renderHomeWardrobe(body, opts);
+    panel.appendChild(body);
+
+    const actions = document.createElement('div');
+    actions.className = 'home-actions';
+    const photo = document.createElement('button');
+    photo.type = 'button';
+    photo.className = 'menu-button';
+    photo.textContent = '📷 Photo mode';
+    photo.dataset.testid = 'home-photo';
+    photo.addEventListener('click', opts.onPhotoMode);
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'menu-button';
+    close.textContent = 'Close';
+    close.dataset.testid = 'home-close';
+    close.addEventListener('click', opts.onClose);
+    actions.append(photo, close);
+    panel.appendChild(actions);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  private renderHomeDecorate(body: HTMLElement, opts: HomePanelOptions): void {
+    const buyHeading = document.createElement('div');
+    buyHeading.className = 'home-heading';
+    buyHeading.textContent = 'Furniture catalog';
+    body.appendChild(buyHeading);
+
+    const list = document.createElement('ul');
+    list.className = 'home-list';
+    list.dataset.testid = 'home-furniture';
+    for (const f of opts.furniture) {
+      const li = document.createElement('li');
+      li.className = 'home-row';
+      const info = document.createElement('div');
+      info.className = 'home-row-head';
+      const title = document.createElement('span');
+      title.className = 'home-title';
+      title.textContent = `${f.name} — ${f.categoryLabel}`;
+      const price = document.createElement('span');
+      price.className = 'home-price';
+      price.textContent = `${f.price} g`;
+      info.append(title, price);
+      const place = document.createElement('button');
+      place.type = 'button';
+      place.className = 'menu-button home-place';
+      place.textContent = 'Place';
+      place.dataset.testid = `home-place-${f.id}`;
+      place.disabled = !f.affordable;
+      place.addEventListener('click', () => opts.onPlace(f.id));
+      li.append(info, place);
+      list.appendChild(li);
+    }
+    body.appendChild(list);
+
+    const placedHeading = document.createElement('div');
+    placedHeading.className = 'home-heading';
+    placedHeading.textContent = `Placed (${opts.placed.length})`;
+    body.appendChild(placedHeading);
+    const placedList = document.createElement('ul');
+    placedList.className = 'home-list';
+    placedList.dataset.testid = 'home-placed';
+    if (opts.placed.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'home-row home-row-empty';
+      li.textContent = 'Nothing placed yet — buy a piece above and set it down.';
+      placedList.appendChild(li);
+    }
+    for (const p of opts.placed) {
+      const li = document.createElement('li');
+      li.className = 'home-row';
+      const title = document.createElement('span');
+      title.className = 'home-title';
+      title.textContent = p.name;
+      const pick = document.createElement('button');
+      pick.type = 'button';
+      pick.className = 'menu-button home-pickup';
+      pick.textContent = 'Pick up';
+      pick.dataset.testid = `home-pickup-${p.id}`;
+      pick.addEventListener('click', () => opts.onPickUp(p.id));
+      li.append(title, pick);
+      placedList.appendChild(li);
+    }
+    body.appendChild(placedList);
+  }
+
+  private renderHomeSurfaces(body: HTMLElement, opts: HomePanelOptions): void {
+    const section = (heading: string, rows: HomeSurfaceRow[], testid: string, onPick: (id: string) => void) => {
+      const h = document.createElement('div');
+      h.className = 'home-heading';
+      h.textContent = heading;
+      body.appendChild(h);
+      const grid = document.createElement('div');
+      grid.className = 'home-swatches';
+      grid.dataset.testid = testid;
+      for (const r of rows) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'menu-button home-swatch';
+        if (r.active) btn.classList.add('home-swatch-active');
+        btn.textContent = r.active ? `✓ ${r.name}` : r.name;
+        btn.dataset.testid = `${testid}-${r.id}`;
+        btn.addEventListener('click', () => onPick(r.id));
+        grid.appendChild(btn);
+      }
+      body.appendChild(grid);
+    };
+    section('Walls', opts.wallpapers, 'home-wallpaper', opts.onWallpaper);
+    section('Floor', opts.floorings, 'home-flooring', opts.onFlooring);
+  }
+
+  private renderHomeRenovate(body: HTMLElement, opts: HomePanelOptions): void {
+    const list = document.createElement('ul');
+    list.className = 'home-list';
+    list.dataset.testid = 'home-renovations';
+    for (const r of opts.renovations) {
+      const li = document.createElement('li');
+      li.className = 'home-row home-row-tall';
+      const head = document.createElement('div');
+      head.className = 'home-row-head';
+      const title = document.createElement('span');
+      title.className = 'home-title';
+      title.textContent = r.name;
+      const price = document.createElement('span');
+      price.className = 'home-price';
+      price.textContent = r.owned ? 'Built' : `${r.price} g`;
+      head.append(title, price);
+      const desc = document.createElement('div');
+      desc.className = 'home-desc';
+      desc.textContent = r.description;
+      const build = document.createElement('button');
+      build.type = 'button';
+      build.className = 'menu-button';
+      build.textContent = r.owned ? 'Built ✓' : 'Build';
+      build.dataset.testid = `home-renovate-${r.id}`;
+      build.disabled = r.owned || !r.affordable;
+      build.addEventListener('click', () => opts.onRenovate(r.id));
+      li.append(head, desc, build);
+      list.appendChild(li);
+    }
+    body.appendChild(list);
+  }
+
+  private renderHomeWardrobe(body: HTMLElement, opts: HomePanelOptions): void {
+    for (const part of opts.wardrobe) {
+      const h = document.createElement('div');
+      h.className = 'home-heading';
+      h.textContent = part.label;
+      body.appendChild(h);
+      const grid = document.createElement('div');
+      grid.className = 'home-swatches';
+      grid.dataset.testid = `home-wardrobe-${part.part}`;
+      for (const s of part.swatches) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'menu-button home-swatch';
+        if (s.active) btn.classList.add('home-swatch-active');
+        btn.textContent = s.active ? `✓ ${s.name}` : s.name;
+        btn.dataset.testid = `home-swatch-${part.part}-${s.id}`;
+        btn.addEventListener('click', () => opts.onSwatch(part.part, s.id));
+        grid.appendChild(btn);
+      }
+      body.appendChild(grid);
+    }
+  }
+
+  /**
+   * Placement HUD (Prompt 060). Shown while a furniture piece is being placed:
+   * the ghost follows the pointer; these controls rotate / commit / cancel.
+   */
+  showPlacementBar(opts: PlacementBarOptions): void {
+    this.clear();
+    const bar = document.createElement('div');
+    bar.className = 'hud-bar placement-bar';
+    bar.dataset.testid = 'placement-bar';
+
+    const info = document.createElement('div');
+    info.className = 'hud-info';
+    const heading = document.createElement('div');
+    heading.className = 'hud-title';
+    heading.textContent = `Placing ${opts.label}`;
+    const hint = document.createElement('div');
+    hint.className = 'hud-status';
+    hint.textContent = 'Tap the floor to position · then Place';
+    info.append(heading, hint);
+
+    const controls = document.createElement('div');
+    controls.className = 'placement-controls';
+    const rotate = document.createElement('button');
+    rotate.type = 'button';
+    rotate.className = 'menu-button';
+    rotate.textContent = '⟳ Rotate';
+    rotate.dataset.testid = 'placement-rotate';
+    rotate.addEventListener('click', opts.onRotate);
+    const place = document.createElement('button');
+    place.type = 'button';
+    place.className = 'menu-button';
+    place.textContent = 'Place';
+    place.dataset.testid = 'placement-confirm';
+    place.addEventListener('click', opts.onPlace);
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'menu-button';
+    cancel.textContent = 'Cancel';
+    cancel.dataset.testid = 'placement-cancel';
+    cancel.addEventListener('click', opts.onCancel);
+    controls.append(rotate, place, cancel);
+
+    bar.append(info, controls);
+    this.root.appendChild(bar);
+  }
+
+  /**
+   * Photo mode bar (Prompt 060). The HUD/panels are hidden for a clean shot;
+   * only this minimal Capture / Exit strip remains.
+   */
+  showPhotoModeBar(opts: PhotoModeBarOptions): void {
+    this.clear();
+    const bar = document.createElement('div');
+    bar.className = 'hud-bar photo-bar';
+    bar.dataset.testid = 'photo-bar';
+
+    const info = document.createElement('div');
+    info.className = 'hud-info';
+    const heading = document.createElement('div');
+    heading.className = 'hud-title';
+    heading.textContent = '📷 Photo mode';
+    const note = document.createElement('div');
+    note.className = 'hud-status';
+    note.dataset.testid = 'photo-note';
+    note.textContent = opts.note;
+    info.append(heading, note);
+
+    const controls = document.createElement('div');
+    controls.className = 'placement-controls';
+    const capture = document.createElement('button');
+    capture.type = 'button';
+    capture.className = 'menu-button';
+    capture.textContent = 'Capture';
+    capture.dataset.testid = 'photo-capture';
+    capture.addEventListener('click', opts.onCapture);
+    const exit = document.createElement('button');
+    exit.type = 'button';
+    exit.className = 'menu-button';
+    exit.textContent = 'Exit';
+    exit.dataset.testid = 'photo-exit';
+    exit.addEventListener('click', opts.onExit);
+    controls.append(capture, exit);
+
+    bar.append(info, controls);
+    this.root.appendChild(bar);
   }
 
   /**

@@ -219,6 +219,8 @@ export interface Placement {
   itemId: string;
   x: number;
   z: number;
+  /** Y-rotation in radians (Prompt 060 furniture placement). Absent = 0 (legacy decor). */
+  rot?: number;
 }
 
 export interface SceneMapState {
@@ -253,6 +255,7 @@ export function placeCrafted(
   itemId: string,
   x: number,
   z: number,
+  rot = 0,
 ): Placement {
   const state = getSceneMapState(save, sceneKey);
   const placement: Placement = {
@@ -260,8 +263,57 @@ export function placeCrafted(
     itemId,
     x,
     z,
+    rot,
   };
   const next: SceneMapState = { placements: [...state.placements, placement] };
   save.mapState[sceneKey] = next;
   return placement;
+}
+
+/** Remove a placement by id (Prompt 060 — pick up furniture). Returns whether it removed one. */
+export function removePlacement(save: SaveData, sceneKey: string, placementId: string): boolean {
+  const state = getSceneMapState(save, sceneKey);
+  const next = state.placements.filter((p) => p.id !== placementId);
+  if (next.length === state.placements.length) return false;
+  save.mapState[sceneKey] = { placements: next };
+  return true;
+}
+
+/** Move a placement to a new floor position (Prompt 060). */
+export function movePlacement(
+  save: SaveData,
+  sceneKey: string,
+  placementId: string,
+  x: number,
+  z: number,
+): boolean {
+  const state = getSceneMapState(save, sceneKey);
+  let found = false;
+  const next = state.placements.map((p) => {
+    if (p.id !== placementId) return p;
+    found = true;
+    return { ...p, x, z };
+  });
+  if (!found) return false;
+  save.mapState[sceneKey] = { placements: next };
+  return true;
+}
+
+/** Rotate a placement about Y (Prompt 060). */
+export function rotatePlacement(
+  save: SaveData,
+  sceneKey: string,
+  placementId: string,
+  rot: number,
+): boolean {
+  const state = getSceneMapState(save, sceneKey);
+  let found = false;
+  const next = state.placements.map((p) => {
+    if (p.id !== placementId) return p;
+    found = true;
+    return { ...p, rot };
+  });
+  if (!found) return false;
+  save.mapState[sceneKey] = { placements: next };
+  return true;
 }

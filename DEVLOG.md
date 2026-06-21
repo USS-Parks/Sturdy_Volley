@@ -5,6 +5,122 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 060 — Home, decor, and customization (legacy 034) (2026-06-21)
+
+A **Home** system at the farmhouse: buy + freely place furniture, repaint walls
+and floors, build one-time renovations, change the player's appearance, and enter
+a **photo mode**. A new wardrobe **dresser** in the `InteriorScene` opens a tabbed
+panel — **Decorate · Surfaces · Renovate · Wardrobe** — plus a Photo-mode button.
+Built on the existing decor-placement engine (extended for free positioning +
+rotation + pick-up) and the WEF interior shell.
+
+**Furniture placement (touch + mouse).** A 12-piece **furniture catalog** content
+collection (`furniture.json` + `furnitureSchema`: id / name / description /
+category / price / footprint / mount). The Decorate tab lists affordable pieces;
+"Place" enters a placement mode where a translucent ghost follows the pointer
+(`scene.onPointerObservable` → floor raycast, clamped to the room), Rotate spins
+it 45°, and Place commits (deducts gold, drops it on the map). Pointer events are
+unified across mouse + touch; the placement-bar buttons give a click-only commit
+path. Placed pieces are listed with a **Pick up** action. Placement reuses
+`save.mapState[sceneKey].placements`; `Placement` gains an optional `rot`, and
+`crafting.ts` gains `removePlacement` / `movePlacement` / `rotatePlacement`.
+
+**Surfaces.** Wallpaper (walls) + flooring (floor) finishes — free cosmetic swaps
+that recolour the live interior. Engine catalogs in `home.ts`
+(`WALLPAPER_SWATCHES` / `FLOORING_SWATCHES`), defaults matching the existing
+graybox colours.
+
+**Renovations.** Three one-time gold upgrades (`RENOVATIONS`: Loft Shelf, Bay
+Window, Stone Hearth), each adding a bespoke visible mesh to the room; bought
+once, recorded on the home state.
+
+**Wardrobe / appearance.** `engine/appearance.ts` — an `AppearanceState`
+(body / beanie / accent swatch ids) with a bounded swatch catalog, default keyed
+to the canonical protagonist (§1.4: red beanie + rust accent, harbor-blue body to
+match the existing capsule). `render/player-appearance.ts` `applyPlayerAppearance`
+recolours the capsule + (re)builds a beanie cap and an accent band — applied in
+both the `InteriorScene` and the `FarmScene`, live-updated on a wardrobe change.
+
+**Photo mode.** Hides the HUD/panels (shows only a Capture/Exit strip) and
+captures the canvas via `Tools.CreateScreenshotUsingRenderTargetAsync` → an `<a
+download>` PNG, wrapped in try/catch ("where the browser permits").
+
+**Save.** `player.appearance` (defaulted) + a top-level `home` record
+(`homeSceneStateSchema`: wallpaper / flooring / renovations, per scene). Both are
+defaulted fields — **no `SAVE_VERSION` bump**; pre-060 saves parse cleanly (locked
+by a saveModel test that strips the fields). Kept separate from `placements` so
+neither write clobbers the other.
+
+**Trophy / curio shelves.** Furniture categories — a placed `trophy-shelf` shows a
+cube per **earned milestone** (`earnedTrophies`, derived read-only from quests /
+projects / festivals / recipes / relationships / mine depth / reef / gold); banners
+mount as wall panels; a curio cabinet displays small wonders.
+
+Files: `src/engine/appearance.ts` (new), `src/engine/home.ts` (new),
+`src/render/player-appearance.ts` (new), `src/data/content/furniture.json` (new),
+`src/data/schemas.ts`, `src/data/content.ts`, `src/engine/crafting.ts`,
+`src/engine/saveModel.ts`, `src/ui/overlay.ts`, `src/styles.css`,
+`src/scenes/InteriorScene.ts`, `src/scenes/FarmScene.ts`,
+`tests/unit/appearance.test.ts` (new), `tests/unit/home.test.ts` (new),
+`tests/unit/crafting.test.ts`, `tests/unit/saveModel.test.ts`,
+`tests/unit/content.test.ts`, `tests/e2e/home.spec.ts` (new).
+
+**Acceptance criteria**
+
+- [x] **Decor placement works with touch + mouse** — the Decorate tab buys + places
+  furniture; placement mode follows a unified pointer (mouse + touch) and commits
+  via the placement bar. e2e covers debug-driven placement + the canonical UI
+  click path on desktop + Pixel 5; pieces persist across a reload.
+- [x] **Appearance can be changed after start** — the Wardrobe tab swaps
+  body / beanie / accent swatches; the change recolours the live capsule (verified
+  by a player-colour-hex assertion) and persists across reload.
+- [x] **Photo mode hides UI and saves screenshots where the browser permits** —
+  entering photo mode clears the HUD to a Capture/Exit strip; Capture produces a
+  PNG download via an off-DOM render-target screenshot (try/catch tolerant). e2e
+  asserts the HUD is hidden, capture returns a boolean without throwing, and exit
+  restores the HUD.
+- [x] Built on the WEF interior kit + camera volumes — hosted in the farmhouse
+  `InteriorScene` (the kit reference home), reusing its shell + camera.
+- [x] Visible in the running game + Playwright-verified (§0.8) — the dresser opens
+  the Home panel; all four tabs + photo mode exercised on both projects.
+
+**Decision record**
+
+- **Furniture is content; surfaces / renovations / appearance swatches are engine
+  catalogs.** Furniture is item-like, designer-extendable content → the data-driven
+  pipeline (faithful to 056–059). The bounded, render-coupled colour/upgrade lists
+  live in the engine alongside the camera-profile / palette precedents — keeping
+  exactly one new content collection.
+- **Home state separate from placements.** `placeCrafted` rewrites the whole
+  `mapState[scene]` object, so co-locating surfaces there would clobber them; home
+  state is a sibling top-level `home` record instead.
+- **Surfaces are free swaps.** No purchased-paint tracking — gold sinks are the
+  furniture + renovations; cosmetic recolours are always available.
+- **Appearance default = harbor blue body.** Matches the existing `PALETTE.player`
+  so scenes without a wardrobe stay consistent; the beanie + accent default to the
+  canonical red/rust. Appearance is applied in Interior + Farm only (the legacy
+  scenes the player inhabits); the rest pick it up when the player build centralises.
+- **No `SAVE_VERSION` bump** — defaulted `appearance` + `home`; versioning is
+  Prompt 067.
+
+**Verify gate** — `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **747 passed** (+21) · `validate:assets` 0 · `build` 0 ·
+Playwright home suite **14 passed** + crafting/interior/cooking regression
+**14 passed** on `desktop-chromium` + `mobile-chromium`; full suite
+**351 passed** (desktop + mobile, exit 0) · GitDoctor **100/100**.
+
+**Honest gaps / deferred.** Home is hosted at the farmhouse `InteriorScene`; the
+WEF `FarmhouseInteriorScene` does not host it yet (parity, not 060 — matches the
+059 handoff note). Pick-up does not refund gold. The pointer ghost-follow path is
+real (unified mouse/touch) but the deterministic e2e commits via the placement-bar
+button + debug hook (canvas picking is unreliable on the CI SwiftShader runner —
+handoff §4); the literal pointer-drag is covered by the in-scene wiring, not a CI
+click. Photo capture returns `false` gracefully where the browser blocks the
+render-target screenshot. Appearance is graybox (capsule + beanie + band) until the
+hero rig lands (Prompts 062–063), which reuses the same `AppearanceState`.
+
+---
+
 ## Prompt 059 — Cooking and buffs (legacy 033) (2026-06-21)
 
 A **food-buff** layer on top of the existing recipe/crafting engine, plus a

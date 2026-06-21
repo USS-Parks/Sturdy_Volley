@@ -12,6 +12,9 @@ import {
   isPlaceable,
   placeCrafted,
   listPlacements,
+  removePlacement,
+  rotatePlacement,
+  movePlacement,
   evaluateRecipeUnlocks,
 } from '../../src/engine/crafting';
 import { addItem, createContainer } from '../../src/engine/inventory';
@@ -212,5 +215,27 @@ describe('placement (Prompt 017)', () => {
     // Mimic a save reload: serialize → parse with the schema.
     const round = parseSave(serializeSave(save));
     expect(listPlacements(round, 'Interior')).toEqual(listPlacements(save, 'Interior'));
+  });
+
+  it('placeCrafted records a rotation and it survives a round-trip (Prompt 060)', () => {
+    const save = createNewSave({ name: 'Pat', farmName: 'Tide' }, 0);
+    placeCrafted(save, 'Interior', 'rush-stool', 1, 2, Math.PI / 2);
+    const round = parseSave(serializeSave(save));
+    expect(listPlacements(round, 'Interior')[0]!.rot).toBeCloseTo(Math.PI / 2);
+  });
+
+  it('removePlacement / movePlacement / rotatePlacement edit a placement (Prompt 060)', () => {
+    const save = createNewSave({ name: 'Pat', farmName: 'Tide' }, 0);
+    const a = placeCrafted(save, 'Interior', 'rush-stool', 0, 0);
+    const b = placeCrafted(save, 'Interior', 'round-tea-table', 1, 1);
+    expect(movePlacement(save, 'Interior', a.id, 3, 4)).toBe(true);
+    expect(rotatePlacement(save, 'Interior', a.id, 1.5)).toBe(true);
+    const moved = listPlacements(save, 'Interior').find((p) => p.id === a.id)!;
+    expect([moved.x, moved.z, moved.rot]).toEqual([3, 4, 1.5]);
+    expect(removePlacement(save, 'Interior', b.id)).toBe(true);
+    expect(listPlacements(save, 'Interior').map((p) => p.id)).toEqual([a.id]);
+    // Editing an unknown id is a safe no-op.
+    expect(removePlacement(save, 'Interior', 'nope')).toBe(false);
+    expect(movePlacement(save, 'Interior', 'nope', 0, 0)).toBe(false);
   });
 });
