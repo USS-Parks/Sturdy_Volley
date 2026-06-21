@@ -100,6 +100,8 @@ export class TitleScene extends GameScene {
       items.push({ id: 'dev-wild-lab', label: 'Dev · Wild Lab', enabled: true, testId: 'title-dev-wild-lab' });
       items.push({ id: 'dev-mount-lab', label: 'Dev · Mount Lab', enabled: true, testId: 'title-dev-mount-lab' });
       items.push({ id: 'dev-flora-lab', label: 'Dev · Flora Lab', enabled: true, testId: 'title-dev-flora-lab' });
+      items.push({ id: 'dev-breakpoint-farm', label: 'Dev · Breakpoint Farm', enabled: true, testId: 'title-dev-breakpoint-farm' });
+      items.push({ id: 'dev-farmhouse', label: 'Dev · Farmhouse', enabled: true, testId: 'title-dev-farmhouse' });
     }
     this.ctx.overlay.showMenu(
       'Sturdy Volley',
@@ -158,6 +160,12 @@ export class TitleScene extends GameScene {
         break;
       case 'dev-flora-lab':
         this.goTo('FloraLab');
+        break;
+      case 'dev-breakpoint-farm':
+        this.goTo('BreakpointFarm');
+        break;
+      case 'dev-farmhouse':
+        this.goTo('FarmhouseInterior');
         break;
     }
   }

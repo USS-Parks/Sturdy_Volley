@@ -5,6 +5,90 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 046 — Production-foundation maps I: Farm exterior + Farmhouse interior (WEF-10a) (2026-06-21)
+
+Built the first two production-foundation maps — **Breakpoint Farm** (exterior)
+and the **Farmhouse interior** — from the approved blockout + metric/interior
+kits, as graybox geometry over production collision, navigation, anchor,
+camera-volume, and transition data, driven by the shared camera rig + kinematic
+motor + interaction stack. The farmhouse **door** is a real `SceneManager`
+transition between the two regions that preserves anchor / facing / camera / clock
+/ NPC state.
+
+**Breakpoint Farm (`src/scenes/BreakpointFarmScene.ts`, new).** Reads
+`BREAKPOINT_FARM_BLOCKOUT` (anchors, camera volumes, nav refs, chunk grid).
+Graybox matches `sv_map_012_breakpoint_farm_layout.png` + `sv_env_041`: farmhouse
++ shed + greenhouse shells, fenced pasture with a grazing goat (animal-families),
+quadrant irrigated crop field + grass tufts (flora-motion sway), pond + creek
+(wade) + footbridge, orchard bluff (raised plateau + stair ramp = elevation +
+traversal), redwood ring + ocean cliff (geography, not walls), a well. The shared
+`CameraRig` consumes the blockout's authored volumes (farmyard `farm:standard`,
+orchard-bluff `exterior:standard`); the shared `stepMotor` drives the player over
+multi-AABB collision + ground-height elevation + water. **Five debug layers**
+(render / collision / nav / anchor / volume) toggle independently. No central
+court/net (§1.4 purge).
+
+**Farmhouse interior (`src/scenes/FarmhouseInteriorScene.ts`, new).** The Prompt
+036 interior-kit reference implementation: `buildRoom` from `FARMHOUSE_SPEC` (bed,
+fireplace, kitchen counter, dining table, chest, south door, window — mirroring
+`sv_map_023`), its authored `smallInterior` camera volume, the shared motor, and
+near-wall fade over the closed backing shell. The south door transitions back to
+the farm restoring the saved return pose.
+
+**Transition (`src/world/region-transition.ts`, new).** `RegionTransitionData`
+carries the destination anchor + facing + camera context across a
+`SceneManager.goTo`, plus the clock + NPC token that must survive **unchanged**.
+
+Files: `src/scenes/BreakpointFarmScene.ts` (new), `src/scenes/FarmhouseInteriorScene.ts`
+(new), `src/world/region-transition.ts` (new), `tests/unit/breakpoint-farm.test.ts`
+(new), `tests/e2e/breakpoint-farm.spec.ts` (new), `src/scenes/registry.ts`,
+`src/scenes/dev-route.ts`, `src/scenes/TitleScene.ts`.
+
+**Acceptance criteria**
+
+- [x] Both reachable through ordinary gameplay transitions using the shared
+  camera/motor/interaction stack; the exterior/interior handoff preserves
+  anchor/facing/camera/time/NPC state (e2e round-trips farm→farmhouse→farm; clock
+  + NPC token unchanged; return pose restored; camera hands to `smallInterior` and
+  back to `farm`).
+- [x] Each demonstrates its required activities, elevation, traversal, camera,
+  NPC/fauna, flora, and environmental-motion cases; boundaries read as
+  geography/architecture (orchard bluff + stairs, pond/creek wade + footbridge,
+  authored volumes, pasture goat, crop/grass sway, redwood ring + ocean cliff).
+- [x] Collision proxies, nav surfaces, interaction anchors, camera volumes, and
+  render meshes each toggle in debug view (5 `FarmLayer`s, e2e-asserted); the farm
+  reads the validated blockout (region + 16-chunk grid + anchors); automated tours
+  cover every transition + representative interaction on both Playwright projects;
+  map stays inside the budget envelope (graybox primitives only).
+- [x] **Art reference:** graybox layout + silhouettes match
+  `sv_map_012_breakpoint_farm_layout.png`, `sv_map_023_farmhouse_interior_starter.png`,
+  and the morning mood of `sv_env_041_breakpoint_morning.png`.
+
+**Decision record**
+
+- **Two real scenes + a `goTo` transition** (not one combined scene). Models the
+  farm + farmhouse as the distinct regions the blockout + 053 migration expect; the
+  `RegionTransitionData` payload carries the preserved state, proven by a cross-scene
+  e2e round-trip (the town-doors pattern).
+- **Shared motor everywhere.** The player uses `stepMotor` over a multi-AABB wall
+  probe (the MountLab pattern) + a ground-height function (orchard bluff) + water
+  columns (pond/creek) — same grounding/slope/wade guarantees as every other WEF
+  scene, no scene-local movement.
+- **Debug layers via `metadata.layer` + dedicated viz meshes.** Collision / nav /
+  anchor / volume each get hidden viz meshes toggled as a group, so all five
+  separable concerns (§3.1) are independently inspectable.
+- **Streaming referenced, not re-implemented.** The 128 m farm loads as one region
+  (chunk grid exposed in debug); live chunk streaming is StreamingLab's concern
+  (035), not duplicated here.
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **584 passed** (+4 breakpoint-farm) · Playwright **251
+passed + 1 skipped** (desktop-only aspect sweep) on both `desktop-chromium` +
+`mobile-chromium` (+12 breakpoint-farm) · `validate:assets` 0 · `build` 0 ·
+GitDoctor **100/100**.
+
+---
+
 ## Prompt 045 — Flora and environmental-motion tiers (WEF-09) (2026-06-21)
 
 Shared, deterministic flora/environment-motion layer for nine families — grass,

@@ -16,6 +16,8 @@ import { FaunaLabScene } from './FaunaLabScene';
 import { WildLabScene } from './WildLabScene';
 import { MountLabScene } from './MountLabScene';
 import { FloraLabScene } from './FloraLabScene';
+import { BreakpointFarmScene } from './BreakpointFarmScene';
+import { FarmhouseInteriorScene } from './FarmhouseInteriorScene';
 
 /** All game scenes, keyed by the names used in save.location.sceneKey + transitions. */
 export const SCENE_FACTORIES: Record<string, SceneFactory> = {
@@ -46,4 +48,7 @@ export const SCENE_FACTORIES: Record<string, SceneFactory> = {
   MountLab: (ctx) => new MountLabScene(ctx),
   // Dev-only flora/environment-motion proving ground (WEF-09). `?scene=FloraLab`.
   FloraLab: (ctx) => new FloraLabScene(ctx),
+  // Production-foundation map I (WEF-10a, Prompt 046). `?scene=BreakpointFarm`.
+  BreakpointFarm: (ctx) => new BreakpointFarmScene(ctx),
+  FarmhouseInterior: (ctx) => new FarmhouseInteriorScene(ctx),
 };
