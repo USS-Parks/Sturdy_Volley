@@ -125,6 +125,9 @@ export function resolveDay(input: ResolveDayInput): ResolveDayResult {
   const nextTime = startNextDay(endingTime);
   applyGameTime(save, nextTime);
 
+  // Prompt 059: food buffs are a within-day boost — a night's sleep clears them.
+  save.activeBuffs = [];
+
   const rained = input.todayWeatherId === 'rain';
   const cropResult = advanceCrops({
     plantings: save.plantings,

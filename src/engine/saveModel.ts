@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { seasonSchema } from '../data/schemas';
+import { seasonSchema, buffEffectSchema } from '../data/schemas';
 
 /**
  * The save model. Versioned for future migrations (Prompt 041). Validated with
@@ -96,6 +96,20 @@ export type FestivalState = z.infer<typeof festivalStateSchema>;
 export type FestivalRecord = Record<string, FestivalState>;
 
 /**
+ * An active food buff (Prompt 059). `expiresAtMinutes` is the in-day clock minute
+ * the buff lapses; buffs are pruned as time advances and cleared at sleep.
+ * Defaulted field, no `SAVE_VERSION` bump.
+ */
+export const activeBuffSchema = z
+  .object({
+    effect: buffEffectSchema,
+    magnitude: z.number(),
+    expiresAtMinutes: z.number().int().nonnegative(),
+  })
+  .strict();
+export type ActiveBuff = z.infer<typeof activeBuffSchema>;
+
+/**
  * Per-letter mail state (Prompt 058). A letter is `delivered` to the mailbox when
  * its trigger fires (the year stamps recurring date letters so they re-deliver
  * each year), then `read` once the player opens it. Defaulted field, no
@@ -169,6 +183,7 @@ export const saveSchema = z
     projects: z.record(z.string(), projectStateSchema).default({}),
     festivals: z.record(z.string(), festivalStateSchema).default({}),
     mail: z.record(z.string(), mailStateSchema).default({}),
+    activeBuffs: z.array(activeBuffSchema).default([]),
     mapState: z.record(z.string(), z.unknown()),
     machines: z
       .record(
@@ -352,6 +367,7 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
     projects: {},
     festivals: {},
     mail: {},
+    activeBuffs: [],
     mapState: {},
     machines: defaultFarmMachines(),
     animals: defaultFarmAnimals(),

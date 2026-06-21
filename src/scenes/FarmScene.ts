@@ -18,7 +18,7 @@ import { writeSave } from '../engine/save';
 import { formatWorldStatus } from '../engine/format';
 import { computeMoveVector, type MoveInput } from '../engine/movement';
 import { FarmGrid, FARM_CELL_SIZE } from '../engine/farmGrid';
-import { createControllerState, stepController, type ControllerState } from '../engine/controller';
+import { createControllerState, stepController, DEFAULT_CONTROLLER_CONFIG, type ControllerConfig, type ControllerState } from '../engine/controller';
 import { resolveInteraction, type InteractTarget } from '../engine/interaction';
 import type { Container, SaveData } from '../engine/saveModel';
 import { loadGameContent } from '../data/content';
@@ -65,6 +65,7 @@ import {
   deliverActiveMail,
   readActiveMail,
 } from '../engine/mail-tracking';
+import { activeBuffEffectsNow, activeBuffRows, pruneActiveBuffs } from '../engine/buff-tracking';
 import type { QuestPanelRow } from '../ui/overlay';
 import type { QuestJournalRow } from '../engine/quests';
 import {
@@ -627,6 +628,23 @@ export class FarmScene extends GameScene {
     };
   }
 
+  /**
+   * Prompt 059: fold active food buffs into the locomotion config — a movement
+   * buff scales the gait speeds, a stamina-regen buff adds to recovery. Returns
+   * the default config untouched when no relevant buff is active.
+   */
+  private buffedControllerConfig(): ControllerConfig {
+    const eff = activeBuffEffectsNow();
+    if (eff.movementMult === 1 && eff.staminaRegenBonus === 0) return DEFAULT_CONTROLLER_CONFIG;
+    return {
+      ...DEFAULT_CONTROLLER_CONFIG,
+      jogSpeed: DEFAULT_CONTROLLER_CONFIG.jogSpeed * eff.movementMult,
+      sprintSpeed: DEFAULT_CONTROLLER_CONFIG.sprintSpeed * eff.movementMult,
+      exhaustedSpeed: DEFAULT_CONTROLLER_CONFIG.exhaustedSpeed * eff.movementMult,
+      staminaRecovery: DEFAULT_CONTROLLER_CONFIG.staminaRecovery + eff.staminaRegenBonus,
+    };
+  }
+
   /* Prompt 058 — mailbox -------------------------------------------- */
 
   /** Deliver any due mail, flash a HUD note for new letters, and raise the flag. */
@@ -723,7 +741,7 @@ export class FarmScene extends GameScene {
 
     const dir = this.cameraRelativeDir(computeMoveVector(this.readInput()));
     const sprint = this.pressed.has('shift');
-    this.controller = stepController(this.controller, { dir, sprint }, dt);
+    this.controller = stepController(this.controller, { dir, sprint }, dt, this.buffedControllerConfig());
     if (this.controller.speed > 0.01 && (dir.x !== 0 || dir.z !== 0)) {
       this.player.moveWithCollisions(new Vector3(dir.x, 0, dir.z).scale(this.controller.speed * dt));
     }
@@ -775,6 +793,7 @@ export class FarmScene extends GameScene {
       this.checkMachineReadyTransitions();
       this.paintAllMachines();
       this.applyAnimalShelterState();
+      pruneActiveBuffs(); // Prompt 059: expire lapsed food buffs as time advances.
     }
 
     // Animal bob animation runs every frame.
@@ -903,6 +922,9 @@ export class FarmScene extends GameScene {
       gold: this.save.wallet.gold,
     });
     let line = `${status} · energy ${stamina}% · active: ${this.activeSlotLabel()}`;
+    // Prompt 059: surface active food buffs so the player can see what's running.
+    const buffs = activeBuffRows();
+    if (buffs.length > 0) line += ` · 🍲 ${buffs.map((b) => `${b.label} ${b.minutesLeft}m`).join(', ')}`;
     if (this.actionTimer > 0) line += ` · ✔ ${this.actionLabel}`;
     else if (this.nearest) line += ` · [E] ${this.nearest.label}`;
     this.ctx.overlay.showHud('Breakpoint Farm', line, () => this.openMenu());

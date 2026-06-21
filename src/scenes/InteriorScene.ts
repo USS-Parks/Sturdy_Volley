@@ -29,9 +29,11 @@ import {
 } from '../engine/crafting';
 import { writeSave } from '../engine/save';
 import { recordActiveQuestEvent } from '../engine/quest-tracking';
+import { eatActiveFood, activeBuffRows } from '../engine/buff-tracking';
+import { describeBuff, isEdible } from '../engine/buffs';
 import { formatWorldStatus } from '../engine/format';
 import { computeMoveVector, type MoveInput } from '../engine/movement';
-import { createControllerState, stepController, type ControllerState } from '../engine/controller';
+import { createControllerState, stepController, DEFAULT_CONTROLLER_CONFIG, type ControllerState } from '../engine/controller';
 import { resolveInteraction, type InteractTarget } from '../engine/interaction';
 import type { SaveData } from '../engine/saveModel';
 import { loadGameContent } from '../data/content';
@@ -55,6 +57,11 @@ interface InteriorDebugApi {
   grantItem: (itemId: string, qty: number) => void;
   grantRecipe: (recipeId: string) => void;
   knownRecipes: () => readonly string[];
+  // Prompt 059 — cooking + buffs.
+  openKitchen: () => void;
+  cook: (recipeId: string) => { cooked: boolean };
+  eat: (itemId: string) => { eaten: boolean; staminaRestore: number; buffLabel: string | null };
+  activeBuffs: () => Array<{ effect: string; label: string; minutesLeft: number }>;
 }
 
 interface InteriorEntryData {
@@ -131,6 +138,8 @@ export class InteriorScene extends GameScene {
   private shopId: string | null = null;
   private shopOpen = false;
   private craftingOpen = false;
+  /** Prompt 059: the kitchen cooking/eating panel is open. */
+  private cookingOpen = false;
   private readonly workbenchAnchor = new Vector3(2.4, 0, -3.6);
   private readonly placementRoot = new Vector3(-2.5, 0, -4.8);
   private placementMeshes: AbstractMesh[] = [];
@@ -342,12 +351,17 @@ export class InteriorScene extends GameScene {
         persistActiveSave();
       },
       knownRecipes: () => [...this.save.knownRecipeIds],
+      // Prompt 059 — cooking + buffs.
+      openKitchen: () => this.openCooking(),
+      cook: (recipeId: string) => ({ cooked: this.handleCookDish(recipeId) }),
+      eat: (itemId: string) => this.handleEat(itemId),
+      activeBuffs: () => activeBuffRows().map((b) => ({ effect: b.effect, label: b.label, minutesLeft: b.minutesLeft })),
     };
   }
 
   override update(dt: number): void {
     if (!this.player || !this.save) return;
-    if (this.menuOpen || this.dayResolving || this.shopOpen || this.craftingOpen) {
+    if (this.menuOpen || this.dayResolving || this.shopOpen || this.craftingOpen || this.cookingOpen) {
       this.clock = pauseClock(this.clock, true);
       this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
       return;
@@ -369,6 +383,7 @@ export class InteriorScene extends GameScene {
       else if (this.nearest.id === 'bed') this.triggerSleep(false);
       else if (this.nearest.id === 'shop-counter') this.openShop();
       else if (this.nearest.id === 'workbench') this.openCrafting();
+      else if (this.nearest.id === 'kitchen') this.openCooking();
       else {
         this.actionLabel = this.nearest.label;
         this.actionTimer = 1.6;
@@ -571,6 +586,90 @@ export class InteriorScene extends GameScene {
     this.save.inventory = added.container;
     persistActiveSave();
     this.renderShop(entries, items);
+  }
+
+  /* Prompt 059 — kitchen cooking + eating ----------------------------- */
+
+  private openCooking(): void {
+    this.cookingOpen = true;
+    this.renderCooking();
+  }
+
+  private renderCooking(): void {
+    const content = loadGameContent();
+    const itemsById = new Map<string, Item>(content.items.map((i) => [i.id, i] as const));
+    const recipes = loadRecipesFromContent(content);
+    const cookingDefs = recipes.filter((r) => r.type === 'cooking');
+    const rows = buildCraftingPanelRecipes({
+      knownRecipeIds: this.save.knownRecipeIds,
+      recipes: cookingDefs,
+      itemsById,
+      container: this.save.inventory,
+    });
+    const recipeRows = rows.map((r) => {
+      const def = cookingDefs.find((x) => x.id === r.id)!;
+      const out = itemsById.get(def.outputItemId);
+      return {
+        id: r.id,
+        name: r.name,
+        outputName: r.outputName,
+        outputQty: r.outputQty,
+        ingredients: r.ingredients.map((i) => ({ itemName: i.itemName, need: i.need, have: i.have })),
+        canCook: r.canCraft,
+        buffLabel: out?.buff ? describeBuff(out.buff) : null,
+      };
+    });
+
+    // Pantry — edible items the player holds, summed by id.
+    const held = new Map<string, number>();
+    for (const slot of this.save.inventory.slots) {
+      if (slot) held.set(slot.itemId, (held.get(slot.itemId) ?? 0) + slot.qty);
+    }
+    const pantry = [...held.entries()]
+      .map(([itemId, qty]) => ({ itemId, qty, item: itemsById.get(itemId) }))
+      .filter((e): e is { itemId: string; qty: number; item: Item } => !!e.item && isEdible(e.item))
+      .map((e) => {
+        const parts: string[] = [];
+        if ((e.item.staminaRestore ?? 0) > 0) parts.push(`+${e.item.staminaRestore} stamina`);
+        if (e.item.buff) parts.push(describeBuff(e.item.buff));
+        return { itemId: e.itemId, name: e.item.name, qty: e.qty, effectLabel: parts.join(' · ') || 'A simple bite' };
+      });
+
+    this.ctx.overlay.showCookingPanel({
+      recipes: recipeRows,
+      pantry,
+      activeBuffs: activeBuffRows().map((b) => ({ label: b.label, magnitudeLabel: b.magnitudeLabel, minutesLeft: b.minutesLeft })),
+      onCook: (id) => this.handleCookDish(id),
+      onEat: (itemId) => this.handleEat(itemId),
+      onClose: () => {
+        this.cookingOpen = false;
+        this.refreshHud();
+      },
+    });
+  }
+
+  private handleCookDish(recipeId: string): boolean {
+    const recipe = loadGameContent().recipes.find((r) => r.id === recipeId);
+    if (!recipe) return false;
+    const result = craft({ recipe, container: this.save.inventory });
+    if (result.accepted) {
+      this.save.inventory = result.container;
+      persistActiveSave();
+    }
+    if (this.cookingOpen) this.renderCooking();
+    return result.accepted;
+  }
+
+  private handleEat(itemId: string): { eaten: boolean; staminaRestore: number; buffLabel: string | null } {
+    const result = eatActiveFood(itemId);
+    if (result.eaten && result.staminaRestore > 0) {
+      this.controller = {
+        ...this.controller,
+        stamina: Math.min(DEFAULT_CONTROLLER_CONFIG.maxStamina, this.controller.stamina + result.staminaRestore),
+      };
+    }
+    if (this.cookingOpen) this.renderCooking();
+    return { eaten: result.eaten, staminaRestore: result.staminaRestore, buffLabel: result.buffLabel };
   }
 
   private openCrafting(): void {

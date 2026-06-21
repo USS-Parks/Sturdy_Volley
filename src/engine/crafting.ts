@@ -99,6 +99,13 @@ export const RECIPE_UNLOCK_SOURCES: Record<string, RecipeUnlockSource> = {
   'cheese-omelet': { source: 'npc', npcId: 'wren', minHearts: 4 },
   'pea-cheese-stew': { source: 'skill', skillId: 'crafting', level: 20 },
   'sea-salt-bulk': { source: 'skill', skillId: 'foraging', level: 40 },
+  // Prompt 059: the new buff meals unlock as the player levels the relevant craft.
+  'kelp-roll': { source: 'skill', skillId: 'foraging', level: 10 },
+  'tide-chowder': { source: 'skill', skillId: 'cultivation', level: 20 },
+  'miners-pasty': { source: 'skill', skillId: 'crafting', level: 10 },
+  'reef-skewer': { source: 'skill', skillId: 'foraging', level: 20 },
+  'sunrise-flapjack': { source: 'skill', skillId: 'cultivation', level: 10 },
+  'harbor-hash': { source: 'skill', skillId: 'crafting', level: 30 },
 };
 
 /**

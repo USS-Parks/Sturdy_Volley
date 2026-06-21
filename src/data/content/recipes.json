@@ -192,5 +192,73 @@
     "outputItemId": "salt",
     "outputQty": 5,
     "ingredients": [{ "itemId": "tide-shell", "qty": 3 }]
+  },
+  {
+    "id": "kelp-roll",
+    "name": "Kelp Roll",
+    "type": "cooking",
+    "outputItemId": "kelp-roll",
+    "outputQty": 1,
+    "ingredients": [
+      { "itemId": "sea-lettuce", "qty": 2 },
+      { "itemId": "salt", "qty": 1 }
+    ]
+  },
+  {
+    "id": "tide-chowder",
+    "name": "Tide Chowder",
+    "type": "cooking",
+    "outputItemId": "tide-chowder",
+    "outputQty": 1,
+    "ingredients": [
+      { "itemId": "silver-skipper", "qty": 1 },
+      { "itemId": "bluff-goat-milk", "qty": 1 },
+      { "itemId": "tide-turnip", "qty": 1 }
+    ]
+  },
+  {
+    "id": "miners-pasty",
+    "name": "Miner's Pasty",
+    "type": "cooking",
+    "outputItemId": "miners-pasty",
+    "outputQty": 1,
+    "ingredients": [
+      { "itemId": "blush-radish", "qty": 1 },
+      { "itemId": "goat-cheese", "qty": 1 }
+    ]
+  },
+  {
+    "id": "reef-skewer",
+    "name": "Reef Skewer",
+    "type": "cooking",
+    "outputItemId": "reef-skewer",
+    "outputQty": 1,
+    "ingredients": [
+      { "itemId": "urchin", "qty": 1 },
+      { "itemId": "sea-lettuce", "qty": 1 }
+    ]
+  },
+  {
+    "id": "sunrise-flapjack",
+    "name": "Sunrise Flapjack",
+    "type": "cooking",
+    "outputItemId": "sunrise-flapjack",
+    "outputQty": 1,
+    "ingredients": [
+      { "itemId": "sunmelon", "qty": 1 },
+      { "itemId": "mooncalf-egg", "qty": 1 }
+    ]
+  },
+  {
+    "id": "harbor-hash",
+    "name": "Harbor Hash",
+    "type": "cooking",
+    "outputItemId": "harbor-hash",
+    "outputQty": 1,
+    "ingredients": [
+      { "itemId": "tide-turnip", "qty": 1 },
+      { "itemId": "blush-radish", "qty": 1 },
+      { "itemId": "mooncalf-egg", "qty": 1 }
+    ]
   }
 ]

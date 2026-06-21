@@ -31,6 +31,33 @@ export const itemCategorySchema = z.enum([
 ]);
 export type ItemCategory = z.infer<typeof itemCategorySchema>;
 
+/**
+ * Food buff (Prompt 059). Eating an edible item grants this timed effect on top
+ * of any immediate stamina restore. `effect` names the system it touches;
+ * `magnitude` is a multiplier delta for proportional effects (movement / skill-xp
+ * / fishing / mining / foraging / combat — e.g. 0.2 = +20%) and a flat per-minute
+ * rate for `stamina-regen`. `durationMinutes` is the in-game lifetime.
+ */
+export const buffEffectSchema = z.enum([
+  'stamina-regen',
+  'movement',
+  'skill-xp',
+  'fishing',
+  'mining',
+  'foraging',
+  'combat',
+]);
+export type BuffEffect = z.infer<typeof buffEffectSchema>;
+
+export const foodBuffSchema = z
+  .object({
+    effect: buffEffectSchema,
+    magnitude: z.number(),
+    durationMinutes: z.number().int().positive(),
+  })
+  .strict();
+export type FoodBuff = z.infer<typeof foodBuffSchema>;
+
 export const itemSchema = z
   .object({
     id: idSchema,
@@ -40,6 +67,10 @@ export const itemSchema = z
     sellPrice: z.number().int().nonnegative(),
     stackable: z.boolean(),
     tags: z.array(z.string()).default([]),
+    /** Stamina restored immediately when the item is eaten (absent = not nourishing). */
+    staminaRestore: z.number().int().nonnegative().optional(),
+    /** Timed buff granted when the item is eaten, if any. */
+    buff: foodBuffSchema.optional(),
   })
   .strict();
 export type Item = z.infer<typeof itemSchema>;

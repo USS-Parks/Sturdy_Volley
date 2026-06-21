@@ -588,4 +588,28 @@ describe('UIOverlay', () => {
     expect(document.querySelectorAll('[data-testid="notice-requests"] li')).toHaveLength(1);
     expect(document.querySelectorAll('[data-testid="notice-news"] li')).toHaveLength(2);
   });
+
+  it('Prompt 059: showCookingPanel renders recipes + pantry and wires Cook/Eat', () => {
+    const overlay = new UIOverlay();
+    const cooked: string[] = [];
+    const eaten: string[] = [];
+    overlay.showCookingPanel({
+      activeBuffs: [{ label: 'Quick step', magnitudeLabel: '+20%', minutesLeft: 90 }],
+      recipes: [
+        { id: 'bell-pea-stew', name: 'Bell Pea Stew', outputName: 'Bell Pea Stew', outputQty: 1, ingredients: [{ itemName: 'Bell Peas', need: 2, have: 3 }], canCook: true, buffLabel: 'Stamina regen +2/min' },
+      ],
+      pantry: [
+        { itemId: 'sunmelon-juice', name: 'Sunmelon Juice', qty: 2, effectLabel: '+15 stamina · Quick step +20%' },
+      ],
+      onCook: (id) => cooked.push(id),
+      onEat: (id) => eaten.push(id),
+      onClose: () => {},
+    });
+    expect(document.querySelector('[data-testid="cooking-panel"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="cooking-buffs"]')?.textContent).toContain('Quick step');
+    document.querySelector<HTMLButtonElement>('[data-testid="cooking-cook-bell-pea-stew"]')?.click();
+    document.querySelector<HTMLButtonElement>('[data-testid="pantry-eat-sunmelon-juice"]')?.click();
+    expect(cooked).toEqual(['bell-pea-stew']);
+    expect(eaten).toEqual(['sunmelon-juice']);
+  });
 });

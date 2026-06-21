@@ -269,6 +269,42 @@ export interface NoticeBoardPanelOptions {
   onClose: () => void;
 }
 
+export interface CookingPanelRecipe {
+  id: string;
+  name: string;
+  outputName: string;
+  outputQty: number;
+  ingredients: Array<{ itemName: string; need: number; have: number }>;
+  canCook: boolean;
+  /** Buff the cooked dish grants, e.g. "Quick step +20%". */
+  buffLabel?: string | null;
+}
+
+export interface CookingPantryRow {
+  itemId: string;
+  name: string;
+  qty: number;
+  /** "+30 stamina · Quick step +20%" or just the stamina. */
+  effectLabel: string;
+}
+
+export interface CookingBuffRow {
+  label: string;
+  magnitudeLabel: string;
+  minutesLeft: number;
+}
+
+export interface CookingPanelOptions {
+  recipes: CookingPanelRecipe[];
+  /** Edible items the player is holding, with their effect. */
+  pantry: CookingPantryRow[];
+  /** Currently-active buffs. */
+  activeBuffs: CookingBuffRow[];
+  onCook: (recipeId: string) => void;
+  onEat: (itemId: string) => void;
+  onClose: () => void;
+}
+
 export interface ElevatorPanelOption {
   level: number;
   name: string;
@@ -1593,6 +1629,120 @@ export class UIOverlay {
     close.className = 'menu-button';
     close.textContent = 'Close';
     close.dataset.testid = 'notice-close';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /**
+   * Kitchen / cooking panel (Prompt 059). Active buffs at the top, the cooking
+   * recipes the player knows (with the buff each dish grants) to Cook, and a
+   * pantry of edible items the player is holding to Eat (restoring stamina +
+   * granting the dish's timed buff). Re-rendered by the scene after each action.
+   */
+  showCookingPanel(opts: CookingPanelOptions): void {
+    this.clear();
+    const panel = this.createPanel('Kitchen', `${opts.recipes.length} recipe${opts.recipes.length === 1 ? '' : 's'} known`);
+    panel.classList.add('cooking-panel');
+    panel.dataset.testid = 'cooking-panel';
+
+    if (opts.activeBuffs.length > 0) {
+      const buffs = document.createElement('div');
+      buffs.className = 'cooking-buffs';
+      buffs.dataset.testid = 'cooking-buffs';
+      for (const b of opts.activeBuffs) {
+        const chip = document.createElement('span');
+        chip.className = 'cooking-buff-chip';
+        chip.textContent = `${b.label} ${b.magnitudeLabel} · ${b.minutesLeft}m`;
+        buffs.appendChild(chip);
+      }
+      panel.appendChild(buffs);
+    }
+
+    const cookHeading = document.createElement('div');
+    cookHeading.className = 'cooking-heading';
+    cookHeading.textContent = 'Cook';
+    panel.appendChild(cookHeading);
+
+    const recipeList = document.createElement('ul');
+    recipeList.className = 'cooking-list';
+    recipeList.dataset.testid = 'cooking-recipes';
+    if (opts.recipes.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'cooking-row cooking-row-empty';
+      li.textContent = 'No cooking recipes known yet — find them through skills, friends, and shops.';
+      recipeList.appendChild(li);
+    }
+    for (const r of opts.recipes) {
+      const li = document.createElement('li');
+      li.className = 'cooking-row';
+      li.dataset.testid = `cooking-recipe-${r.id}`;
+      const head = document.createElement('div');
+      head.className = 'cooking-row-head';
+      const title = document.createElement('span');
+      title.className = 'cooking-title';
+      title.textContent = `${r.name} → ${r.outputName} ×${r.outputQty}`;
+      head.appendChild(title);
+      const ing = document.createElement('div');
+      ing.className = 'cooking-ingredients';
+      ing.textContent = r.ingredients.map((i) => `${i.have}/${i.need} ${i.itemName}`).join(' · ') + (r.buffLabel ? ` · grants ${r.buffLabel}` : '');
+      const cook = document.createElement('button');
+      cook.type = 'button';
+      cook.className = 'menu-button cooking-cook';
+      cook.textContent = 'Cook';
+      cook.dataset.testid = `cooking-cook-${r.id}`;
+      cook.disabled = !r.canCook;
+      cook.addEventListener('click', () => opts.onCook(r.id));
+      li.append(head, ing, cook);
+      recipeList.appendChild(li);
+    }
+    panel.appendChild(recipeList);
+
+    const eatHeading = document.createElement('div');
+    eatHeading.className = 'cooking-heading';
+    eatHeading.textContent = 'Pantry';
+    panel.appendChild(eatHeading);
+
+    const pantry = document.createElement('ul');
+    pantry.className = 'cooking-list';
+    pantry.dataset.testid = 'cooking-pantry';
+    if (opts.pantry.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'cooking-row cooking-row-empty';
+      li.textContent = 'Nothing to eat on hand. Cook a dish first.';
+      pantry.appendChild(li);
+    }
+    for (const p of opts.pantry) {
+      const li = document.createElement('li');
+      li.className = 'cooking-row';
+      li.dataset.testid = `pantry-row-${p.itemId}`;
+      const head = document.createElement('div');
+      head.className = 'cooking-row-head';
+      const title = document.createElement('span');
+      title.className = 'cooking-title';
+      title.textContent = `${p.name} ×${p.qty}`;
+      head.appendChild(title);
+      const eff = document.createElement('div');
+      eff.className = 'cooking-ingredients';
+      eff.textContent = p.effectLabel;
+      const eat = document.createElement('button');
+      eat.type = 'button';
+      eat.className = 'menu-button cooking-eat';
+      eat.textContent = 'Eat';
+      eat.dataset.testid = `pantry-eat-${p.itemId}`;
+      eat.addEventListener('click', () => opts.onEat(p.itemId));
+      li.append(head, eff, eat);
+      pantry.appendChild(li);
+    }
+    panel.appendChild(pantry);
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'menu-button';
+    close.textContent = 'Close';
+    close.dataset.testid = 'cooking-close';
     close.addEventListener('click', opts.onClose);
     panel.appendChild(close);
 

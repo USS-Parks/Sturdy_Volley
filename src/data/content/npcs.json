@@ -5,7 +5,7 @@
     "role": "Harbor mechanic and shipwright's apprentice",
     "description": "Direct, funny, and precise. Rebuilding trust after she was wrongly blamed for a harbor repair that failed in the storm.",
     "birthday": { "season": "summer", "day": 14 },
-    "lovedGiftItemIds": ["goat-cheese", "driftwood"],
+    "lovedGiftItemIds": ["goat-cheese", "driftwood", "harbor-hash"],
     "romanceable": true
   },
   {
@@ -14,7 +14,7 @@
     "role": "Bakery owner and beach cleanup organizer",
     "description": "Gentle, stubborn, and secretly competitive. Torn between family expectations and civic leadership.",
     "birthday": { "season": "fall", "day": 7 },
-    "lovedGiftItemIds": ["garden-omelet", "blush-radish"],
+    "lovedGiftItemIds": ["garden-omelet", "blush-radish", "harborlime-tart"],
     "romanceable": true
   },
   {
@@ -23,7 +23,7 @@
     "role": "Cliffside botanist and seed archivist",
     "description": "Dreamy and rigorous, distracted by every plant. Tracking down extinct coastal crops in the storm-buried seed caches.",
     "birthday": { "season": "spring", "day": 19 },
-    "lovedGiftItemIds": ["bell-peas", "blush-radish"],
+    "lovedGiftItemIds": ["bell-peas", "blush-radish", "kelp-roll"],
     "romanceable": true
   },
   {
@@ -32,7 +32,7 @@
     "role": "Fishmonger and reef diver",
     "description": "Flamboyant and generous; conflict-avoidant. Quietly afraid of the deep water after the storm.",
     "birthday": { "season": "summer", "day": 27 },
-    "lovedGiftItemIds": ["tide-shell", "driftwood"],
+    "lovedGiftItemIds": ["tide-shell", "driftwood", "tide-chowder"],
     "romanceable": true
   }
 ]

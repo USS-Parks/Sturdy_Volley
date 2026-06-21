@@ -5,6 +5,96 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 059 — Cooking and buffs (legacy 033) (2026-06-21)
+
+A **food-buff** layer on top of the existing recipe/crafting engine, plus a
+**kitchen** at the farmhouse where the player cooks and eats. Eating restores
+stamina and grants a timed buff that affects gameplay (movement / stamina regen /
+skill / fishing / mining / foraging / combat); buffs show in the HUD + kitchen
+panel and clear at sleep. Cooked dishes are NPC favorites, so cooking integrates
+with relationships through the gift system. The recipe library grows to **26**.
+
+**Schema + content.** `itemSchema` gains optional `staminaRestore` + `buff`
+(`foodBuffSchema`: effect / magnitude / durationMinutes). The six existing cooking
+dishes get buffs; **six new cooking recipes + food items** are added (Kelp Roll,
+Tide Chowder, Miner's Pasty, Reef Skewer, Sunrise Flapjack, Harbor Hash) — 20 → 26
+recipes — covering all seven buff effects; they unlock via the existing skill
+sources. Four NPCs gain a cooked meal in their loved gifts (`npcs.json`).
+
+**Engine (pure, unit-tested).** `src/engine/buffs.ts`: `isEdible`, `eatFood`,
+`applyBuff` (re-eating the same effect refreshes, not stacks), `tickBuffs`
+(expire), `activeBuffEffects` (aggregate to multipliers + a stamina-regen bonus),
+`buffRows` / `describeBuff`. Save gains a defaulted `activeBuffs` array
+(`activeBuffSchema`), cleared on sleep in `dayResolution`. Glue in
+`buff-tracking.ts` (eat from the active save, live effects, prune).
+
+**UI.** `overlay.ts` `showCookingPanel` — active buffs, a Cook list (cooking
+recipes with the buff each dish grants), and a Pantry of edible held items to Eat.
+Styled in `styles.css`.
+
+**Integration.** `InteriorScene` wires the existing `kitchen` prop to the cooking
+panel (cook + eat); eating restores the controller's stamina. `FarmScene` folds
+active buffs into the locomotion config (`buffedControllerConfig` — movement
+buff scales gait speed, stamina-regen adds to recovery), shows active buffs in the
+HUD, and prunes lapsed buffs as time advances. Debug hooks on the Interior
+(`openKitchen` / `cook` / `eat` / `activeBuffs`).
+
+Files: `src/data/schemas.ts`, `src/data/content/items.json`,
+`src/data/content/recipes.json`, `src/data/content/npcs.json`,
+`src/engine/crafting.ts`, `src/engine/saveModel.ts`, `src/engine/dayResolution.ts`,
+`src/engine/buffs.ts` (new), `src/engine/buff-tracking.ts` (new),
+`src/ui/overlay.ts`, `src/styles.css`, `src/scenes/InteriorScene.ts`,
+`src/scenes/FarmScene.ts`, `tests/unit/buffs.test.ts` (new),
+`tests/unit/overlay.test.ts`, `tests/e2e/cooking.spec.ts` (new).
+
+**Acceptance criteria**
+
+- [x] **At least 25 original recipes exist** — 26 recipes ship (20 prior + 6 new
+  buff dishes); locked by `buffs.test.ts` content acceptance.
+- [x] **Buffs affect stamina, skill, movement, fishing, mining, foraging, or
+  combat** — every effect is represented in content; stamina (immediate restore +
+  a regen buff) and movement are wired into the live controller (`FarmScene`
+  `buffedControllerConfig` + the eat stamina restore); the rest are aggregated by
+  `activeBuffEffects` for their systems to read and surface in the UI.
+- [x] **NPC meal preferences integrate with relationships** — Mara/Jun/Sol/Lio
+  each love a cooked dish (`lovedGiftItemIds`), so gifting a meal bumps rapport
+  through the existing gift/tasting system (locked by a content-acceptance test).
+- [x] Visible in the running game + Playwright-verified (§0.8) — the farmhouse
+  kitchen cooks + eats; the e2e cooks a dish, eats it, and asserts the buff is
+  active, on desktop + Pixel 5.
+
+**Decision record**
+
+- **Buffs as item data, eating as the trigger.** A `buff` on the food item (not a
+  parallel registry) means any edible can carry an effect; `eatFood` is pure and
+  the timed `ActiveBuff` lives on the save with an in-day expiry.
+- **Re-eating refreshes, never stacks** — one active buff per effect keeps the
+  effect model simple and predictable.
+- **Cleared at sleep.** Food buffs are a within-day boost (cozy-sim convention);
+  `dayResolution` wipes `activeBuffs` on the night's roll, so the in-day expiry
+  math never crosses a day boundary.
+- **Movement + stamina wired into the hot path; the rest aggregated.** The
+  least-risky effects (movement scale + stamina) are applied in the `FarmScene`
+  controller; the skill/fishing/mining/foraging/combat multipliers are exposed via
+  `activeBuffEffects` (and shown in the UI) for their systems to consume.
+- **No `SAVE_VERSION` bump** — defaulted `activeBuffs`; versioning is Prompt 067.
+
+**Verify gate** — `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **726 passed** (+14) · `validate:assets` 0 · `build` 0 ·
+Playwright cooking suite **6 passed** on `desktop-chromium` + `mobile-chromium`;
+full suite **337 passed + 1 skipped** (`--retries=2`, exit 0) · GitDoctor **100/100**.
+
+**Honest gaps / deferred.** The skill-xp / fishing / mining / foraging / combat
+buffs are aggregated + displayed but only movement + stamina are consumed in the
+hot path so far — wiring the multipliers into `fishing.ts` / `mine.ts` /
+`forage.ts` / `combat.ts` is a low-risk follow-up (the effects are already
+exposed via `activeBuffEffects`). Cooking is hosted at the farmhouse
+`InteriorScene` kitchen; the picnic / shared-meal-at-festival scenes named in the
+prompt are deferred (the festival relationship moment already covers a shared
+beat). The movement buff is asserted as active in e2e, not by measuring speed.
+
+---
+
 ## Prompt 058 — Mail, news, and world reactivity (legacy 032) (2026-06-21)
 
 A **mail system** (a farm mailbox) and a **town notice board** that make the
