@@ -5,6 +5,80 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 050 — Asset & rig contract + validator (WEF-11a) (2026-06-21)
+
+Authored the asset & rig contract and built the validator that enforces it, so a
+non-conformant `.glb` is rejected — with an actionable message — before it can
+swap a graybox (Prompt 051). Covers the §4.2 reference families: player + NPCs,
+animals/fauna (incl. the rideable mount), flora, buildings, terrain modules,
+tools, machines, and loose props.
+
+**Contract data (`src/render/asset-contract.json`, new).** The single source of
+truth: per-family rules (name prefix, max materials, max base-LOD triangles,
+required clips + events, collision-proxy requirement, required rig sockets, max
+texture size, min LODs) + the universal scale/axes constants. Shared by the
+runtime validator and the gate so they can never drift.
+
+**Validator (`src/render/asset-contract.ts`, new, pure).** `AssetDescriptor` type
+(the metadata a `.glb` sidecar declares) + `validateAssetDescriptor` returning
+every issue — `wrong-scale`, `non-identity-transform`, `wrong-axis`,
+`invalid-name`, `too-many-materials`, `too-many-triangles`, `missing-clip`,
+`missing-event`, `missing-collision-proxy`, `missing-socket`, `texture-too-large`,
+`insufficient-lods` (advisory), `unknown-family` — each naming the asset, the
+value, and the limit. `isAssetConformant` gates on HIGH severity. This is what the
+Prompt 051 swap factories will call.
+
+**Gate (`scripts/validate-assets.mjs`, extended).** Preserves the original
+directory check; adds a contract self-check + per-family validation of every
+`*.asset.json` sidecar under `public/assets/` against the same JSON contract (the
+CLI mirror of the TS validator). A HIGH issue fails the gate (exit 1); with no
+assets present it reports the contract is OK (10 families) and stays green.
+
+**Doc (`docs/ASSET_AND_RIG_CONTRACT.md`, new).** Universal rules (metres, +Z/Y-up,
+identity transforms, origins, naming, materials/UVs, texture budgets, sockets,
+LODs, collision proxies, clips/events, root-motion policy, bounds, export) + the
+per-family budget table + the validator/issue-code reference.
+
+Files: `src/render/asset-contract.json` (new), `src/render/asset-contract.ts`
+(new), `tests/unit/asset-contract.test.ts` (new), `scripts/validate-assets.mjs`
+(extended), `docs/ASSET_AND_RIG_CONTRACT.md` (new).
+
+**Acceptance criteria**
+
+- [x] The contract defines per-family reference requirements (character + NPCs,
+  animals/fauna + mount, flora, buildings, terrain modules, tools, machines, loose
+  props) — `docs/ASSET_AND_RIG_CONTRACT.md` §2 + `ASSET_FAMILIES` (10 families).
+- [x] The validator rejects wrong scale, transforms, axes, missing clips/events,
+  excessive materials/triangles, absent collision metadata, and invalid naming —
+  with actionable messages (`validateAssetDescriptor`; 12 unit cases assert each
+  rejection + the conformant pass + actionable messages).
+- [x] `npm run validate:assets` integrates the validator without weakening
+  existing checks (the directory report is preserved; the contract self-check +
+  descriptor validation are additive; exits 0 with no assets, 1 on a HIGH issue).
+
+**Decision record**
+
+- **One JSON contract, two consumers.** The rule data lives once in
+  `asset-contract.json`; the TS validator (runtime, 051) and the `.mjs` gate (CI)
+  both read it, so budgets can't drift. The validation logic is mirrored (TS
+  authoritative + a compact CLI mirror) but the numbers are single-source.
+- **Descriptor-based, not binary-parsing (yet).** No real `.glb` exists, so the
+  validator checks a sidecar `*.asset.json` descriptor; live binary inspection
+  lands with the art pipeline (documented in §4 of the contract). The validator
+  contract is ready for that day.
+- **Budgets are the graybox-economy floor**, refined to measured ceilings in
+  Prompt 052; the contract is intentionally the conservative starting line.
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **599 passed** (+12 asset-contract) · `validate:assets` 0
+(contract OK, 10 families) · `build` 0 · GitDoctor **100/100**. Playwright: **not
+applicable** — Prompt 050 adds a pure validator + a CLI gate + docs and touches no
+runtime scene, navigation, or scene lifecycle (the validator is not yet imported
+by any scene); the E2E suite is unaffected (last full green at Prompt 049: **285
+passed + 1 skipped** on both projects).
+
+---
+
 ## Prompt 049 — Production-foundation map IV: cavern slice (WEF-10c-ii) (2026-06-21)
 
 Built the **Rainhall Caverns** cave slice — the fourth and final production-

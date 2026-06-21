@@ -1,0 +1,128 @@
+{
+  "_comment": "Asset & rig contract data (WEF-11a, Prompt 050). Single source of truth shared by the TS validator (src/render/asset-contract.ts) and the validate:assets gate (scripts/validate-assets.mjs). Triangle/material budgets are the graybox-economy floor (§1.4 panel 11); refined to measured budgets in Prompt 052. Units: metres; one forward axis (+z), Y-up.",
+  "scaleTolerance": 0.001,
+  "forwardAxis": "+z",
+  "upAxis": "+y",
+  "families": {
+    "character": {
+      "label": "Player / hero",
+      "namePattern": "^sv_player_[a-z0-9-]+$",
+      "maxMaterials": 2,
+      "maxTriangles": 1800,
+      "requiredClips": ["idle", "walk", "run", "tool-swing", "carry", "kneel"],
+      "requiredEvents": ["tool-impact"],
+      "requiresCollisionProxy": true,
+      "requiredSockets": ["hand-r", "head", "back"],
+      "maxTextureSize": 2048,
+      "minLods": 2
+    },
+    "npc": {
+      "label": "NPC",
+      "namePattern": "^sv_npc_[a-z0-9-]+$",
+      "maxMaterials": 2,
+      "maxTriangles": 900,
+      "requiredClips": ["idle", "walk"],
+      "requiredEvents": [],
+      "requiresCollisionProxy": true,
+      "requiredSockets": ["hand-r"],
+      "maxTextureSize": 1024,
+      "minLods": 2
+    },
+    "animal": {
+      "label": "Animal / fauna",
+      "namePattern": "^sv_animal_[a-z0-9-]+$",
+      "maxMaterials": 2,
+      "maxTriangles": 800,
+      "requiredClips": ["idle", "walk"],
+      "requiredEvents": [],
+      "requiresCollisionProxy": true,
+      "requiredSockets": [],
+      "maxTextureSize": 1024,
+      "minLods": 2
+    },
+    "mount": {
+      "label": "Rideable mount (horse)",
+      "namePattern": "^sv_mount_[a-z0-9-]+$",
+      "maxMaterials": 2,
+      "maxTriangles": 1400,
+      "requiredClips": ["idle", "walk", "trot", "canter", "gallop"],
+      "requiredEvents": ["footfall"],
+      "requiresCollisionProxy": true,
+      "requiredSockets": ["mount-anchor"],
+      "maxTextureSize": 2048,
+      "minLods": 2
+    },
+    "flora": {
+      "label": "Flora / plant",
+      "namePattern": "^sv_(flora|crop)_[a-z0-9-]+$",
+      "maxMaterials": 1,
+      "maxTriangles": 400,
+      "requiredClips": [],
+      "requiredEvents": [],
+      "requiresCollisionProxy": false,
+      "requiredSockets": [],
+      "maxTextureSize": 1024,
+      "minLods": 2
+    },
+    "building": {
+      "label": "Building",
+      "namePattern": "^sv_building_[a-z0-9-]+$",
+      "maxMaterials": 3,
+      "maxTriangles": 2500,
+      "requiredClips": [],
+      "requiredEvents": [],
+      "requiresCollisionProxy": true,
+      "requiredSockets": [],
+      "maxTextureSize": 4096,
+      "minLods": 2
+    },
+    "terrain": {
+      "label": "Terrain module",
+      "namePattern": "^sv_terrain_[a-z0-9-]+$",
+      "maxMaterials": 2,
+      "maxTriangles": 3000,
+      "requiredClips": [],
+      "requiredEvents": [],
+      "requiresCollisionProxy": true,
+      "requiredSockets": [],
+      "maxTextureSize": 4096,
+      "minLods": 1
+    },
+    "tool": {
+      "label": "Tool",
+      "namePattern": "^sv_tool_[a-z0-9-]+$",
+      "maxMaterials": 1,
+      "maxTriangles": 300,
+      "requiredClips": [],
+      "requiredEvents": [],
+      "requiresCollisionProxy": false,
+      "requiredSockets": ["grip"],
+      "maxTextureSize": 512,
+      "minLods": 1
+    },
+    "machine": {
+      "label": "Machine",
+      "namePattern": "^sv_machine_[a-z0-9-]+$",
+      "maxMaterials": 2,
+      "maxTriangles": 1500,
+      "requiredClips": ["idle", "active"],
+      "requiredEvents": [],
+      "requiresCollisionProxy": true,
+      "requiredSockets": [],
+      "maxTextureSize": 1024,
+      "minLods": 1
+    },
+    "prop": {
+      "label": "Loose prop",
+      "namePattern": "^sv_prop_[a-z0-9-]+$",
+      "maxMaterials": 1,
+      "maxTriangles": 500,
+      "requiredClips": [],
+      "requiredEvents": [],
+      "requiresCollisionProxy": true,
+      "requiredSockets": [],
+      "maxTextureSize": 1024,
+      "minLods": 1
+    }
+  }
+}
