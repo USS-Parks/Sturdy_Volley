@@ -103,6 +103,39 @@ export interface ProfessionPanelOptions {
   onClose: () => void;
 }
 
+export interface QuestPanelObjective {
+  label: string;
+  current: number;
+  target: number;
+  done: boolean;
+}
+
+export interface QuestPanelRow {
+  id: string;
+  name: string;
+  category: string;
+  kind: string;
+  status: 'active' | 'available' | 'complete' | 'failed';
+  description: string;
+  objectives: QuestPanelObjective[];
+  rewardSummary: string;
+  /** Display name of the quest giver, when any. */
+  giver?: string | null;
+  canAccept: boolean;
+  canCancel: boolean;
+  /** e.g. "3 days left" — shown only on timed active quests. */
+  timeLeftLabel?: string;
+}
+
+export interface QuestPanelOptions {
+  rows: QuestPanelRow[];
+  /** Summary line, e.g. "2 active · 6 available · 1 done". */
+  summary: string;
+  onAccept: (id: string) => void;
+  onCancel: (id: string) => void;
+  onClose: () => void;
+}
+
 export interface ElevatorPanelOption {
   level: number;
   name: string;
@@ -876,6 +909,123 @@ export class UIOverlay {
     close.className = 'menu-button';
     close.textContent = 'Close';
     close.dataset.testid = 'profession-close';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /**
+   * Quest journal (Prompt 054). A scrollable, touch-friendly list of quests
+   * sorted active → available → done → failed. Each card shows the giver,
+   * category/kind chips, objective progress, the reward summary, and any time
+   * limit; Accept/Cancel buttons appear for the rows that allow them.
+   */
+  showQuestPanel(opts: QuestPanelOptions): void {
+    this.clear();
+    const panel = this.createPanel('Quest Journal', opts.summary);
+    panel.classList.add('quest-panel');
+    panel.dataset.testid = 'quest-panel';
+
+    if (opts.rows.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'panel-body';
+      empty.textContent = 'No quests yet. Talk to the folks of Ballast Bay and check the town notice board.';
+      panel.appendChild(empty);
+    } else {
+      const list = document.createElement('ul');
+      list.className = 'quest-list';
+      list.dataset.testid = 'quest-list';
+
+      const STATUS_LABEL: Record<QuestPanelRow['status'], string> = {
+        active: 'Active',
+        available: 'Available',
+        complete: 'Done',
+        failed: 'Failed',
+      };
+
+      for (const row of opts.rows) {
+        const li = document.createElement('li');
+        li.className = `quest-row quest-status-${row.status}`;
+        li.dataset.testid = `quest-row-${row.id}`;
+
+        const head = document.createElement('div');
+        head.className = 'quest-head';
+        const title = document.createElement('span');
+        title.className = 'quest-title';
+        title.textContent = row.name;
+        const status = document.createElement('span');
+        status.className = `quest-badge quest-badge-${row.status}`;
+        status.dataset.testid = `quest-status-${row.id}`;
+        status.textContent = STATUS_LABEL[row.status];
+        head.append(title, status);
+        li.appendChild(head);
+
+        const chips = document.createElement('div');
+        chips.className = 'quest-chips';
+        const chipParts = [row.category, row.kind];
+        if (row.giver) chipParts.push(`from ${row.giver}`);
+        if (row.timeLeftLabel) chipParts.push(row.timeLeftLabel);
+        chips.textContent = chipParts.join(' · ');
+        li.appendChild(chips);
+
+        const desc = document.createElement('p');
+        desc.className = 'quest-desc';
+        desc.textContent = row.description;
+        li.appendChild(desc);
+
+        const objList = document.createElement('ul');
+        objList.className = 'quest-objectives';
+        row.objectives.forEach((obj, i) => {
+          const oli = document.createElement('li');
+          oli.className = `quest-objective${obj.done ? ' quest-objective-done' : ''}`;
+          oli.dataset.testid = `quest-objective-${row.id}-${i}`;
+          const mark = obj.done ? '✔' : '○';
+          oli.textContent = `${mark} ${obj.label} — ${obj.current}/${obj.target}`;
+          objList.appendChild(oli);
+        });
+        li.appendChild(objList);
+
+        const reward = document.createElement('div');
+        reward.className = 'quest-reward';
+        reward.textContent = `Reward: ${row.rewardSummary}`;
+        li.appendChild(reward);
+
+        if (row.canAccept || row.canCancel) {
+          const actions = document.createElement('div');
+          actions.className = 'quest-actions';
+          if (row.canAccept) {
+            const accept = document.createElement('button');
+            accept.type = 'button';
+            accept.className = 'menu-button';
+            accept.textContent = 'Accept';
+            accept.dataset.testid = `quest-accept-${row.id}`;
+            accept.addEventListener('click', () => opts.onAccept(row.id));
+            actions.appendChild(accept);
+          }
+          if (row.canCancel) {
+            const cancel = document.createElement('button');
+            cancel.type = 'button';
+            cancel.className = 'menu-button menu-button-secondary';
+            cancel.textContent = 'Abandon';
+            cancel.dataset.testid = `quest-cancel-${row.id}`;
+            cancel.addEventListener('click', () => opts.onCancel(row.id));
+            actions.appendChild(cancel);
+          }
+          li.appendChild(actions);
+        }
+
+        list.appendChild(li);
+      }
+      panel.appendChild(list);
+    }
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'menu-button';
+    close.textContent = 'Close';
+    close.dataset.testid = 'quest-close';
     close.addEventListener('click', opts.onClose);
     panel.appendChild(close);
 

@@ -14,6 +14,7 @@ import {
   recordSkillXp,
 } from '../engine/gameState';
 import { writeSave } from '../engine/save';
+import { recordActiveQuestEvent } from '../engine/quest-tracking';
 import { formatWorldStatus } from '../engine/format';
 import { computeMoveVector, type MoveInput } from '../engine/movement';
 import { createControllerState, stepController, type ControllerState } from '../engine/controller';
@@ -179,6 +180,8 @@ export class MineScene extends GameScene {
     this.save = save;
     save.location.sceneKey = 'Mine';
     writeSave(save);
+    // Prompt 054: descending credits "delve the quarry" exploration objectives.
+    recordActiveQuestEvent({ kind: 'visit', target: 'Mine' });
     this.controller = createControllerState();
     this.clock = createTimeClock(getGameTime(save));
     this.refreshWorldState();
@@ -721,6 +724,8 @@ export class MineScene extends GameScene {
     this.oreNodes = this.oreNodes.filter((n) => n.id !== nodeId);
     this.rebuildTargets();
     persistActiveSave();
+    // Prompt 054: breaking a deposit advances mining quest objectives.
+    recordActiveQuestEvent({ kind: 'mine', target: result.drop?.itemId ?? null });
   }
 
   private handleDescend(): void {

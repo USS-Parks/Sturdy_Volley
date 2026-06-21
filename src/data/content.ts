@@ -183,6 +183,48 @@ function checkReferences(content: GameContent, issues: ValidationIssue[]): void 
       issues.push({ collection: 'dialogue', path: `[${i}].npcId`, message: `npcId "${d.npcId}" does not match any NPC` });
     }
   });
+
+  // Quests (Prompt 054): validate objective/reward/giver/prerequisite references
+  // so a typo in a quest definition fails the content gate instead of producing
+  // an unwinnable quest at runtime.
+  const recipeIds = new Set(content.recipes.map((r) => r.id));
+  const questIds = new Set(content.quests.map((q) => q.id));
+  const ITEM_TARGET_KINDS = new Set(['harvest', 'fish', 'forage', 'mine', 'craft', 'ship', 'have']);
+  const NPC_TARGET_KINDS = new Set(['gift', 'talk', 'befriend']);
+  const SCENE_TARGET_KINDS = new Set(['visit']);
+  const SCENE_KEYS = new Set(['Farm', 'Town', 'Beach', 'Mine', 'Interior']);
+
+  content.quests.forEach((quest, i) => {
+    if (quest.giverNpcId !== null && !npcIds.has(quest.giverNpcId)) {
+      issues.push({ collection: 'quests', path: `[${i}].giverNpcId`, message: `giverNpcId "${quest.giverNpcId}" does not match any NPC` });
+    }
+    quest.prerequisiteQuestIds.forEach((pid, j) => {
+      if (!questIds.has(pid)) {
+        issues.push({ collection: 'quests', path: `[${i}].prerequisiteQuestIds[${j}]`, message: `prerequisite "${pid}" does not match any quest` });
+      }
+    });
+    quest.objectives.forEach((obj, j) => {
+      if (obj.target === null) return;
+      const path = `[${i}].objectives[${j}].target`;
+      if (ITEM_TARGET_KINDS.has(obj.kind)) {
+        requireItem('quests', path, obj.target, 'objective target');
+      } else if (NPC_TARGET_KINDS.has(obj.kind) && !npcIds.has(obj.target)) {
+        issues.push({ collection: 'quests', path, message: `objective target "${obj.target}" does not match any NPC` });
+      } else if (SCENE_TARGET_KINDS.has(obj.kind) && !SCENE_KEYS.has(obj.target)) {
+        issues.push({ collection: 'quests', path, message: `objective target "${obj.target}" is not a known scene` });
+      }
+    });
+    quest.rewards.forEach((reward, j) => {
+      const path = `[${i}].rewards[${j}]`;
+      if (reward.kind === 'item') {
+        requireItem('quests', `${path}.itemId`, reward.itemId, 'reward itemId');
+      } else if (reward.kind === 'recipe' && !recipeIds.has(reward.recipeId)) {
+        issues.push({ collection: 'quests', path: `${path}.recipeId`, message: `reward recipeId "${reward.recipeId}" does not match any recipe` });
+      } else if (reward.kind === 'relationship' && !npcIds.has(reward.npcId)) {
+        issues.push({ collection: 'quests', path: `${path}.npcId`, message: `reward npcId "${reward.npcId}" does not match any NPC` });
+      }
+    });
+  });
 }
 
 let cached: GameContent | null = null;

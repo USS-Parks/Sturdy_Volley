@@ -26,6 +26,12 @@ declare global {
       pet: () => null | { name: string; kind: string; affection: number; pettedToday: boolean; bowlFilledToday: boolean; collar: 'red'|'kelp'|'shell'|null; x: number; z: number; perk: 'comfort'|'forage-sniff'|null };
       openPetPanel: () => void;
       setPetAffection: (value: number) => void;
+      // Prompt 054 — quest system.
+      quests: () => Array<{ id: string; name: string; status: string; objectives: Array<{ current: number; target: number; done: boolean }> }>;
+      openQuestPanel: () => void;
+      recordQuestEvent: (kind: string, target: string | null, qty?: number) => string[];
+      acceptQuest: (id: string) => void;
+      cancelQuest: (id: string) => void;
     };
   }
 }

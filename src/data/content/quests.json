@@ -1,4 +1,221 @@
 [
-  { "id": "relight-the-netlight", "name": "Relight the Old Netlight", "description": "Help Mara gather materials to restore the lighthouse beacon.", "category": "story" },
-  { "id": "first-harvest", "name": "First Harvest", "description": "Grow and ship your first crop from Breakpoint Farm.", "category": "farming" }
+  {
+    "id": "first-harvest",
+    "name": "First Harvest",
+    "description": "Grow and ship your first crop from Breakpoint Farm. Aunt Nessa says the soil remembers.",
+    "category": "farming",
+    "kind": "story",
+    "autoActivate": true,
+    "objectives": [
+      { "kind": "harvest", "label": "Harvest a ripe crop" },
+      { "kind": "ship", "label": "Ship a crop in the bin overnight" }
+    ],
+    "rewards": [{ "kind": "gold", "amount": 100 }]
+  },
+  {
+    "id": "relight-the-netlight",
+    "name": "Relight the Old Netlight",
+    "description": "Help Mara gather salvage to restore the harbor lighthouse beacon.",
+    "category": "story",
+    "kind": "story",
+    "giverNpcId": "mara-vale",
+    "prerequisiteQuestIds": ["first-harvest"],
+    "autoActivate": true,
+    "objectives": [
+      { "kind": "have", "target": "driftwood", "count": 6, "label": "Hold 6 driftwood" },
+      { "kind": "have", "target": "tide-shell", "count": 4, "label": "Hold 4 tide-shells" }
+    ],
+    "rewards": [
+      { "kind": "relationship", "npcId": "mara-vale", "delta": 50 },
+      { "kind": "gold", "amount": 150 },
+      { "kind": "flag", "flag": "netlight-relit", "value": true }
+    ]
+  },
+  {
+    "id": "pea-pioneer",
+    "name": "Pea Pioneer",
+    "description": "Sol wants a sturdy batch of Bell Peas for the seed archive.",
+    "category": "farming",
+    "kind": "request",
+    "giverNpcId": "sol-aranda",
+    "limitDays": 6,
+    "cancellable": true,
+    "objectives": [{ "kind": "harvest", "target": "bell-peas", "count": 6, "label": "Harvest 6 Bell Peas" }],
+    "rewards": [
+      { "kind": "gold", "amount": 120 },
+      { "kind": "relationship", "npcId": "sol-aranda", "delta": 20 }
+    ]
+  },
+  {
+    "id": "radish-rush",
+    "name": "Radish Rush",
+    "description": "A special order for crisp Blush Radishes, due quickly.",
+    "category": "farming",
+    "kind": "order",
+    "limitDays": 8,
+    "cancellable": true,
+    "objectives": [{ "kind": "harvest", "target": "blush-radish", "count": 8, "label": "Harvest 8 Blush Radishes" }],
+    "rewards": [{ "kind": "gold", "amount": 200 }]
+  },
+  {
+    "id": "tide-forager",
+    "name": "Tide Forager",
+    "description": "Lio needs polished tide-shells for the fishmonger's stall display.",
+    "category": "foraging",
+    "kind": "request",
+    "giverNpcId": "lio-marin",
+    "limitDays": 4,
+    "cancellable": true,
+    "objectives": [{ "kind": "forage", "target": "tide-shell", "count": 5, "label": "Collect 5 tide-shells from the shore" }],
+    "rewards": [
+      { "kind": "gold", "amount": 80 },
+      { "kind": "relationship", "npcId": "lio-marin", "delta": 15 }
+    ]
+  },
+  {
+    "id": "driftwood-drive",
+    "name": "Driftwood Drive",
+    "description": "The boardwalk repair crew is short on driftwood.",
+    "category": "foraging",
+    "kind": "order",
+    "limitDays": 5,
+    "cancellable": true,
+    "objectives": [{ "kind": "forage", "target": "driftwood", "count": 6, "label": "Gather 6 driftwood" }],
+    "rewards": [{ "kind": "gold", "amount": 70 }]
+  },
+  {
+    "id": "first-cast",
+    "name": "First Cast",
+    "description": "Lio offers to teach the basics — land a few fish from the bay.",
+    "category": "fishing",
+    "kind": "request",
+    "giverNpcId": "lio-marin",
+    "limitDays": 5,
+    "cancellable": true,
+    "objectives": [{ "kind": "fish", "count": 3, "label": "Catch any 3 fish" }],
+    "rewards": [
+      { "kind": "gold", "amount": 90 },
+      { "kind": "relationship", "npcId": "lio-marin", "delta": 15 }
+    ]
+  },
+  {
+    "id": "mullet-market",
+    "name": "Mullet for the Market",
+    "description": "A standing order for Striped Mullet at the harbor market.",
+    "category": "fishing",
+    "kind": "order",
+    "limitDays": 7,
+    "cancellable": true,
+    "objectives": [{ "kind": "fish", "target": "striped-mullet", "count": 4, "label": "Catch 4 Striped Mullet" }],
+    "rewards": [{ "kind": "gold", "amount": 220 }]
+  },
+  {
+    "id": "salt-of-the-bay",
+    "name": "Salt of the Bay",
+    "description": "Refine sea salt from tide-shells for the bakery's pantry.",
+    "category": "crafting",
+    "kind": "request",
+    "giverNpcId": "jun-park",
+    "limitDays": 6,
+    "cancellable": true,
+    "objectives": [{ "kind": "craft", "target": "salt", "count": 6, "label": "Refine 6 Sea Salt" }],
+    "rewards": [
+      { "kind": "gold", "amount": 100 },
+      { "kind": "relationship", "npcId": "jun-park", "delta": 15 }
+    ]
+  },
+  {
+    "id": "driftwood-carpenter",
+    "name": "Driftwood Carpenter",
+    "description": "Mill planks to help rebuild storm-worn shelving.",
+    "category": "crafting",
+    "kind": "order",
+    "limitDays": 8,
+    "cancellable": true,
+    "objectives": [{ "kind": "craft", "target": "driftwood-plank", "count": 4, "label": "Mill 4 Driftwood Planks" }],
+    "rewards": [
+      { "kind": "gold", "amount": 160 },
+      { "kind": "recipe", "recipeId": "driftwood-shelf" }
+    ]
+  },
+  {
+    "id": "quarry-start",
+    "name": "Into the Quarry",
+    "description": "Mara asks you to clear loose ore from the upper Ironroot tunnels.",
+    "category": "mining",
+    "kind": "request",
+    "giverNpcId": "mara-vale",
+    "limitDays": 6,
+    "cancellable": true,
+    "objectives": [{ "kind": "mine", "count": 5, "label": "Break 5 ore deposits" }],
+    "rewards": [
+      { "kind": "gold", "amount": 110 },
+      { "kind": "relationship", "npcId": "mara-vale", "delta": 10 }
+    ]
+  },
+  {
+    "id": "iron-order",
+    "name": "Iron Order",
+    "description": "The smith needs iron ore for harbor brackets.",
+    "category": "mining",
+    "kind": "order",
+    "limitDays": 9,
+    "cancellable": true,
+    "objectives": [{ "kind": "mine", "target": "iron-ore", "count": 4, "label": "Mine 4 Iron Ore" }],
+    "rewards": [{ "kind": "gold", "amount": 240 }]
+  },
+  {
+    "id": "see-the-bay",
+    "name": "See the Bay",
+    "description": "Get your bearings — walk into town and down to the beach.",
+    "category": "exploration",
+    "kind": "request",
+    "autoActivate": true,
+    "objectives": [
+      { "kind": "visit", "target": "Town", "label": "Visit Ballast Bay" },
+      { "kind": "visit", "target": "Beach", "label": "Walk Driftwood Beach" }
+    ],
+    "rewards": [
+      { "kind": "gold", "amount": 50 },
+      { "kind": "flag", "flag": "explored-coast", "value": true }
+    ]
+  },
+  {
+    "id": "delve-the-quarry",
+    "name": "Delve the Quarry",
+    "description": "Descend into Ironroot Quarry and see how deep the storm cracked it.",
+    "category": "exploration",
+    "kind": "request",
+    "cancellable": true,
+    "objectives": [{ "kind": "visit", "target": "Mine", "label": "Descend into Ironroot Quarry" }],
+    "rewards": [
+      { "kind": "gold", "amount": 60 },
+      { "kind": "relationship", "npcId": "mara-vale", "delta": 10 }
+    ]
+  },
+  {
+    "id": "harbor-friends",
+    "name": "Harbor Friends",
+    "description": "Mara's been through a lot. Spend time with her and rebuild some trust.",
+    "category": "social",
+    "kind": "request",
+    "giverNpcId": "mara-vale",
+    "autoActivate": true,
+    "objectives": [{ "kind": "befriend", "target": "mara-vale", "count": 2, "label": "Reach 2 hearts with Mara Vale" }],
+    "rewards": [
+      { "kind": "gold", "amount": 100 },
+      { "kind": "flag", "flag": "mara-trust", "value": true }
+    ]
+  },
+  {
+    "id": "botanists-bond",
+    "name": "Botanist's Bond",
+    "description": "Sol could use a friend among the seed caches.",
+    "category": "social",
+    "kind": "request",
+    "giverNpcId": "sol-aranda",
+    "cancellable": true,
+    "objectives": [{ "kind": "befriend", "target": "sol-aranda", "count": 2, "label": "Reach 2 hearts with Sol Aranda" }],
+    "rewards": [{ "kind": "gold", "amount": 100 }]
+  }
 ]

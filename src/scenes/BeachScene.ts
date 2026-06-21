@@ -26,6 +26,7 @@ import { getGameTime } from '../engine/dayResolution';
 import { createTimeClock, pauseClock, tickClock, type TimeClockState } from '../engine/timeClock';
 import type { Weather } from '../data/schemas';
 import { collect, type WorldEntity } from '../engine/forage';
+import { recordActiveQuestEvent } from '../engine/quest-tracking';
 import { addItem, countItem, removeItem } from '../engine/inventory';
 import {
   BEACH_ENTITY_ANCHORS,
@@ -184,6 +185,8 @@ export class BeachScene extends GameScene {
     this.save = save;
     save.location.sceneKey = 'Beach';
     writeSave(save);
+    // Prompt 054: arriving credits "visit Driftwood Beach" exploration objectives.
+    recordActiveQuestEvent({ kind: 'visit', target: 'Beach' });
     this.controller = createControllerState();
     this.clock = createTimeClock(getGameTime(save));
     this.refreshWorldState();
@@ -666,6 +669,8 @@ export class BeachScene extends GameScene {
         this.fishingLastCatch = FISH_CATALOG.find((f) => f.id === id)?.name ?? id;
       }
       recordSkillXp('angling', 6);
+      // Prompt 054: a real catch advances fishing quest objectives (treasure does not).
+      recordActiveQuestEvent({ kind: 'fish', target: id });
     } else {
       this.fishingLastCatch = id;
     }
@@ -731,6 +736,10 @@ export class BeachScene extends GameScene {
     this.refreshEntityMeshes();
     this.rebuildTargets();
     persistActiveSave();
+    // Prompt 054: shoreline gathering advances foraging quest objectives.
+    if (result.reward) {
+      recordActiveQuestEvent({ kind: 'forage', target: result.reward.itemId, qty: result.reward.qty });
+    }
   }
 
   private refreshHud(): void {

@@ -53,6 +53,15 @@ import type { Crop } from '../data/schemas';
 import type { AbstractMesh as BabylonMesh } from '@babylonjs/core';
 import { collect, type WorldEntity } from '../engine/forage';
 import {
+  recordActiveQuestEvent,
+  reconcileActiveQuests,
+  acceptActiveQuest,
+  cancelActiveQuest,
+  activeQuestJournalRows,
+} from '../engine/quest-tracking';
+import type { QuestPanelRow } from '../ui/overlay';
+import type { QuestJournalRow } from '../engine/quests';
+import {
   anchorFor,
   buildEntityMesh,
   entityLabel,
@@ -133,6 +142,11 @@ interface DebugApi {
   pet: () => null | { name: string; kind: string; affection: number; pettedToday: boolean; bowlFilledToday: boolean; collar: 'red'|'kelp'|'shell'|null; x: number; z: number; perk: 'comfort'|'forage-sniff'|null };
   openPetPanel: () => void;
   setPetAffection: (value: number) => void;
+  quests: () => Array<{ id: string; name: string; status: string; objectives: Array<{ current: number; target: number; done: boolean }> }>;
+  openQuestPanel: () => void;
+  recordQuestEvent: (kind: string, target: string | null, qty?: number) => string[];
+  acceptQuest: (id: string) => void;
+  cancelQuest: (id: string) => void;
 }
 
 type PartnerKind = 'chest' | 'shipping-bin' | null;
@@ -190,6 +204,7 @@ export class FarmScene extends GameScene {
   private petPanelOpen = false;
   private petSeed = 1;
   private professionsPanelOpen = false;
+  private questsPanelOpen = false;
   private readonly homePosition = new Vector3(-8, 0.9, -5.4);
   private readonly plotOrigin = new Vector3(-6, 0, -4);
   private static readonly SCENE_KEY = 'Farm';
@@ -403,6 +418,11 @@ export class FarmScene extends GameScene {
     // RF-14: play the first-morning cutscene exactly once, gated by a flag.
     if (!save.flags['first-morning-seen']) this.startFirstMorningCutscene();
 
+    // Prompt 054: seed quest states (auto-activate story quests, offer requests,
+    // refresh standing objectives) and flash any quest completed off-screen.
+    this.flashQuestOutcomes(reconcileActiveQuests());
+    this.questsPanelOpen = false;
+
     (window as unknown as { sturdyVolleyDebug?: DebugApi }).sturdyVolleyDebug = {
       player: () => ({ x: this.player.position.x, z: this.player.position.z }),
       controller: () => ({
@@ -529,6 +549,32 @@ export class FarmScene extends GameScene {
         this.save.pet = { ...this.save.pet, affection: Math.max(0, Math.min(1000, value)) };
         persistActiveSave();
       },
+      quests: () =>
+        activeQuestJournalRows().map((r) => ({
+          id: r.id,
+          name: r.name,
+          status: r.status,
+          objectives: r.objectives.map((o) => ({ current: o.current, target: o.target, done: o.done })),
+        })),
+      openQuestPanel: () => this.openQuestPanel(),
+      recordQuestEvent: (kind: string, target: string | null, qty?: number): string[] => {
+        const completed = recordActiveQuestEvent({
+          kind: kind as Parameters<typeof recordActiveQuestEvent>[0]['kind'],
+          target,
+          qty,
+        });
+        if (completed.length > 0) {
+          this.flashQuestOutcomes({ completed, failed: [] });
+          this.refreshHotbar();
+        }
+        return completed.map((q) => q.id);
+      },
+      acceptQuest: (id: string) => {
+        acceptActiveQuest(id);
+      },
+      cancelQuest: (id: string) => {
+        cancelActiveQuest(id);
+      },
     };
   }
 
@@ -545,7 +591,7 @@ export class FarmScene extends GameScene {
         return;
       }
     }
-    if (this.menuOpen || this.inventoryOpen || this.dayResolving || this.machinePanelOpen || this.animalsPanelOpen || this.petPanelOpen || this.professionsPanelOpen) {
+    if (this.menuOpen || this.inventoryOpen || this.dayResolving || this.machinePanelOpen || this.animalsPanelOpen || this.petPanelOpen || this.professionsPanelOpen || this.questsPanelOpen) {
       this.clock = pauseClock(this.clock, true);
       this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
       return;
@@ -745,6 +791,7 @@ export class FarmScene extends GameScene {
         { id: 'animals', label: 'Animals', enabled: true, testId: 'pause-animals' },
         { id: 'pet', label: 'Pet', enabled: Boolean(this.save.pet), testId: 'pause-pet' },
         { id: 'skills', label: 'Skills & Professions', enabled: true, testId: 'pause-skills' },
+        { id: 'quests', label: 'Quest Journal', enabled: true, testId: 'pause-quests' },
         { id: 'sleep', label: 'Sleep until tomorrow', enabled: true, testId: 'pause-sleep' },
         { id: 'town', label: 'Walk to Ballast Bay', enabled: true, testId: 'nav-town' },
         { id: 'beach', label: 'Driftwood Beach', enabled: true, testId: 'nav-beach' },
@@ -781,6 +828,10 @@ export class FarmScene extends GameScene {
       case 'skills':
         this.menuOpen = false;
         this.openProfessionPanel();
+        break;
+      case 'quests':
+        this.menuOpen = false;
+        this.openQuestPanel();
         break;
       case 'sleep':
         this.menuOpen = false;
@@ -987,11 +1038,91 @@ export class FarmScene extends GameScene {
     this.refreshCropMeshes();
     this.refreshHotbar();
     persistActiveSave();
+
+    // Prompt 054: a harvest advances farming quest objectives.
+    const completed = recordActiveQuestEvent({ kind: 'harvest', target: result.produceItemId });
+    if (completed.length > 0) {
+      this.flashQuestOutcomes({ completed, failed: [] });
+      this.refreshHotbar();
+    }
   }
 
   private flashAction(label: string): void {
     this.actionLabel = label;
     this.actionTimer = 1.6;
+  }
+
+  /** Surface quest completions/expiries from a reconcile or event as a HUD flash. */
+  private flashQuestOutcomes(result: {
+    completed: ReadonlyArray<{ name: string }>;
+    failed: ReadonlyArray<{ name: string }>;
+  }): void {
+    if (result.completed.length > 0) {
+      this.flashAction(
+        result.completed.length === 1
+          ? `Quest complete: ${result.completed[0]!.name}`
+          : `${result.completed.length} quests complete`,
+      );
+    } else if (result.failed.length > 0) {
+      this.flashAction(`Quest expired: ${result.failed[0]!.name}`);
+    }
+  }
+
+  private openQuestPanel(): void {
+    this.questsPanelOpen = true;
+    // Reconcile first so standing objectives (befriend / have) can complete and
+    // grant before the journal renders.
+    this.flashQuestOutcomes(reconcileActiveQuests());
+    this.renderQuestPanel();
+  }
+
+  private renderQuestPanel(): void {
+    const npcNames = new Map(loadGameContent().npcs.map((n) => [n.id, n.name] as const));
+    const toRow = (r: QuestJournalRow): QuestPanelRow => ({
+      id: r.id,
+      name: r.name,
+      category: r.category,
+      kind: r.kind,
+      status: r.status === 'locked' ? 'available' : r.status,
+      description: r.description,
+      objectives: r.objectives.map((o) => ({
+        label: o.label,
+        current: o.current,
+        target: o.target,
+        done: o.done,
+      })),
+      rewardSummary: r.rewardSummary,
+      giver: r.giverNpcId ? (npcNames.get(r.giverNpcId) ?? r.giverNpcId) : null,
+      canAccept: r.canAccept,
+      canCancel: r.canCancel,
+      timeLeftLabel:
+        r.timeLeftDays != null ? `${r.timeLeftDays} day${r.timeLeftDays === 1 ? '' : 's'} left` : undefined,
+    });
+
+    const rows = activeQuestJournalRows().map(toRow);
+    const active = rows.filter((r) => r.status === 'active').length;
+    const available = rows.filter((r) => r.status === 'available').length;
+    const complete = rows.filter((r) => r.status === 'complete').length;
+
+    this.ctx.overlay.showQuestPanel({
+      rows,
+      summary: `${active} active · ${available} available · ${complete} done`,
+      onAccept: (id) => {
+        acceptActiveQuest(id);
+        this.flashQuestOutcomes(reconcileActiveQuests());
+        this.refreshHotbar();
+        this.renderQuestPanel();
+      },
+      onCancel: (id) => {
+        cancelActiveQuest(id);
+        reconcileActiveQuests();
+        this.renderQuestPanel();
+      },
+      onClose: () => {
+        this.questsPanelOpen = false;
+        this.refreshHud();
+      },
+    });
   }
 
   private refreshCropMeshes(): void {
@@ -1672,6 +1803,19 @@ export class FarmScene extends GameScene {
     this.rebuildInteractionTargets();
     this.refreshHotbar();
     persistActiveSave();
+
+    // Prompt 054: gathering a world item advances foraging quest objectives.
+    if (result.reward) {
+      const completed = recordActiveQuestEvent({
+        kind: 'forage',
+        target: result.reward.itemId,
+        qty: result.reward.qty,
+      });
+      if (completed.length > 0) {
+        this.flashQuestOutcomes({ completed, failed: [] });
+        this.refreshHotbar();
+      }
+    }
   }
 
   private startFirstMorningCutscene(): void {
@@ -1719,6 +1863,11 @@ export class FarmScene extends GameScene {
 
     const content = loadGameContent();
     const ledger = getDayLedger();
+    // Prompt 054: capture what's being shipped before resolveDay drains the bin,
+    // so "ship" quest objectives can credit each item.
+    const shippedStacks = this.save.shippingBin.slots
+      .filter((s): s is NonNullable<typeof s> => s !== null)
+      .map((s) => ({ itemId: s.itemId, qty: s.qty }));
     const result = resolveDay({
       save: this.save,
       ledger,
@@ -1733,6 +1882,21 @@ export class FarmScene extends GameScene {
 
     resetDayLedger();
     applyGameTime(this.save, result.nextTime);
+
+    // Prompt 054: credit shipped items, then run the quest day-tick (timer
+    // expiry for non-story quests + standing-objective refresh). Surface any
+    // completions/expiries in the bedtime summary.
+    const questCompleted: Array<{ name: string }> = [];
+    for (const stack of shippedStacks) {
+      questCompleted.push(...recordActiveQuestEvent({ kind: 'ship', target: stack.itemId, qty: stack.qty }));
+    }
+    const questTick = reconcileActiveQuests(true);
+    for (const quest of [...questCompleted, ...questTick.completed]) {
+      result.summary.notices.push(`Quest complete: ${quest.name}`);
+    }
+    for (const quest of questTick.failed) {
+      result.summary.notices.push(`Quest expired: ${quest.name}`);
+    }
     if (result.collapse) {
       this.controller = { ...this.controller, stamina: result.collapse.wakeStamina };
     } else {

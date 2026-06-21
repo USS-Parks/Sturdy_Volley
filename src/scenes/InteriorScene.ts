@@ -28,6 +28,7 @@ import {
   unlockRecipes,
 } from '../engine/crafting';
 import { writeSave } from '../engine/save';
+import { recordActiveQuestEvent } from '../engine/quest-tracking';
 import { formatWorldStatus } from '../engine/format';
 import { computeMoveVector, type MoveInput } from '../engine/movement';
 import { createControllerState, stepController, type ControllerState } from '../engine/controller';
@@ -641,6 +642,8 @@ export class InteriorScene extends GameScene {
       this.actionLabel = `Crafted ${recipe.name}`;
       this.actionTimer = 1.6;
     }
+    // Prompt 054: a successful craft advances crafting quest objectives.
+    recordActiveQuestEvent({ kind: 'craft', target: recipe.outputItemId, qty: recipe.outputQty });
     this.renderCrafting(recipes, itemsById);
   }
 

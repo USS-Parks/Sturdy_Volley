@@ -343,4 +343,63 @@ describe('UIOverlay', () => {
     document.querySelector<HTMLButtonElement>('[data-testid="panel-back"]')?.click();
     expect(backed).toBe(true);
   });
+
+  it('Prompt 054: showQuestPanel renders rows, objectives, and Accept/Cancel wiring', () => {
+    const overlay = new UIOverlay();
+    const accepted: string[] = [];
+    const cancelled: string[] = [];
+    overlay.showQuestPanel({
+      summary: '1 active · 1 available · 0 done',
+      rows: [
+        {
+          id: 'first-harvest',
+          name: 'First Harvest',
+          category: 'farming',
+          kind: 'story',
+          status: 'active',
+          description: 'Grow and ship a crop.',
+          objectives: [{ label: 'Harvest a ripe crop', current: 0, target: 1, done: false }],
+          rewardSummary: '100 g',
+          giver: null,
+          canAccept: false,
+          canCancel: false,
+        },
+        {
+          id: 'tide-forager',
+          name: 'Tide Forager',
+          category: 'foraging',
+          kind: 'request',
+          status: 'available',
+          description: 'Collect shells.',
+          objectives: [{ label: 'Collect 5 tide-shells', current: 0, target: 5, done: false }],
+          rewardSummary: '80 g · +15 with Lio Marin',
+          giver: 'Lio Marin',
+          canAccept: true,
+          canCancel: true,
+          timeLeftLabel: '4 days left',
+        },
+      ],
+      onAccept: (id) => accepted.push(id),
+      onCancel: (id) => cancelled.push(id),
+      onClose: () => {},
+    });
+    expect(document.querySelector('[data-testid="quest-panel"]')).toBeTruthy();
+    expect(document.querySelectorAll('[data-testid^="quest-row-"]')).toHaveLength(2);
+    expect(document.querySelector('[data-testid="quest-status-first-harvest"]')?.textContent).toBe('Active');
+    expect(document.querySelector('[data-testid="quest-objective-tide-forager-0"]')?.textContent).toContain('0/5');
+
+    document.querySelector<HTMLButtonElement>('[data-testid="quest-accept-tide-forager"]')?.click();
+    document.querySelector<HTMLButtonElement>('[data-testid="quest-cancel-tide-forager"]')?.click();
+    expect(accepted).toEqual(['tide-forager']);
+    expect(cancelled).toEqual(['tide-forager']);
+    // The active story quest offers neither button.
+    expect(document.querySelector('[data-testid="quest-accept-first-harvest"]')).toBeNull();
+  });
+
+  it('Prompt 054: showQuestPanel shows an empty-state message with no quests', () => {
+    const overlay = new UIOverlay();
+    overlay.showQuestPanel({ summary: '', rows: [], onAccept: () => {}, onCancel: () => {}, onClose: () => {} });
+    expect(document.querySelector('[data-testid="quest-list"]')).toBeNull();
+    expect(document.querySelector('.quest-panel .panel-body')?.textContent).toContain('No quests yet');
+  });
 });

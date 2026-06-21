@@ -42,6 +42,24 @@ export const containerSchema = z
   });
 export type Container = z.infer<typeof containerSchema>;
 
+/**
+ * Per-quest runtime progress (Prompt 054). `objectives` is a parallel counter
+ * array aligned to the quest definition's objectives; the quest engine tolerates
+ * a length mismatch (a definition that changed shape) by re-seeding the counters.
+ * Added as a defaulted field, so v3 saves written before quests existed parse
+ * cleanly to `{}` without a version bump (real migration lands in Prompt 067).
+ */
+export const questStateSchema = z
+  .object({
+    status: z.enum(['locked', 'available', 'active', 'complete', 'failed']),
+    objectives: z.array(z.number().int().nonnegative()),
+    startedDay: z.number().int().nonnegative().nullable().default(null),
+    completedDay: z.number().int().nonnegative().nullable().default(null),
+  })
+  .strict();
+export type QuestState = z.infer<typeof questStateSchema>;
+export type QuestRecord = Record<string, QuestState>;
+
 export const saveSchema = z
   .object({
     version: z.literal(SAVE_VERSION),
@@ -96,6 +114,7 @@ export const saveSchema = z
       .strict()
       .default({ totalMasteryXp: 0, ranks: {} }),
     flags: z.record(z.string(), z.union([z.boolean(), z.number(), z.string()])),
+    quests: z.record(z.string(), questStateSchema).default({}),
     mapState: z.record(z.string(), z.unknown()),
     machines: z
       .record(
@@ -275,6 +294,7 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
     professions: {},
     mastery: { totalMasteryXp: 0, ranks: {} },
     flags: {},
+    quests: {},
     mapState: {},
     machines: defaultFarmMachines(),
     animals: defaultFarmAnimals(),

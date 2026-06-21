@@ -5,6 +5,107 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 054 — Quest system (legacy 028) (2026-06-21)
+
+First gameplay-continuation prompt on the foundation. Shipped a deterministic,
+data-driven **quest system** — a journal, story quests, daily requests, special
+orders, objective tracking, timers, rewards, relationship/flag effects, progress
+notifications, and cancellation rules — wired visibly into the running game and
+verified on desktop + Pixel 5.
+
+**Engine (pure, unit-tested).** New `src/engine/quests.ts` is a pure state machine
+over the quest definitions and the per-save quest record:
+`locked → (available → active | active) → complete | failed`. `reconcileQuests`
+seeds states, promotes locked quests when prerequisites clear, refreshes standing
+objectives, expires non-story timed quests, and detects completions;
+`applyQuestEvent` advances event objectives from player actions; `acceptQuest` /
+`cancelQuest` handle requests; `grantQuestRewards` applies gold/item/recipe/
+relationship/flag rewards to a save; `questJournalRows` / `questCounts` are the UI
+selectors. **Timers never fail story quests** (`isStoryQuest` short-circuits
+expiry), which structurally guarantees "failed timed quests do not break story
+paths." New `src/engine/quest-tracking.ts` is the thin runtime glue scenes call
+(reads/mutates the active save, persists, resolves reward names from content).
+
+**Data.** `src/data/schemas.ts` `questSchema` upgraded from a 4-field stub to the
+full model (category arc + kind + giver + objectives + rewards (discriminated
+union) + `limitDays` + prerequisites + `autoActivate` + `cancellable`);
+`src/data/content/quests.json` now ships **16 quests across all seven arcs**
+(farming, fishing, crafting, mining, foraging, exploration, social) + story.
+`src/data/content.ts` `checkReferences` validates every quest objective/reward/
+giver/prerequisite reference so a typo fails the content gate, not the player.
+
+**Save.** `src/engine/saveModel.ts` gains a `quests` record (`questStateSchema`),
+added as a **defaulted field with no `SAVE_VERSION` bump** — pre-quest v3 saves
+parse cleanly to `{}` (real migration is Prompt 067).
+
+**UI.** `src/ui/overlay.ts` `showQuestPanel` renders a scrollable, touch-friendly
+journal (status-sorted cards, objective progress, reward summary, time limit,
+Accept/Abandon buttons); styled in `src/styles.css` on the parchment/wood palette.
+
+**Integration (visible + cross-arc).** `FarmScene` adds the journal (pause menu
+"Quest Journal" + debug API), seeds/ticks quests on enter + at bedtime, and emits
+`harvest` / `forage` / `ship` events with HUD completion flashes + day-summary
+notices. Cross-arc emits added at their real resolution points: `BeachScene`
+(`fish`, `forage`, `visit Beach`), `MineScene` (`mine`, `visit Mine`),
+`InteriorScene` (`craft`), `TownScene` (`visit Town`). Social/`befriend` and
+`have` objectives reconcile from world state on journal-open + day-tick.
+
+Files: `src/engine/quests.ts` (new), `src/engine/quest-tracking.ts` (new),
+`src/data/content/quests.json`, `src/data/schemas.ts`, `src/data/content.ts`,
+`src/engine/saveModel.ts`, `src/ui/overlay.ts`, `src/styles.css`,
+`src/scenes/FarmScene.ts`, `src/scenes/BeachScene.ts`, `src/scenes/MineScene.ts`,
+`src/scenes/InteriorScene.ts`, `src/scenes/TownScene.ts`,
+`tests/unit/quests.test.ts` (new), `tests/unit/overlay.test.ts`,
+`tests/e2e/quests.spec.ts` (new), `tests/e2e/farm.spec.ts`.
+
+**Acceptance criteria**
+
+- [x] Quest journal, story quests, daily requests, special orders, objectives,
+  timers, rewards, relationship effects, progress notifications, cancellation
+  rules — all present (`kind: story | request | order`; rewards include
+  relationship + flag; HUD flash + day-summary notices + journal are the
+  notification surfaces; cancellable requests have an Abandon path).
+- [x] **≥12 quests across farming, fishing, crafting, mining, foraging,
+  exploration, social arcs** — 16 ship, covering all seven arcs + story
+  (locked by `quests.test.ts` "content acceptance" + by `content.test.ts`).
+- [x] **Quest UI is touch-friendly** — DOM overlay with full-width buttons;
+  e2e passes on `mobile-chromium` (Pixel 5) opening + driving the journal.
+- [x] **Failed timed quests do not break story paths** — `isStoryQuest` exempts
+  story quests from `limitDays` entirely; unit test + e2e (`a missed timed
+  request fails without breaking the story quest`) prove a request can expire
+  while the story quest stays active and the game stays playable.
+- [x] Visible in the running game + Playwright-verified (§0.8) — reachable via
+  the Farm pause menu; genuine in-world forage advances a real objective in e2e.
+
+**Decision record**
+
+- **Direct `recordQuestEvent` helper over a global event bus.** No pub/sub
+  mechanism existed; rather than add one (listener lifecycle, leak risk), scenes
+  call a pure `applyQuestEvent` via `quest-tracking`. Deterministic, leak-free,
+  matches the codebase's "pure functions + explicit state" idiom.
+- **Rich `questSchema` in the existing JSON content pipeline** (not a parallel TS
+  module) — keeps one quest concept, reuses Zod validation + cross-reference
+  integrity, and matches the PSPR's data-driven-content intent.
+- **No `SAVE_VERSION` bump.** A defaulted `quests` record is backward-compatible;
+  versioning/migration is owned by Prompt 067.
+- **Standing vs. event objectives.** `have`/`befriend` reconcile from world state
+  (no per-event wiring needed); the rest accumulate from scene emits. `have` is a
+  possession check (non-consuming) by design.
+
+**Verify gate** — `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **641 passed** (+24) · `validate:assets` 0 · `build` 0 ·
+Playwright **301 passed + 1 skipped** on `desktop-chromium` + `mobile-chromium`
+(full suite, +8 quest specs) · GitDoctor **100/100**.
+
+**Honest gaps / deferred.** Quest completions in Beach/Mine/Interior are functional
+but silent (no per-scene HUD flash — the journal + reward grant + FarmScene flash
+are the feedback surfaces); a polish pass could flash there too. Dialogue's
+`startQuest` effect is declared but still routed by the caller, not yet hooked to
+the quest engine (no quest is dialogue-gated yet). `gift`/`talk` objective kinds
+exist in the schema but no shipped quest uses them yet.
+
+---
+
 ## Prompt 053 — Migrate current scenes + close the foundation phase (WEF-13) (2026-06-21)
 
 Closed the **World Embodiment Foundation** (Prompts 028–053). Reconciled the

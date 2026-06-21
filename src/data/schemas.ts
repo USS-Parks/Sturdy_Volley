@@ -124,20 +124,105 @@ export const festivalSchema = z
   .strict();
 export type Festival = z.infer<typeof festivalSchema>;
 
+/**
+ * Quest taxonomy (Prompt 054).
+ *
+ * `category` is the *activity arc* a quest belongs to (the journal groups by it);
+ * `kind` is its *delivery* (a main-story beat, a daily help-wanted request, or a
+ * special order). The two are independent — a story quest can live in the farming
+ * arc, a request can live in the fishing arc.
+ */
+export const questCategorySchema = z.enum([
+  'story',
+  'farming',
+  'fishing',
+  'crafting',
+  'mining',
+  'foraging',
+  'exploration',
+  'social',
+  'combat',
+]);
+export type QuestCategory = z.infer<typeof questCategorySchema>;
+
+export const questKindSchema = z.enum(['story', 'request', 'order']);
+export type QuestKind = z.infer<typeof questKindSchema>;
+
+/**
+ * Objective kinds. Most are *event* objectives that accumulate as the player
+ * acts (harvest/fish/forage/mine/craft/ship/gift/talk/visit). Two are *standing*
+ * objectives re-evaluated from world state on each reconcile: `befriend` (a
+ * relationship level for an NPC) and `have` (a quantity held in the bag).
+ */
+export const questObjectiveKindSchema = z.enum([
+  'harvest',
+  'fish',
+  'forage',
+  'mine',
+  'craft',
+  'ship',
+  'gift',
+  'talk',
+  'visit',
+  'befriend',
+  'have',
+]);
+export type QuestObjectiveKind = z.infer<typeof questObjectiveKindSchema>;
+
+export const questObjectiveSchema = z
+  .object({
+    kind: questObjectiveKindSchema,
+    /** itemId / npcId / sceneKey depending on kind; null = "any". */
+    target: z.string().min(1).nullable().default(null),
+    count: z.number().int().positive().default(1),
+    label: z.string().min(1),
+  })
+  .strict();
+export type QuestObjective = z.infer<typeof questObjectiveSchema>;
+
+export const questRewardSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('gold'), amount: z.number().int().positive() }).strict(),
+  z
+    .object({
+      kind: z.literal('item'),
+      itemId: idSchema,
+      qty: z.number().int().positive(),
+      quality: z.number().int().min(0).max(3).default(0),
+    })
+    .strict(),
+  z.object({ kind: z.literal('recipe'), recipeId: idSchema }).strict(),
+  z.object({ kind: z.literal('relationship'), npcId: idSchema, delta: z.number().int() }).strict(),
+  z
+    .object({
+      kind: z.literal('flag'),
+      flag: z.string().min(1),
+      value: z.union([z.boolean(), z.number(), z.string()]),
+    })
+    .strict(),
+]);
+export type QuestReward = z.infer<typeof questRewardSchema>;
+
 export const questSchema = z
   .object({
     id: idSchema,
     name: z.string().min(1),
     description: z.string().min(1),
-    category: z.enum([
-      'story',
-      'farming',
-      'fishing',
-      'crafting',
-      'exploration',
-      'social',
-      'combat',
-    ]),
+    category: questCategorySchema,
+    kind: questKindSchema.default('request'),
+    /** NPC who hands out / receives the quest, if any. */
+    giverNpcId: idSchema.nullable().default(null),
+    objectives: z.array(questObjectiveSchema).min(1),
+    rewards: z.array(questRewardSchema).default([]),
+    /**
+     * Optional countdown in in-game days. Timers NEVER fail story quests — the
+     * engine ignores `limitDays` for `category === 'story'` / `kind === 'story'`
+     * so a missed deadline can never break a story path (Prompt 054 acceptance).
+     */
+    limitDays: z.number().int().positive().nullable().default(null),
+    prerequisiteQuestIds: z.array(idSchema).default([]),
+    /** Story/tutorial quests activate themselves once prerequisites clear; requests wait to be accepted. */
+    autoActivate: z.boolean().default(false),
+    cancellable: z.boolean().default(false),
   })
   .strict();
 export type Quest = z.infer<typeof questSchema>;

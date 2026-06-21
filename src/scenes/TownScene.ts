@@ -14,6 +14,7 @@ import {
   clearActiveSave,
 } from '../engine/gameState';
 import { writeSave } from '../engine/save';
+import { recordActiveQuestEvent } from '../engine/quest-tracking';
 import { formatWorldStatus } from '../engine/format';
 import { computeMoveVector, type MoveInput } from '../engine/movement';
 import { createControllerState, stepController, type ControllerState } from '../engine/controller';
@@ -313,6 +314,8 @@ export class TownScene extends GameScene {
     this.save = save;
     save.location.sceneKey = 'Town';
     writeSave(save);
+    // Prompt 054: arriving credits "visit Ballast Bay" exploration objectives.
+    recordActiveQuestEvent({ kind: 'visit', target: 'Town' });
     this.controller = createControllerState();
     this.clock = createTimeClock(getGameTime(save));
     this.refreshWorldState();
