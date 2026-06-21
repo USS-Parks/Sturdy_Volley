@@ -1,7 +1,6 @@
 import type { Quest, QuestObjective, QuestObjectiveKind } from '../data/schemas';
 import type { QuestRecord, QuestState, SaveData } from './saveModel';
-import { addItem } from './inventory';
-import { unlockRecipes } from './crafting';
+import { grantRewards } from './rewards';
 
 /**
  * Quest engine (Prompt 054) — a pure, deterministic state machine over the
@@ -309,27 +308,7 @@ export function cancelQuest(record: QuestRecord, defs: readonly Quest[], id: str
 
 /** Apply a completed quest's rewards to the save (mutates `save`). */
 export function grantQuestRewards(save: SaveData, quest: Quest): void {
-  for (const reward of quest.rewards) {
-    switch (reward.kind) {
-      case 'gold':
-        save.wallet.gold += reward.amount;
-        break;
-      case 'item': {
-        const r = addItem(save.inventory, reward.itemId, reward.qty, reward.quality);
-        save.inventory = r.container;
-        break;
-      }
-      case 'recipe':
-        save.knownRecipeIds = unlockRecipes(save.knownRecipeIds, [reward.recipeId]);
-        break;
-      case 'relationship':
-        save.relationships[reward.npcId] = (save.relationships[reward.npcId] ?? 0) + reward.delta;
-        break;
-      case 'flag':
-        save.flags[reward.flag] = reward.value;
-        break;
-    }
-  }
+  grantRewards(save, quest.rewards);
 }
 
 function summarizeReward(reward: Quest['rewards'][number], names: QuestNameResolvers): string {

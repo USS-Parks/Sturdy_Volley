@@ -402,4 +402,59 @@ describe('UIOverlay', () => {
     expect(document.querySelector('[data-testid="quest-list"]')).toBeNull();
     expect(document.querySelector('.quest-panel .panel-body')?.textContent).toContain('No quests yet');
   });
+
+  it('Prompt 055: showCivicBoardPanel renders requirements + a Give button, gates have none', () => {
+    const overlay = new UIOverlay();
+    const given: Array<[string, number]> = [];
+    overlay.showCivicBoardPanel({
+      summary: '1 in progress · 0 restored',
+      rows: [
+        {
+          id: 'netlight-beacon',
+          name: 'The Netlight Beacon',
+          description: 'Relight it.',
+          unlocks: 'Opens the observatory.',
+          complete: false,
+          phaseLabel: 'Phase 1/2 · Clear the salvage',
+          phaseDescription: 'Haul debris.',
+          requirements: [
+            { label: 'Driftwood', kind: 'item', current: 2, target: 8, met: false, contributable: true },
+            { label: '1 hearts with Mara Vale', kind: 'relationship', current: 0, target: 1, met: false, contributable: false },
+          ],
+          rewardSummary: '300 g',
+          giver: 'Mara Vale',
+        },
+      ],
+      onContribute: (id, i) => given.push([id, i]),
+      onClose: () => {},
+    });
+    expect(document.querySelector('[data-testid="civic-panel"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="civic-status-netlight-beacon"]')?.textContent).toContain('Phase 1/2');
+    expect(document.querySelector('[data-testid="civic-req-netlight-beacon-0"]')?.textContent).toContain('2/8');
+    // Item req has a Give button; the relationship gate does not.
+    expect(document.querySelector('[data-testid="civic-give-netlight-beacon-0"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="civic-give-netlight-beacon-1"]')).toBeNull();
+    document.querySelector<HTMLButtonElement>('[data-testid="civic-give-netlight-beacon-0"]')?.click();
+    expect(given).toEqual([['netlight-beacon', 0]]);
+  });
+
+  it('Prompt 055: showCeremony lists NPC reaction lines and a Continue button', () => {
+    const overlay = new UIOverlay();
+    let continued = false;
+    overlay.showCeremony({
+      projectName: 'The Netlight Beacon',
+      unlocks: 'Opens the observatory.',
+      reactions: [
+        { speaker: 'Mara Vale', line: 'It burns again.' },
+        { speaker: 'Lio Marin', line: 'I can fish past dusk now.' },
+      ],
+      onClose: () => {
+        continued = true;
+      },
+    });
+    expect(document.querySelector('[data-testid="ceremony-panel"]')).toBeTruthy();
+    expect(document.querySelectorAll('[data-testid="ceremony-reactions"] li')).toHaveLength(2);
+    document.querySelector<HTMLButtonElement>('[data-testid="ceremony-continue"]')?.click();
+    expect(continued).toBe(true);
+  });
 });

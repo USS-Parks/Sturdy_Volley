@@ -18,6 +18,7 @@ const EMPTY_RAW: RawContent = {
   festivals: [],
   quests: [],
   shops: [],
+  projects: [],
   maps: [],
   dialogue: [],
 };

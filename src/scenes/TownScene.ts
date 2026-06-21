@@ -15,6 +15,13 @@ import {
 } from '../engine/gameState';
 import { writeSave } from '../engine/save';
 import { recordActiveQuestEvent } from '../engine/quest-tracking';
+import {
+  activeProjectBoardRows,
+  activeCompletedProjectFlags,
+  contributeActive,
+  reconcileActiveProjects,
+} from '../engine/civic-tracking';
+import type { CivicProject } from '../data/schemas';
 import { formatWorldStatus } from '../engine/format';
 import { computeMoveVector, type MoveInput } from '../engine/movement';
 import { createControllerState, stepController, type ControllerState } from '../engine/controller';
@@ -45,7 +52,7 @@ import {
   type TastingTable,
 } from '../engine/friendship';
 import { recordRelationshipChange } from '../engine/gameState';
-import { removeItem } from '../engine/inventory';
+import { addItem, removeItem } from '../engine/inventory';
 import { hoursFor, isShopOpen, type ShopHours } from '../engine/shops';
 import {
   activeBehaviorFor as npcActiveBehaviorFor,
@@ -195,6 +202,8 @@ export class TownScene extends GameScene {
   private flagAge = 0;
   private readonly npcs = new Map<string, LiveNpc>();
   private tastingTable: TastingTable = {};
+  /** Prompt 055: per-project graybox meshes shown when that project completes. */
+  private readonly civicMeshes = new Map<string, AbstractMesh[]>();
 
   build(): Scene {
     const scene = makeScene(this.ctx.engine, PALETTE.sky);
@@ -219,6 +228,8 @@ export class TownScene extends GameScene {
     this.buildBuildings(scene);
     this.buildHarbor(scene);
     this.buildLanternPoles(scene);
+    this.buildCivicBoard(scene);
+    this.buildCivicAssets(scene);
 
     const player = MeshBuilder.CreateCapsule('player', { height: 1.8, radius: 0.4 }, scene);
     player.position.set(0, 0.9, 8);
@@ -305,6 +316,65 @@ export class TownScene extends GameScene {
     });
   }
 
+  /** Prompt 055: a rope-bound notice board near the market lane — opens the civic project board. */
+  private buildCivicBoard(scene: Scene): void {
+    const post = MeshBuilder.CreateBox('civic-board-post', { width: 0.16, depth: 0.16, height: 1.6 }, scene);
+    post.position.set(3, 0.8, 4);
+    post.material = flatMaterial(scene, 'civic-board-post', PALETTE.wood, 0.2);
+    const board = MeshBuilder.CreateBox('civic-board', { width: 1.5, depth: 0.12, height: 1.0 }, scene);
+    board.position.set(3, 1.5, 4);
+    board.material = flatMaterial(scene, 'civic-board', PALETTE.sand, 0.2);
+  }
+
+  /**
+   * Prompt 055: per-project completion meshes, built hidden. `applyCivicState()`
+   * reveals them once `save.projects[id].complete` — the visible map change.
+   */
+  private buildCivicAssets(scene: Scene): void {
+    // The Netlight Beacon — a warm lamp atop the harbor flag pole.
+    const beaconLamp = MeshBuilder.CreateSphere('civic-beacon-lamp', { diameter: 0.9 }, scene);
+    beaconLamp.position.set(-5, 5.3, 3);
+    beaconLamp.material = flatMaterial(scene, 'civic-beacon-lamp', PALETTE.warmLight, 0.7);
+    beaconLamp.isVisible = false;
+    this.civicMeshes.set('netlight-beacon', [beaconLamp]);
+
+    // Market Lane Canopies — salt-canvas awnings down the lane.
+    const canopies: AbstractMesh[] = [];
+    for (const [i, x] of [-12, -4, 4, 12].entries()) {
+      const canopy = MeshBuilder.CreateBox(`civic-canopy-${i}`, { width: 3.2, depth: 2.4, height: 0.25 }, scene);
+      canopy.position.set(x, 2.6, 0);
+      canopy.rotation.z = 0.08;
+      canopy.material = flatMaterial(scene, `civic-canopy-${i}`, PALETTE.accent, 0.28);
+      canopy.isVisible = false;
+      canopies.push(canopy);
+    }
+    this.civicMeshes.set('market-canopies', canopies);
+
+    // Belltide Boardwalk — a plank path running out toward the marsh.
+    const planks: AbstractMesh[] = [];
+    for (const [i, z] of [10, 13, 16, 19].entries()) {
+      const plank = MeshBuilder.CreateBox(`civic-boardwalk-${i}`, { width: 2.4, depth: 2.6, height: 0.2 }, scene);
+      plank.position.set(12, 0.2, z);
+      plank.material = flatMaterial(scene, `civic-boardwalk-${i}`, PALETTE.wood, 0.2);
+      plank.isVisible = false;
+      planks.push(plank);
+    }
+    this.civicMeshes.set('belltide-boardwalk', planks);
+  }
+
+  /** Reveal the completion meshes for every finished project. */
+  private applyCivicState(): void {
+    const completed = new Set(
+      Object.entries(this.save.projects ?? {})
+        .filter(([, s]) => s.complete)
+        .map(([id]) => id),
+    );
+    for (const [projectId, meshes] of this.civicMeshes) {
+      const visible = completed.has(projectId);
+      for (const mesh of meshes) mesh.isVisible = visible;
+    }
+  }
+
   override enter(): void {
     const save = getActiveSave();
     if (!save) {
@@ -348,6 +418,11 @@ export class TownScene extends GameScene {
       });
     }
 
+    // Prompt 055: advance projects whose relationship gates are now met, then
+    // reveal the completion meshes for every finished project (visible map change).
+    reconcileActiveProjects();
+    this.applyCivicState();
+
     this.rebuildTargets();
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
@@ -361,6 +436,13 @@ export class TownScene extends GameScene {
         npcs: () => Array<{ id: string; pos: { x: number; z: number }; sceneKey: string }>;
         targets: () => Array<{ id: string; label: string; x: number; z: number; radius: number }>;
         nearest: () => string | null;
+        projects: () => Array<{ id: string; name: string; complete: boolean; phaseIndex: number; phaseCount: number }>;
+        openCivicBoard: () => void;
+        contributeProject: (id: string, reqIndex: number) => { accepted: number; completed: string | null };
+        completedFlags: () => string[];
+        civicMeshVisible: (id: string) => boolean;
+        grantItem: (itemId: string, qty: number) => void;
+        setRelationship: (npcId: string, points: number) => void;
       };
     }).sturdyVolleyTown = {
       npcs: () => {
@@ -377,7 +459,42 @@ export class TownScene extends GameScene {
       targets: () =>
         this.targets.map((t) => ({ id: t.id, label: t.label, x: t.x, z: t.z, radius: t.radius })),
       nearest: () => this.nearest?.id ?? null,
+      // Prompt 055 — civic project board.
+      projects: () =>
+        activeProjectBoardRows().map((r) => ({
+          id: r.id,
+          name: r.name,
+          complete: r.complete,
+          phaseIndex: r.phaseIndex,
+          phaseCount: r.phaseCount,
+        })),
+      openCivicBoard: () => this.openCivicBoard(),
+      contributeProject: (id: string, reqIndex: number) => {
+        const result = this.handleContributionForDebug(id, reqIndex);
+        return result;
+      },
+      completedFlags: () => activeCompletedProjectFlags(),
+      civicMeshVisible: (id: string) => (this.civicMeshes.get(id) ?? []).every((m) => m.isVisible) && (this.civicMeshes.get(id)?.length ?? 0) > 0,
+      grantItem: (itemId: string, qty: number) => {
+        this.save.inventory = addItem(this.save.inventory, itemId, qty, 0).container;
+        persistActiveSave();
+      },
+      setRelationship: (npcId: string, points: number) => {
+        this.save.relationships[npcId] = points;
+        persistActiveSave();
+      },
     };
+  }
+
+  /** Debug-only contribution that also applies the map change + ceremony, returning a serializable result. */
+  private handleContributionForDebug(projectId: string, reqIndex: number): { accepted: number; completed: string | null } {
+    const result = contributeActive(projectId, reqIndex);
+    if (result.completed) {
+      this.applyCivicState();
+      this.rebuildTargets();
+      this.showCeremony(result.completed);
+    }
+    return { accepted: result.accepted, completed: result.completed?.id ?? null };
   }
 
   private scheduleContext() {
@@ -387,8 +504,77 @@ export class TownScene extends GameScene {
       weatherId: this.weather?.id ?? null,
       festivalId: null,
       relationshipLevel: 0,
-      activeEventFlags: [] as string[],
+      // Prompt 055: completed projects activate `byEvent` schedule layers
+      // (e.g. Mara tends the relit beacon in the evening instead of leaving town).
+      activeEventFlags: activeCompletedProjectFlags(),
     };
+  }
+
+  private npcName(npcId: string): string | undefined {
+    return NPC_SEEDS.find((s) => s.id === npcId)?.name;
+  }
+
+  private openCivicBoard(): void {
+    this.menuOpen = true;
+    this.renderCivicBoard();
+  }
+
+  private renderCivicBoard(): void {
+    const rows = activeProjectBoardRows().map((r) => ({
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      unlocks: r.unlocks,
+      complete: r.complete,
+      phaseLabel: `Phase ${r.phaseIndex + 1}/${r.phaseCount} · ${r.phaseName}`,
+      phaseDescription: r.phaseDescription,
+      requirements: r.requirements.map((req) => ({
+        label: req.label,
+        kind: req.kind,
+        current: req.current,
+        target: req.target,
+        met: req.met,
+        contributable: req.contributable,
+      })),
+      rewardSummary: r.rewardSummary,
+      giver: r.giverNpcId ? this.npcName(r.giverNpcId) ?? r.giverNpcId : null,
+    }));
+    const inProgress = rows.filter((r) => !r.complete).length;
+    const restored = rows.filter((r) => r.complete).length;
+    this.ctx.overlay.showCivicBoardPanel({
+      rows,
+      summary: `${inProgress} in progress · ${restored} restored`,
+      onContribute: (projectId, reqIndex) => this.handleContribution(projectId, reqIndex),
+      onClose: () => {
+        this.menuOpen = false;
+        this.refreshHud();
+      },
+    });
+  }
+
+  private handleContribution(projectId: string, reqIndex: number): void {
+    const result = contributeActive(projectId, reqIndex);
+    if (result.completed) {
+      this.applyCivicState();
+      this.rebuildTargets();
+      this.showCeremony(result.completed);
+    } else {
+      this.renderCivicBoard();
+    }
+  }
+
+  private showCeremony(project: CivicProject): void {
+    this.menuOpen = true;
+    this.ctx.overlay.showCeremony({
+      projectName: project.name,
+      unlocks: project.unlocks,
+      reactions: project.ceremony.map((c) => ({
+        speaker: this.npcName(c.npcId) ?? c.npcId,
+        line: c.line,
+      })),
+      // Return to the board so the player sees the project marked "Restored".
+      onClose: () => this.renderCivicBoard(),
+    });
   }
 
   private rebuildTargets(): void {
@@ -426,6 +612,16 @@ export class TownScene extends GameScene {
         priority: 3,
       });
     }
+    // Prompt 055: the civic project board.
+    base.push({
+      id: 'civic-board',
+      kind: 'prop',
+      label: 'Read the restoration board',
+      x: 3,
+      z: 4.6,
+      radius: 1.5,
+      priority: 3,
+    });
     this.targets = base;
   }
 
@@ -483,6 +679,7 @@ export class TownScene extends GameScene {
     if (interact && !this.ePrev && this.nearest) {
       if (this.nearest.id.startsWith('npc:')) this.openNpcGreeting(this.nearest.id.slice('npc:'.length));
       else if (this.nearest.id.startsWith('door:')) this.handleDoor(this.nearest.id.slice('door:'.length));
+      else if (this.nearest.id === 'civic-board') this.openCivicBoard();
       else {
         this.actionLabel = this.nearest.label;
         this.actionTimer = 1.6;

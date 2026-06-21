@@ -820,6 +820,56 @@ body {
 .quest-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .quest-actions .menu-button { flex: 1; min-width: 120px; }
 
+/* Civic project board + ceremony (Prompt 055). */
+.civic-panel { width: min(560px, 96vw); }
+.civic-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(58vh, 480px);
+  overflow-y: auto;
+}
+.civic-row {
+  padding: 10px 12px;
+  background: var(--sv-parchment);
+  border: 1px solid var(--sv-wood);
+  border-left-width: 4px;
+  border-left-color: #c9a23a;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.civic-row-complete { border-left-color: #5a9; opacity: 0.82; }
+.civic-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.civic-title { font-weight: 700; }
+.civic-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: rgba(0, 0, 0, 0.12);
+}
+.civic-badge-active { background: rgba(201, 162, 58, 0.28); }
+.civic-badge-complete { background: rgba(80, 160, 150, 0.25); }
+.civic-desc { font-size: 12px; margin: 2px 0; opacity: 0.9; }
+.civic-reqs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.civic-req { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+.civic-req-met { opacity: 0.7; }
+.civic-req-text { flex: 1; }
+.civic-give { padding: 4px 12px; min-height: 34px; flex: 0 0 auto; }
+.civic-reward { font-size: 12px; font-weight: 600; opacity: 0.85; }
+
+.ceremony-panel { width: min(520px, 96vw); text-align: center; }
+.ceremony-reactions { list-style: none; margin: 10px 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.ceremony-reaction { display: flex; flex-direction: column; gap: 2px; }
+.ceremony-speaker { font-weight: 700; color: var(--sv-accent); }
+.ceremony-line { font-style: italic; }
+
 /* Pet panel (Prompt 020). */
 .pet-panel { width: min(520px, 96vw); }
 .pet-stats { font-weight: 700; }

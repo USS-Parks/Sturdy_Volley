@@ -10,6 +10,7 @@ import {
   festivalSchema,
   questSchema,
   shopSchema,
+  projectSchema,
   mapSchema,
   dialogueSchema,
   type GameContent,
@@ -25,6 +26,7 @@ import weatherJson from './content/weather.json';
 import festivalsJson from './content/festivals.json';
 import questsJson from './content/quests.json';
 import shopsJson from './content/shops.json';
+import projectsJson from './content/projects.json';
 import mapsJson from './content/maps.json';
 import dialogueJson from './content/dialogue.json';
 
@@ -39,6 +41,7 @@ const SCHEMAS = {
   festivals: festivalSchema,
   quests: questSchema,
   shops: shopSchema,
+  projects: projectSchema,
   maps: mapSchema,
   dialogue: dialogueSchema,
 } as const;
@@ -75,6 +78,7 @@ const BUNDLED = {
   festivals: festivalsJson,
   quests: questsJson,
   shops: shopsJson,
+  projects: projectsJson,
   maps: mapsJson,
   dialogue: dialogueJson,
 } as unknown as RawContent;
@@ -222,6 +226,39 @@ function checkReferences(content: GameContent, issues: ValidationIssue[]): void 
         issues.push({ collection: 'quests', path: `${path}.recipeId`, message: `reward recipeId "${reward.recipeId}" does not match any recipe` });
       } else if (reward.kind === 'relationship' && !npcIds.has(reward.npcId)) {
         issues.push({ collection: 'quests', path: `${path}.npcId`, message: `reward npcId "${reward.npcId}" does not match any NPC` });
+      }
+    });
+  });
+
+  // Civic projects (Prompt 055): validate giver / phase-requirement / reward /
+  // ceremony references so a typo fails the content gate, not a stuck project.
+  content.projects.forEach((project, i) => {
+    if (project.giverNpcId !== null && !npcIds.has(project.giverNpcId)) {
+      issues.push({ collection: 'projects', path: `[${i}].giverNpcId`, message: `giverNpcId "${project.giverNpcId}" does not match any NPC` });
+    }
+    project.phases.forEach((phase, j) => {
+      phase.requirements.forEach((req, k) => {
+        const path = `[${i}].phases[${j}].requirements[${k}]`;
+        if (req.kind === 'item') {
+          requireItem('projects', `${path}.itemId`, req.itemId, 'requirement itemId');
+        } else if (req.kind === 'relationship' && !npcIds.has(req.npcId)) {
+          issues.push({ collection: 'projects', path: `${path}.npcId`, message: `requirement npcId "${req.npcId}" does not match any NPC` });
+        }
+      });
+    });
+    project.rewards.forEach((reward, j) => {
+      const path = `[${i}].rewards[${j}]`;
+      if (reward.kind === 'item') {
+        requireItem('projects', `${path}.itemId`, reward.itemId, 'reward itemId');
+      } else if (reward.kind === 'recipe' && !recipeIds.has(reward.recipeId)) {
+        issues.push({ collection: 'projects', path: `${path}.recipeId`, message: `reward recipeId "${reward.recipeId}" does not match any recipe` });
+      } else if (reward.kind === 'relationship' && !npcIds.has(reward.npcId)) {
+        issues.push({ collection: 'projects', path: `${path}.npcId`, message: `reward npcId "${reward.npcId}" does not match any NPC` });
+      }
+    });
+    project.ceremony.forEach((reaction, j) => {
+      if (!npcIds.has(reaction.npcId)) {
+        issues.push({ collection: 'projects', path: `[${i}].ceremony[${j}].npcId`, message: `ceremony npcId "${reaction.npcId}" does not match any NPC` });
       }
     });
   });

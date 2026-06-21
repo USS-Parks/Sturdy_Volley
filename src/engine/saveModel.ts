@@ -60,6 +60,23 @@ export const questStateSchema = z
 export type QuestState = z.infer<typeof questStateSchema>;
 export type QuestRecord = Record<string, QuestState>;
 
+/**
+ * Per-project restoration progress (Prompt 055). `phase` is the current phase
+ * index (=== phases.length when complete); `contributed[phaseIndex][reqIndex]`
+ * accumulates item/gold contributions for that phase. Defaulted field, no
+ * version bump — pre-projects saves parse to `{}`.
+ */
+export const projectStateSchema = z
+  .object({
+    phase: z.number().int().nonnegative(),
+    contributed: z.array(z.array(z.number().int().nonnegative())),
+    complete: z.boolean(),
+    completedDay: z.number().int().nonnegative().nullable().default(null),
+  })
+  .strict();
+export type ProjectState = z.infer<typeof projectStateSchema>;
+export type ProjectRecord = Record<string, ProjectState>;
+
 export const saveSchema = z
   .object({
     version: z.literal(SAVE_VERSION),
@@ -115,6 +132,7 @@ export const saveSchema = z
       .default({ totalMasteryXp: 0, ranks: {} }),
     flags: z.record(z.string(), z.union([z.boolean(), z.number(), z.string()])),
     quests: z.record(z.string(), questStateSchema).default({}),
+    projects: z.record(z.string(), projectStateSchema).default({}),
     mapState: z.record(z.string(), z.unknown()),
     machines: z
       .record(
@@ -295,6 +313,7 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
     mastery: { totalMasteryXp: 0, ranks: {} },
     flags: {},
     quests: {},
+    projects: {},
     mapState: {},
     machines: defaultFarmMachines(),
     animals: defaultFarmAnimals(),

@@ -5,6 +5,102 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 055 — Community restoration projects (legacy 029) (2026-06-21)
+
+A civic restoration system on the foundation: a town project board, phased
+item/money/relationship contributions, opening ceremonies with NPC reactions, and
+completions that visibly alter the map + NPC schedules. Mirrors the Prompt 054
+quest architecture (rich schema in the validated content pipeline + pure engine +
+defaulted save state + overlay panel + scene wiring + unit & e2e).
+
+**Engine (pure, unit-tested).** New `src/engine/civic.ts` advances a project
+through ordered phases; each phase needs item/gold contributions and/or a
+relationship level (a gate, not consumed). `contribute` records a capped
+contribution + advances satisfied phases (returning how much was `accepted` so the
+caller removes exactly that); `reconcileProjects` advances phases whose
+relationship gate is met outside a contribution; `grantProjectRewards`,
+`completedProjectFlags` (→ `civic:<id>`), and `projectBoardRows` round it out.
+Reward-granting was extracted to shared `src/engine/rewards.ts` (`grantRewards`),
+now used by both quests and projects. Runtime glue in `src/engine/civic-tracking.ts`.
+
+**Data.** `src/data/schemas.ts` gains `projectSchema` (phases + a
+`contributionRequirementSchema` discriminated union + reused `questRewardSchema`
+rewards + ceremony reactions). `src/data/content/projects.json` ships the **3
+restoration-trio projects** — The Netlight Beacon, Market Lane Canopies, Belltide
+Boardwalk — each with two phases. `content.ts` `checkReferences` validates every
+giver/requirement/reward/ceremony reference.
+
+**Save.** `src/engine/saveModel.ts` gains a defaulted `projects` record (per-phase
+contribution grid), no `SAVE_VERSION` bump.
+
+**UI.** `src/ui/overlay.ts` `showCivicBoardPanel` (touch-friendly cards with phase
++ requirement progress, Give buttons on item/gold reqs, met/unmet relationship
+gates) and `showCeremony` (project name, what it unlocks, NPC reaction lines);
+styled in `src/styles.css`.
+
+**Integration (visible map + schedule change).** `TownScene` builds a civic board
+prop (interaction target → board panel) and per-project completion meshes (beacon
+lamp / market canopies / boardwalk planks), hidden until `applyCivicState()`
+reveals them. Completing a project runs the ceremony, reveals its mesh, and adds
+`civic:<id>` to `scheduleContext().activeEventFlags` — `src/data/content/schedules.json`
+gains a `byEvent` layer so **Mara tends the relit beacon in the evening instead of
+leaving town** once `civic:netlight-beacon` is complete.
+
+Files: `src/engine/civic.ts` (new), `src/engine/civic-tracking.ts` (new),
+`src/engine/rewards.ts` (new), `src/engine/quests.ts` (delegates to rewards.ts),
+`src/data/content/projects.json` (new), `src/data/content/schedules.json`,
+`src/data/schemas.ts`, `src/data/content.ts`, `src/engine/saveModel.ts`,
+`src/ui/overlay.ts`, `src/styles.css`, `src/scenes/TownScene.ts`,
+`tests/unit/civic.test.ts` (new), `tests/unit/overlay.test.ts`,
+`tests/unit/content.test.ts`, `tests/e2e/civic.spec.ts` (new).
+
+**Acceptance criteria**
+
+- [x] Civic project board, contribution UI, item/money/relationship requirements,
+  project phases, visual map changes, opening ceremonies, reward unlocks — all
+  present (board panel + Give contributions; phases with item/gold reqs +
+  relationship gates; completion reveals meshes; ceremony panel with NPC lines;
+  `questRewardSchema` rewards incl. recipe/flag unlocks).
+- [x] **≥3 projects fully functional** — Netlight Beacon, Market Lane Canopies,
+  Belltide Boardwalk, each two-phased; `civic.test.ts` proves every project is
+  completable; e2e completes the Netlight Beacon end to end.
+- [x] **Completed projects visibly alter maps + schedules** — completion reveals
+  graybox meshes in TownScene (e2e asserts `civicMeshVisible`), and the
+  `civic:<id>` flag activates a `byEvent` schedule layer (e2e asserts the flag is
+  active; the `byEvent` precedence is locked by the existing `npcSchedule` tests).
+- [x] **Project ceremonies include NPC reactions** — `showCeremony` renders the
+  project's ceremony reaction lines on completion (e2e asserts the ceremony panel
+  + reaction lines appear).
+- [x] Visible in the running game + Playwright-verified (§0.8) — reachable via the
+  TownScene civic-board prop; the board Give button contributes from inventory.
+
+**Decision record**
+
+- **Reward-granting extracted to `rewards.ts`** so quests + projects share one
+  granter (gold/item/recipe/relationship/flag); `grantQuestRewards` delegates,
+  keeping its tests green.
+- **Relationship requirements are gates, not contributions** — the engine checks
+  them against world state; a phase completes only when its item/gold reqs are
+  contributed *and* its relationship gates are met (re-checked on board open + via
+  `reconcileProjects`).
+- **No `SAVE_VERSION` bump** — defaulted `projects` record; versioning is Prompt 067.
+- **Schedule change keyed off `civic:<id>` via the existing `byEvent` layer** — no
+  new schedule mechanism; the completion flag flows through `scheduleContext`.
+
+**Verify gate** — `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **656 passed** (+15) · `validate:assets` 0 · `build` 0 ·
+Playwright **307 passed + 1 skipped** on `desktop-chromium` + `mobile-chromium`
+(+6 civic specs) · GitDoctor **100/100**.
+
+**Honest gaps / deferred.** The visible map changes + the board live in TownScene
+(graybox meshes); the lighthouse/marsh region scenes those projects "unlock" are
+future work. The schedule change is asserted at the flag level in e2e (the
+`byEvent` precedence itself is unit-tested in `npcSchedule`), not by walking an NPC
+to its new waypoint. Town interaction is keyboard/`E` only — touch-interact parity
+for non-Farm scenes is the spawned Prompt-068 follow-up.
+
+---
+
 ## Prompt 054 — Quest system (legacy 028) (2026-06-21)
 
 First gameplay-continuation prompt on the foundation. Shipped a deterministic,

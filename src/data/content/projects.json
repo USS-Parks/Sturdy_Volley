@@ -1,0 +1,107 @@
+[
+  {
+    "id": "netlight-beacon",
+    "name": "The Netlight Beacon",
+    "description": "Relight the Old Netlight so boats can find the harbor after dark again.",
+    "region": "Town",
+    "giverNpcId": "mara-vale",
+    "phases": [
+      {
+        "name": "Clear the salvage",
+        "description": "Haul storm debris off the lighthouse stair and fund the first repairs.",
+        "requirements": [
+          { "kind": "item", "itemId": "driftwood", "qty": 8 },
+          { "kind": "gold", "amount": 200 }
+        ]
+      },
+      {
+        "name": "Wire the lamp",
+        "description": "Rebuild the beacon housing — and Mara has to trust you to hand over the lamp.",
+        "requirements": [
+          { "kind": "item", "itemId": "iron-ore", "qty": 4 },
+          { "kind": "item", "itemId": "tide-shell", "qty": 6 },
+          { "kind": "relationship", "npcId": "mara-vale", "level": 1 }
+        ]
+      }
+    ],
+    "rewards": [
+      { "kind": "gold", "amount": 300 },
+      { "kind": "relationship", "npcId": "mara-vale", "delta": 30 },
+      { "kind": "flag", "flag": "observatory-open", "value": true }
+    ],
+    "unlocks": "Relights the harbor and opens the observatory deck.",
+    "ceremony": [
+      { "npcId": "mara-vale", "line": "The Old Netlight burns again — boats can find us in the dark." },
+      { "npcId": "lio-marin", "line": "I can finally fish past dusk. Thank you." }
+    ]
+  },
+  {
+    "id": "market-canopies",
+    "name": "Market Lane Canopies",
+    "description": "Re-canopy Market Lane so the stalls trade rain or shine.",
+    "region": "Town",
+    "giverNpcId": "jun-park",
+    "phases": [
+      {
+        "name": "Frame the stalls",
+        "description": "Mill planks and frame the canopy posts down the lane.",
+        "requirements": [
+          { "kind": "item", "itemId": "driftwood-plank", "qty": 6 },
+          { "kind": "gold", "amount": 150 }
+        ]
+      },
+      {
+        "name": "Stitch the canvas",
+        "description": "String the salt-canvas awnings and trim them with shell weights.",
+        "requirements": [
+          { "kind": "item", "itemId": "tide-shell", "qty": 4 },
+          { "kind": "gold", "amount": 100 }
+        ]
+      }
+    ],
+    "rewards": [
+      { "kind": "gold", "amount": 200 },
+      { "kind": "relationship", "npcId": "jun-park", "delta": 25 }
+    ],
+    "unlocks": "Market Lane reopens with rain-day stalls and traveling vendors.",
+    "ceremony": [
+      { "npcId": "jun-park", "line": "The lane's alive again — even in the rain." },
+      { "npcId": "sol-aranda", "line": "I'll set a seed stall up here. It's perfect." }
+    ]
+  },
+  {
+    "id": "belltide-boardwalk",
+    "name": "Belltide Boardwalk",
+    "description": "Rebuild the storm-broken boardwalk out to Belltide Marsh.",
+    "region": "Town",
+    "giverNpcId": "sol-aranda",
+    "phases": [
+      {
+        "name": "Lay the planks",
+        "description": "Deck the boardwalk back across the tide flat.",
+        "requirements": [
+          { "kind": "item", "itemId": "driftwood-plank", "qty": 10 },
+          { "kind": "gold", "amount": 250 }
+        ]
+      },
+      {
+        "name": "Raise the rails",
+        "description": "Add safety rails — and earn Sol's confidence to open the marsh route.",
+        "requirements": [
+          { "kind": "item", "itemId": "driftwood", "qty": 8 },
+          { "kind": "relationship", "npcId": "sol-aranda", "level": 1 }
+        ]
+      }
+    ],
+    "rewards": [
+      { "kind": "gold", "amount": 250 },
+      { "kind": "recipe", "recipeId": "driftwood-shelf" },
+      { "kind": "flag", "flag": "marsh-open", "value": true }
+    ],
+    "unlocks": "Opens Belltide Marsh — forage, birding, and medicine routes.",
+    "ceremony": [
+      { "npcId": "sol-aranda", "line": "The boardwalk reaches the marsh again. So much to study out there." },
+      { "npcId": "jun-park", "line": "Careful on the flats — but it's beautiful, isn't it?" }
+    ]
+  }
+]

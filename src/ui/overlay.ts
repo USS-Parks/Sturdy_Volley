@@ -136,6 +136,50 @@ export interface QuestPanelOptions {
   onClose: () => void;
 }
 
+export interface CivicBoardRequirement {
+  label: string;
+  kind: 'item' | 'gold' | 'relationship';
+  current: number;
+  target: number;
+  met: boolean;
+  /** True for item/gold reqs offering a "Give" button (false for relationship gates). */
+  contributable: boolean;
+}
+
+export interface CivicBoardRow {
+  id: string;
+  name: string;
+  description: string;
+  unlocks: string;
+  complete: boolean;
+  /** e.g. "Phase 1/2 · Clear the salvage". */
+  phaseLabel: string;
+  phaseDescription: string;
+  requirements: CivicBoardRequirement[];
+  rewardSummary: string;
+  giver?: string | null;
+}
+
+export interface CivicBoardOptions {
+  rows: CivicBoardRow[];
+  /** Summary line, e.g. "2 in progress · 1 restored". */
+  summary: string;
+  onContribute: (projectId: string, reqIndex: number) => void;
+  onClose: () => void;
+}
+
+export interface CeremonyReactionLine {
+  speaker: string;
+  line: string;
+}
+
+export interface CeremonyOptions {
+  projectName: string;
+  unlocks: string;
+  reactions: CeremonyReactionLine[];
+  onClose: () => void;
+}
+
 export interface ElevatorPanelOption {
   level: number;
   name: string;
@@ -1026,6 +1070,135 @@ export class UIOverlay {
     close.className = 'menu-button';
     close.textContent = 'Close';
     close.dataset.testid = 'quest-close';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /**
+   * Civic project board (Prompt 055). A scrollable, touch-friendly list of
+   * community restoration projects. Each card shows the current phase, its
+   * requirements (item/gold with a Give button, relationship gates as met/unmet
+   * pips), the reward, and what completing it unlocks.
+   */
+  showCivicBoardPanel(opts: CivicBoardOptions): void {
+    this.clear();
+    const panel = this.createPanel('Community Restoration', opts.summary);
+    panel.classList.add('civic-panel');
+    panel.dataset.testid = 'civic-panel';
+
+    const list = document.createElement('ul');
+    list.className = 'civic-list';
+    list.dataset.testid = 'civic-list';
+
+    for (const row of opts.rows) {
+      const li = document.createElement('li');
+      li.className = `civic-row${row.complete ? ' civic-row-complete' : ''}`;
+      li.dataset.testid = `civic-row-${row.id}`;
+
+      const head = document.createElement('div');
+      head.className = 'civic-head';
+      const title = document.createElement('span');
+      title.className = 'civic-title';
+      title.textContent = row.name;
+      const status = document.createElement('span');
+      status.className = `civic-badge ${row.complete ? 'civic-badge-complete' : 'civic-badge-active'}`;
+      status.dataset.testid = `civic-status-${row.id}`;
+      status.textContent = row.complete ? 'Restored' : row.phaseLabel;
+      head.append(title, status);
+      li.appendChild(head);
+
+      const desc = document.createElement('p');
+      desc.className = 'civic-desc';
+      desc.textContent = row.complete ? row.unlocks : row.phaseDescription;
+      li.appendChild(desc);
+
+      if (!row.complete) {
+        const reqList = document.createElement('ul');
+        reqList.className = 'civic-reqs';
+        row.requirements.forEach((req, i) => {
+          const rli = document.createElement('li');
+          rli.className = `civic-req${req.met ? ' civic-req-met' : ''}`;
+          rli.dataset.testid = `civic-req-${row.id}-${i}`;
+
+          const text = document.createElement('span');
+          text.className = 'civic-req-text';
+          const mark = req.met ? '✔' : '○';
+          text.textContent =
+            req.kind === 'relationship'
+              ? `${mark} ${req.label}`
+              : `${mark} ${req.label} — ${req.current}/${req.target}`;
+          rli.appendChild(text);
+
+          if (req.contributable && !req.met) {
+            const give = document.createElement('button');
+            give.type = 'button';
+            give.className = 'menu-button civic-give';
+            give.textContent = 'Give';
+            give.dataset.testid = `civic-give-${row.id}-${i}`;
+            give.addEventListener('click', () => opts.onContribute(row.id, i));
+            rli.appendChild(give);
+          }
+          reqList.appendChild(rli);
+        });
+        li.appendChild(reqList);
+      }
+
+      const reward = document.createElement('div');
+      reward.className = 'civic-reward';
+      reward.textContent = `Reward: ${row.rewardSummary} · Unlocks: ${row.unlocks}`;
+      li.appendChild(reward);
+
+      list.appendChild(li);
+    }
+    panel.appendChild(list);
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'menu-button';
+    close.textContent = 'Close';
+    close.dataset.testid = 'civic-close';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /**
+   * Opening-ceremony panel (Prompt 055). Shown when a civic project completes:
+   * the project name, what it unlocks, and a short run of NPC reaction lines.
+   */
+  showCeremony(opts: CeremonyOptions): void {
+    this.clear();
+    const panel = this.createPanel(`${opts.projectName} — Restored!`, opts.unlocks);
+    panel.classList.add('ceremony-panel');
+    panel.dataset.testid = 'ceremony-panel';
+
+    const list = document.createElement('ul');
+    list.className = 'ceremony-reactions';
+    list.dataset.testid = 'ceremony-reactions';
+    for (const reaction of opts.reactions) {
+      const li = document.createElement('li');
+      li.className = 'ceremony-reaction';
+      const who = document.createElement('span');
+      who.className = 'ceremony-speaker';
+      who.textContent = reaction.speaker;
+      const line = document.createElement('span');
+      line.className = 'ceremony-line';
+      line.textContent = `“${reaction.line}”`;
+      li.append(who, line);
+      list.appendChild(li);
+    }
+    panel.appendChild(list);
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'menu-button';
+    close.textContent = 'Continue';
+    close.dataset.testid = 'ceremony-continue';
     close.addEventListener('click', opts.onClose);
     panel.appendChild(close);
 

@@ -1196,7 +1196,7 @@ bug fixing, performance, save stability, credits, privacy-first telemetry option
 
 **Gameplay continuation:**
 
-- [x] 054 Quests · [ ] 055 Civic projects · [ ] 056 Festivals I · [ ] 057 Festivals II ·
+- [x] 054 Quests · [x] 055 Civic projects · [ ] 056 Festivals I · [ ] 057 Festivals II ·
   [ ] 058 Mail/news · [ ] 059 Cooking · [ ] 060 Home/decor · [ ] 061 Audio · [ ] 062 Visual polish I ·
   [ ] 063 Visual polish II · [ ] 064 NPC expansion · [ ] 065 Narrative · [ ] 066 Secrets ·
   [ ] 067 Save migration · [ ] 068 Mobile · [ ] 069 Controller · [ ] 070 Accessibility ·

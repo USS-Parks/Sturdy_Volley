@@ -11,6 +11,13 @@
         { "startMinutes": 360, "waypoint": { "sceneKey": "Interior", "x": 0, "z": 0, "posture": "work" } },
         { "startMinutes": 1320, "waypoint": { "sceneKey": "Interior", "x": 0, "z": 0, "posture": "sit" } }
       ]
+    },
+    "byEvent": {
+      "civic:netlight-beacon": [
+        { "startMinutes": 360, "waypoint": { "sceneKey": "Town", "x": -8, "z": -4, "posture": "idle" } },
+        { "startMinutes": 540, "waypoint": { "sceneKey": "Town", "x": 0, "z": -4, "posture": "work" } },
+        { "startMinutes": 1080, "waypoint": { "sceneKey": "Town", "x": -5, "z": 4, "posture": "lean" } }
+      ]
     }
   },
   "jun-park": {

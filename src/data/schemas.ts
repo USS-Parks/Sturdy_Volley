@@ -237,6 +237,53 @@ export const shopSchema = z
   .strict();
 export type Shop = z.infer<typeof shopSchema>;
 
+/**
+ * Community restoration projects (Prompt 055). A civic project is delivered in
+ * ordered phases; each phase requires the player to contribute items, money,
+ * and/or hold a relationship level (a gate). Completing every phase finishes the
+ * project, grants rewards, runs an opening ceremony (NPC reaction lines), and
+ * sets `civic:<id>` complete so scenes can visibly alter the map + NPC schedules.
+ */
+export const contributionRequirementSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('item'), itemId: idSchema, qty: z.number().int().positive() }).strict(),
+  z.object({ kind: z.literal('gold'), amount: z.number().int().positive() }).strict(),
+  // A gate, not a consumed contribution: the player must hold this relationship level.
+  z.object({ kind: z.literal('relationship'), npcId: idSchema, level: z.number().int().positive() }).strict(),
+]);
+export type ContributionRequirement = z.infer<typeof contributionRequirementSchema>;
+
+export const projectPhaseSchema = z
+  .object({
+    name: z.string().min(1),
+    description: z.string().min(1),
+    requirements: z.array(contributionRequirementSchema).min(1),
+  })
+  .strict();
+export type ProjectPhase = z.infer<typeof projectPhaseSchema>;
+
+export const ceremonyReactionSchema = z
+  .object({ npcId: idSchema, line: z.string().min(1) })
+  .strict();
+export type CeremonyReaction = z.infer<typeof ceremonyReactionSchema>;
+
+export const projectSchema = z
+  .object({
+    id: idSchema,
+    name: z.string().min(1),
+    description: z.string().min(1),
+    /** Scene whose map the completion visibly alters (e.g. "Town"). */
+    region: z.string().min(1).default('Town'),
+    giverNpcId: idSchema.nullable().default(null),
+    phases: z.array(projectPhaseSchema).min(1),
+    rewards: z.array(questRewardSchema).default([]),
+    /** One-line blurb of what finishing the project opens up. */
+    unlocks: z.string().min(1),
+    /** Opening-ceremony reaction lines, played when the project completes. */
+    ceremony: z.array(ceremonyReactionSchema).default([]),
+  })
+  .strict();
+export type CivicProject = z.infer<typeof projectSchema>;
+
 export const mapSchema = z
   .object({
     id: idSchema,
@@ -268,6 +315,7 @@ export interface GameContent {
   festivals: Festival[];
   quests: Quest[];
   shops: Shop[];
+  projects: CivicProject[];
   maps: GameMap[];
   dialogue: Dialogue[];
 }
