@@ -103,6 +103,7 @@ export class TitleScene extends GameScene {
       items.push({ id: 'dev-breakpoint-farm', label: 'Dev · Breakpoint Farm', enabled: true, testId: 'title-dev-breakpoint-farm' });
       items.push({ id: 'dev-farmhouse', label: 'Dev · Farmhouse', enabled: true, testId: 'title-dev-farmhouse' });
       items.push({ id: 'dev-ballast-bay-town', label: 'Dev · Ballast Bay Town', enabled: true, testId: 'title-dev-ballast-bay-town' });
+      items.push({ id: 'dev-klamity-river', label: 'Dev · Klam-ity River', enabled: true, testId: 'title-dev-klamity-river' });
     }
     this.ctx.overlay.showMenu(
       'Sturdy Volley',
@@ -170,6 +171,9 @@ export class TitleScene extends GameScene {
         break;
       case 'dev-ballast-bay-town':
         this.goTo('BallastBayTown');
+        break;
+      case 'dev-klamity-river':
+        this.goTo('KlamityRiver');
         break;
     }
   }

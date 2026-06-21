@@ -19,6 +19,7 @@ import { FloraLabScene } from './FloraLabScene';
 import { BreakpointFarmScene } from './BreakpointFarmScene';
 import { FarmhouseInteriorScene } from './FarmhouseInteriorScene';
 import { BallastBayTownScene } from './BallastBayTownScene';
+import { KlamityRiverScene } from './KlamityRiverScene';
 
 /** All game scenes, keyed by the names used in save.location.sceneKey + transitions. */
 export const SCENE_FACTORIES: Record<string, SceneFactory> = {
@@ -54,4 +55,6 @@ export const SCENE_FACTORIES: Record<string, SceneFactory> = {
   FarmhouseInterior: (ctx) => new FarmhouseInteriorScene(ctx),
   // Production-foundation map II (WEF-10b, Prompt 047). `?scene=BallastBayTown`.
   BallastBayTown: (ctx) => new BallastBayTownScene(ctx),
+  // Production-foundation map III (WEF-10c-i, Prompt 048). `?scene=KlamityRiver`.
+  KlamityRiver: (ctx) => new KlamityRiverScene(ctx),
 };

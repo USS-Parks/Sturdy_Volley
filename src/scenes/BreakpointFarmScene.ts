@@ -350,6 +350,12 @@ export class BreakpointFarmScene extends GameScene {
     return Math.hypot(this.motor.position.x - g.x, this.motor.position.z - g.z) <= 3;
   }
 
+  private nearAnchorWithin(id: string, reach: number): boolean {
+    const g = this.anchorAt(id);
+    if (!g) return false;
+    return Math.hypot(this.motor.position.x - g.x, this.motor.position.z - g.z) <= reach;
+  }
+
   private pressAction(): boolean {
     if (this.transitioning) return false;
     // West/town gate → Ballast Bay town district (the reciprocal of town-to-farm).
@@ -363,6 +369,19 @@ export class BreakpointFarmScene extends GameScene {
         npcToken: this.npcToken,
       };
       void this.ctx.manager.goTo('BallastBayTown', data);
+      return true;
+    }
+    // River gate → Klam-ity River corridor (the mounted-traversal showcase).
+    if (this.nearAnchorWithin('farm-gate-river', 3)) {
+      this.transitioning = true;
+      const data: RegionTransitionData = {
+        toAnchor: { x: 64, z: 90 },
+        facing: 0,
+        cameraContext: 'exterior',
+        clockMinutes: this.clockMinutes,
+        npcToken: this.npcToken,
+      };
+      void this.ctx.manager.goTo('KlamityRiver', data);
       return true;
     }
     if (this.nearFarmhouseDoor()) {

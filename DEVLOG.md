@@ -5,6 +5,84 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 048 — Production-foundation map III: Klam-ity River corridor + mounted traversal (WEF-10c-i) (2026-06-21)
+
+Built the **Klam-ity River corridor** — the showcase that exercises the Prompt 044
+mount system on a real map. A riverbank corridor links the inland (Willa Crick /
+farm) community to the coastal (Ballast Bay) community; mount the horse at the
+inland end, ride south, **ford the river**, cross the inland→coastal ground seam,
+and dismount at the coast — the camera hands to the mounted baseline while ridden
+and blends back on dismount, with real `SceneManager` transitions to Breakpoint
+Farm (inland) and Ballast Bay Town (coastal) preserving clock + NPC state.
+
+**Corridor (`src/scenes/KlamityRiverScene.ts`, new).** Graybox on the shared
+camera-rig + kinematic-motor + mount stack: an E–W **river ford** (the ridden
+motor wades it) + a **bridge** deck (dry crossing), a west **cliff** overlook, the
+wet-sand coastal shore with a **sea stack** + driftwood (the
+`sv_map_014`/`sv_map_016` vocabulary), a redwood ring, a hitching post + the
+rideable horse, and two community gates. Mount/dismount + the ridden-locomotion
+motor + the mounted-camera handoff all come from `mount.ts`; **five debug layers**
+toggle independently. Ride proofs (forded, crossed-seam, no-tunnel, rider-never-
+sinks, finite) are e2e-asserted across the gallop south.
+
+**Shared horse graybox (`src/render/horse-graybox.ts`, new).** Extracted the
+Prompt 044 horse builder to a shared render helper (faceted body/neck/head/legs/
+tail/saddle at the mount-anchor socket); `MountLabScene` now consumes it too — one
+source of truth for the rideable-horse graybox, one future `.glb` swap site.
+
+**Transitions.** The corridor transitions to Ballast Bay Town (coastal gate) and
+Breakpoint Farm (inland gate); the farm gained the reciprocal river-gate trigger,
+so **farm → corridor → town** is a real chained journey with the mounted ride in
+the middle, clock + NPC preserved across every seam.
+
+Files: `src/scenes/KlamityRiverScene.ts` (new), `src/render/horse-graybox.ts`
+(new), `tests/e2e/klamity-river.spec.ts` (new), `src/scenes/MountLabScene.ts`
+(use shared helper), `src/scenes/BreakpointFarmScene.ts` (river-gate trigger),
+`src/scenes/registry.ts`, `src/scenes/dev-route.ts`, `src/scenes/TitleScene.ts`.
+
+**Acceptance criteria**
+
+- [x] Reachable through ordinary transitions using the shared stack (farm →
+  corridor inbound; corridor → farm/town outbound); demonstrates wade/ford + shore
+  legibility **and mounted (horseback) traversal end to end across the community
+  transition** (e2e: mount → gallop south → ford → cross seam → dismount at coast).
+- [x] Mounting at one community, riding the corridor, fording the river, and
+  dismounting at the other works without seam pop or camera discontinuity (camera
+  stays `mounted` across the ford + seam, reverts to `exterior` on dismount; the
+  inland→coastal ground change is crossed continuously; rider never sinks/tunnels;
+  pose stays finite; dismount lands a valid grounded pose beside the horse).
+- [x] Boundaries read as geography (cliff, sea stack, redwood ring); routes legible
+  at phone scale; all five debug layers toggle (e2e-asserted on both projects).
+- [x] Automated tours cover every transition + the mounted run on both Playwright
+  projects; graybox primitives stay inside the budget envelope.
+- [x] **Art reference:** river/shore graybox draws on `sv_map_014` + `sv_map_016`
+  (wet sand, sea stack, driftwood, cliffs) + the creek/footbridge + cliff-to-water
+  vocabulary of `sv_map_012` / `sv_env_041`.
+
+**Decision record**
+
+- **The corridor is the mount showcase, not a new mount system.** It composes
+  `mount.ts` (044) + the shared horse graybox + the farm/town production patterns
+  (debug layers, `RegionTransitionData`, camera rig) — proving the 044 mount feel
+  on a real community-to-community map (per the user's OoT/Epona horse-feel
+  north-star, the same layer the future sailing/glider/train/drift-boat modes reuse).
+- **Seam = continuous ride.** Inland green → coastal sand is crossed continuously
+  (no teleport), proving "without seam pop"; the actual region transitions are real
+  `goTo`s at the two community gates.
+- **Extracted the horse graybox.** Now used by MountLab + the corridor (and the
+  053 FarmScene migration later) — one source of truth, one `.glb` swap site.
+- **Kept the foundation general** (per the 2026-06-21 world-scope note): the
+  corridor is one modular streamable region among many; Willa Crick stays
+  provisional (no dimensioned art yet), represented by the inland gate.
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **587 passed** (mount.ts unit coverage from Prompt 044
+covers the ridden logic; no new unit test) · Playwright **273 passed + 1 skipped**
+(desktop-only aspect sweep) on both `desktop-chromium` + `mobile-chromium` (+12
+klamity-river) · `validate:assets` 0 · `build` 0 · GitDoctor **100/100**.
+
+---
+
 ## Prompt 047 — Production-foundation map II: Ballast Bay town district (WEF-10b) (2026-06-21)
 
 Built the representative **Ballast Bay town district** (market lane + harbor
