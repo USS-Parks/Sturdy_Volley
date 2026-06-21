@@ -11,7 +11,14 @@ export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  // The suite runs serially on a software-WebGL (SwiftShader) runner; as it has
+  // grown (now ~340 tests, a ~20-min serial run) the heaviest tests (machine
+  // 12h fast-forward, pet swap, quest forage-loop) intermittently exhaust the
+  // per-test budget under CI load. They are deterministically green locally at
+  // retries:0, so this is environment timing flakiness — give CI two retries and
+  // a larger per-test budget rather than masking a real failure.
+  retries: process.env.CI ? 2 : 0,
+  timeout: process.env.CI ? 45_000 : 30_000,
   // Babylon runs on software WebGL (SwiftShader) in headless Chromium, which is
   // CPU-heavy. Parallel game instances saturate the CPU and stall in-page
   // actionability checks, so run e2e serially for deterministic results.
