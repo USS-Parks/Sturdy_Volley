@@ -1,8 +1,16 @@
 # Scale and Performance — Sturdy Volley
 
-Last revised: 2026-06-19 (VS-A1)
+Last revised: 2026-06-21 (WEF-12, Prompt 052 — post-foundation budgets)
 
-This document is normative for the Vertical Slice phase. Every prompt under §8.0 (VS-A1..VS-A5) and the §8.1 retrofit pass must respect these conventions.
+Normative for the whole project from the foundation onward. The WEF foundation
+(Prompts 028–053) re-platformed camera, motor, collision, navigation, streaming,
+fauna, flora, the mount system, and the production-foundation maps; this document
+now codifies the **measured/targeted budgets, quality tiers, and accessibility
+floor** every gameplay prompt (054+) must respect. Budgets are mirrored in
+`src/engine/foundation-budget.ts`; tiers in `src/engine/quality-tiers.ts`;
+accessibility in `src/engine/accessibility.ts`; the gate manifest in
+`src/engine/foundation-coverage.ts`; the gate test is
+`tests/unit/foundation-gate.test.ts`.
 
 ---
 
@@ -10,73 +18,93 @@ This document is normative for the Vertical Slice phase. Every prompt under §8.
 
 | Convention | Value | Notes |
 |---|---|---|
-| World unit | **1 world unit = 1 meter** | Babylon scenes, collision ellipsoids, camera distances all measured in meters. |
-| Player capsule | **1.8 m tall, 0.4 m radius** | Matches the Theme 3 art bible's "approximately 1.7–1.8 m" guidance. |
-| Farm cell | **1 m × 1 m, 0.12 m thick** | `FARM_CELL_SIZE = 1`. Tilled soil tile uses 0.94 m width to leave a visible ridge. |
-| Building height | **3.0–4.0 m wall, 1.4 m roof peak** | Town buildings, farmhouse exterior, shop kits all read from `TownScene.BUILDINGS`. |
-| Doorway clearance | **≥ 1.0 m wide, ≥ 1.8 m tall** | Player capsule passes without clipping. |
-| Camera follow radius | **14 m** (Farm) / **22 m** (placeholder scenes) | `ArcRotateCamera` default radius in `FarmScene` / `PlaceScene`. |
-| Camera FOV | **0.8 rad ≈ 46°** | Tight enough for adventure framing, wide enough for mobile readability. |
-| Reference fog density | **0.014 (Farm) / 0.02 (placeholder)** | `addFog` calls in scene builders. |
+| World unit | **1 unit = 1 m** | Babylon scenes, collision, camera distances in metres. |
+| Player capsule | **1.8 m tall, 0.4 m radius** | `DEFAULT_MOTOR_CONFIG` (`src/engine/motor.ts`). |
+| Farm cell | **1 m × 1 m** | `FARM_CELL_SIZE = 1`. |
+| Building / wall | **3.0–4.0 m wall, 1.4 m roof peak** | `INTERIOR_METRICS.wallHeight = 3.2`. |
+| Doorway clearance | **≥ 1.0 m × 1.8 m** | `INTERIOR_METRICS.doorway` (1.2 × 2.0). |
+| Camera baselines | **per §2 of the master roster** | Locked in `src/camera/profiles.ts` (`CAMERA_BASELINES`), incl. the `mounted` baseline. |
+| Withers (mount) | **≈ 1.6 m** | Rideable-horse graybox economy. |
 
-Builders adding new geometry must respect the meter convention. Don't drop a 12 m tall placeholder fence in the middle of a 3 m world. When in doubt, drop a 1 m reference cube next to it (`?debug=scale`, planned for VS-A2 follow-up).
-
----
-
-## 2. Mobile performance budgets
-
-Targets are measured on a Playwright Pixel 5 viewport running software WebGL (SwiftShader). These are **hard ceilings the slice may not exceed** without an explicit waiver entered into the DEVLOG.
-
-| Scene | Min FPS | Max draw calls | Max active meshes | Max triangles |
-|---|---|---|---|---|
-| Farm | 30 | 220 | 180 | 220,000 |
-| Town | 30 | 220 | 200 | 220,000 |
-| Interior | 30 | 140 | 120 | 100,000 |
-| Beach | 30 | 180 | 140 | 160,000 |
-| Mine | 30 | 180 | 140 | 160,000 |
-
-Values are codified in `src/render/perf-overlay.ts` as `MOBILE_BUDGETS`. Desktop has 2× headroom by convention but does not need a separate budget.
-
-### How to measure
-
-1. Append `?debug=perf` to the URL. A perf strip mounts in the upper-left corner showing FPS / draw calls / active meshes / triangles.
-2. The strip's cells paint red when the active scene exceeds its budget.
-3. Playwright assertion (VS-A1, `tests/e2e/perf-budget.spec.ts`) walks the slice on Pixel 5 and asserts every visited scene is within budget.
-
-### When a budget is breached
-
-1. Don't relax the number. Add the new geometry **after** removing or instancing equivalent triangles elsewhere.
-2. If the breach is unavoidable (e.g. a one-time cutscene with many extras), file the waiver in the DEVLOG entry for that prompt with the reason and a recovery date.
-3. **Never** disable the perf overlay or the Playwright assertion to ship.
+Builders respect the metre convention from the first primitive (§0.9). The
+representative-graybox conventions (Babylon primitives + `flatMaterial`, one
+material per simple prop, one swap site per entity) carry forward unchanged.
 
 ---
 
-## 3. Initial download budget
+## 2. Foundation performance budgets (hard ceilings)
 
-| Target | Today | Budget |
-|---|---|---|
-| Main JS chunk (gzip) | ~1.15 MB | ≤ 2.5 MB |
-| Total initial download | ~1.2 MB | ≤ 5 MB (35 MB hard cap from §7 P-SPR) |
-| First playable load | n/a | ≤ 5 s on average broadband, cached |
+Every WEF environment must hold these with representative populations, on desktop
+and on a Pixel 5. A breach is a budget **failure** — file a waiver in the DEVLOG
+with a recovery prompt; never relax the number or disable the gate. Mobile values
+below; **desktop carries 2× headroom** on the GPU-bound metrics (draw calls,
+triangles, active/skinned meshes, deforming flora) and 60 FPS.
 
-Real `.glb` assets are streamed per-region and don't count against the initial-download budget.
+| Environment (mobile) | Min FPS | Max draws | Max tris | Max meshes | Phys bodies | Motors | Nav agents | Skinned | Flora | Mem MB | Chunk ms | Region MB |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| breakpoint-farm | 30 | 240 | 240k | 220 | 24 | 12 | 16 | 14 | 48 | 96 | 250 | 12 |
+| farmhouse-interior | 30 | 140 | 100k | 120 | 12 | 12 | 8 | 14 | 48 | 96 | 250 | 12 |
+| ballast-bay-town | 30 | 260 | 260k | 240 | 24 | 12 | 16 | 14 | 48 | 96 | 250 | 12 |
+| klam-ity-river | 30 | 220 | 220k | 200 | 24 | 12 | 16 | 14 | 48 | 96 | 250 | 12 |
+| rainhall-caverns | 30 | 200 | 180k | 180 | 24 | 12 | 16 | 14 | 48 | 96 | 250 | 12 |
+
+The full metric set (FPS / frame time, draw calls, triangles, active meshes,
+physics bodies, character motors, navigation agents, animated/skinned meshes,
+deforming flora, streamed memory, chunk-transition time, region download) is in
+`FOUNDATION_BUDGETS`; `withinBudget(metrics, budget)` returns each breach. The
+per-map Playwright tours + the `?debug=perf` overlay measure mesh/draw live;
+**real-device FPS is a documented manual check** (§0.2 #8 — automation of true
+on-device FPS is impractical in CI under SwiftShader).
 
 ---
 
-## 4. Representative-graybox conventions
+## 3. Initial-download budget
 
-Per §0.10 of the P-SPR (added VS-A1), every prompt that introduces a new entity ships a representative low-poly mesh in the same commit. Conventions:
+| Target | Budget |
+|---|---|
+| Main JS chunk (gzip) | ≤ 2.5 MB |
+| Total initial download | ≤ 5 MB |
+| Hard cap | 35 MB (§7 P-SPR) |
+| First playable load | ≤ 5 s on broadband, cached |
 
-- Use Babylon primitives (`MeshBuilder.Create*`) only. No imported assets.
-- One material per simple prop. Hand off via the existing `flatMaterial(scene, name, color, emissive)` helper.
-- Match the meter scale (§1). A graybox shop is ~4 m wide, ~3 m tall; a graybox NPC is a 1.8 m capsule with a small sphere head.
-- When a real `.glb` lands later, the swap site is a single `MeshBuilder.Create*` line per entity — keep the primitive-construction code in one place per scene helper.
+Codified in `INITIAL_DOWNLOAD_BUDGET`. Real `.glb` assets are streamed per region
+and don't count against the initial download.
 
 ---
 
-## 5. Notes carried forward to VS-A2..VS-A5
+## 4. Quality tiers (density / effects only)
 
-- VS-A2 adds visible forage / debris / tree meshes on the Farm and asserts they stay within the Farm budget after spawn.
-- VS-A3 introduces the `FarmhouseInteriorScene` and reserves the Interior budget.
-- VS-A4 lands one live NPC on the Town map — must stay within the Town budget after the NPC mesh is added.
-- VS-A5 is the slice-gate Playwright spec; it bundles the perf-budget assertion with the loop assertion.
+`QUALITY_TIERS` (`low` / `medium` / `high`, default `medium` on mobile) change
+**only** flora/fauna/particle density, shadows, fog quality, post-processing,
+render scale, and draw distance. They **never** change interaction reach,
+collision, route availability, schedules, or simulation outcomes — the invariant
+is structural (a `QualityTier` carries only visual fields; `INVARIANT_CONCERNS`
+names what it may not touch, and the gate test asserts no invariant leaks into a
+tier). Mobile optimisation polish (Prompt 068) tunes dynamic resolution / shadow
+tiers / fog range / LOD bias on top of this floor.
+
+---
+
+## 5. Accessibility floor (not deferred)
+
+`DEFAULT_ACCESSIBILITY` + `validateAccessibility` cover the twelve required
+controls: input **remapping**, **touch-target size** (≥ 44 CSS px floor), **camera
+sensitivity**, **separate X / Y inversion**, a **recenter control**, **reduced
+motion**, **camera shake**, hold/toggle interaction, **auto-facing assistance**,
+**high-contrast focus**, **subtitles**, and a **no-time-pressure** mode. The
+accessibility-complete pass (Prompt 070) finishes flashing / timing / contrast /
+font / colour / audio-cue coverage on this foundation.
+
+---
+
+## 6. The foundation gate
+
+`FOUNDATION_TOUR` (`src/engine/foundation-coverage.ts`) lists every environment,
+transition, camera context, traversal type, interaction target, NPC state, animal
+family, and simulation tier the foundation must tour, each cross-referenced to its
+proving Playwright spec (`TOUR_SPECS`). `tests/unit/foundation-gate.test.ts`
+asserts the manifest is **complete** against the real source enums
+(`CAMERA_CONTEXTS`, `ANIMAL_FAMILIES`, the budget environments) — so a new
+context / family / environment cannot ship untoured — plus the budget checker, the
+tier invariants, and the accessibility floor. The live environment tours
+themselves are the per-map / per-lab specs in `tests/e2e/`.

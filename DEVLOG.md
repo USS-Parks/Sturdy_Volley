@@ -5,6 +5,92 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 052 — Performance, accessibility, and objective foundation gate (WEF-12) (2026-06-21)
+
+Codified the post-foundation **budgets, quality tiers, accessibility floor**, and
+the **foundation-gate** coverage manifest, and rewrote `docs/SCALE_AND_PERFORMANCE.md`
+as the normative post-foundation budget document. Accessibility and camera comfort
+are not deferred.
+
+**Budgets (`src/engine/foundation-budget.ts`, new).** The full metric set per
+acceptance §1 — FPS/frame time, draw calls, triangles, active meshes, physics
+bodies, character motors, navigation agents, animated/skinned meshes, deforming
+flora, streamed memory, chunk-transition time, region download — as hard ceilings
+for all five WEF environments on `mobile` + `desktop` (desktop = 2× GPU-bound
+headroom + 60 FPS). `withinBudget(metrics, budget)` returns each breach;
+`INITIAL_DOWNLOAD_BUDGET` codifies the bundle budget.
+
+**Quality tiers (`src/engine/quality-tiers.ts`, new).** `low`/`medium`/`high`
+change density + effects only (flora/fauna/particle density, shadows, fog, post,
+render scale, draw distance) — **never** interaction reach, collision, route
+availability, schedules, or simulation outcomes. The invariant is **structural**
+(a `QualityTier` carries only visual fields); `INVARIANT_CONCERNS` names what a
+tier may not touch and the gate asserts no leak.
+
+**Accessibility (`src/engine/accessibility.ts`, new).** `AccessibilitySettings` +
+`DEFAULT_ACCESSIBILITY` + `validateAccessibility` cover all twelve required
+controls (remapping, touch-target ≥ 44 px, sensitivity, separate X/Y inversion,
+recenter, reduced motion, camera shake, hold/toggle, auto-facing, high-contrast
+focus, subtitles, no-time-pressure); `CHECK_TO_SETTING` proves each maps to a
+setting.
+
+**Foundation gate (`src/engine/foundation-coverage.ts` + `tests/unit/foundation-gate.test.ts`,
+new).** `FOUNDATION_TOUR` lists every environment, transition, camera context,
+traversal type, interaction target, NPC state, animal family, and simulation tier,
+each cross-referenced to its proving spec (`TOUR_SPECS`); the gate test asserts the
+manifest is **complete against the real source enums** (`CAMERA_CONTEXTS`,
+`ANIMAL_FAMILIES`, the budget environments) — so a new context/family/environment
+can't ship untoured — plus the budget checker, the tier invariants, and the
+accessibility floor.
+
+Files: `src/engine/foundation-budget.ts` (new), `src/engine/quality-tiers.ts`
+(new), `src/engine/accessibility.ts` (new), `src/engine/foundation-coverage.ts`
+(new), `tests/unit/foundation-gate.test.ts` (new), `docs/SCALE_AND_PERFORMANCE.md`
+(rewritten).
+
+**Acceptance criteria**
+
+- [x] Budgets cover FPS/frame time, draw calls, triangles, active meshes, physics
+  bodies, character motors, navigation agents, animated/skinned meshes, deforming
+  flora, streamed memory, chunk-transition time, and initial/region download; all
+  five maps have desktop + Pixel-5 ceilings with representative populations
+  (`FOUNDATION_BUDGETS`; the per-map Playwright tours measure mesh/draw live;
+  on-device FPS is a documented manual check).
+- [x] Quality tiers change density/effects, not interaction reach, collision,
+  route availability, schedules, or simulation outcomes (structural invariant;
+  `tierIsVisualOnly` + `INVARIANT_CONCERNS`, gate-asserted).
+- [x] Accessibility checks cover remapping, touch target size, camera sensitivity,
+  separate X/Y inversion, recenter control, reduced motion, camera shake,
+  hold/toggle, auto-facing assistance, high-contrast focus, subtitles, and
+  no-time-pressure mode (all twelve, validated + completeness-asserted).
+- [x] A single foundation-gate suite tours every environment, transition, camera
+  context, traversal type, target type, NPC state, animal family, and simulation
+  tier (`FOUNDATION_TOUR` + `foundation-gate.test.ts`, complete vs. the real enums,
+  with `TOUR_SPECS` naming the live tours); `docs/SCALE_AND_PERFORMANCE.md` is
+  updated from the budgets and is now the normative post-foundation document.
+
+**Decision record**
+
+- **Budgets as a contract module, not just a doc.** `foundation-budget.ts` is the
+  single source the doc mirrors and the gate checks, so a budget can't silently
+  drift from the document.
+- **Tier invariants are structural.** Rather than trusting a tier not to change
+  gameplay, a `QualityTier` simply has no field that could — the gate asserts the
+  invariant concerns never appear as tier keys.
+- **The "single gate suite" is a completeness contract over the existing tours.**
+  Re-touring every environment in one mega-spec would duplicate the per-map specs;
+  instead the manifest cross-references them and the test proves coverage is
+  complete against the real enums.
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **617 passed** (+12 foundation-gate) · `validate:assets` 0 ·
+`build` 0 · GitDoctor **100/100**. Playwright: **not applicable** — Prompt 052 adds
+pure budget/tier/accessibility/coverage modules + a doc and touches no runtime
+scene, navigation, or scene lifecycle; the E2E suite is unaffected (last full green
+at Prompt 051: **293 passed + 1 skipped** on both projects).
+
+---
+
 ## Prompt 051 — Swap factories + end-to-end asset fixtures (WEF-11b) (2026-06-21)
 
 Built the asset **swap factory** + five reference fixtures that prove the pipeline:
