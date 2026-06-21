@@ -47,3 +47,32 @@ export function playReadyChime(): void {
   osc.start(now);
   osc.stop(now + 0.42);
 }
+
+/**
+ * Festival cue (Prompt 056). A short three-note rising motif played when the
+ * player arrives on a festival day and when they win a festival minigame. This
+ * is a deliberate placeholder until the full music manager + festival stingers
+ * land in Prompt 061; it satisfies the "festival days alter music" criterion
+ * with a real audible cue. Resolves cleanly when WebAudio is unavailable.
+ */
+export function playFestivalChime(): void {
+  const audio = getCtx();
+  if (!audio) return;
+  if (audio.state === 'suspended') void audio.resume().catch(() => undefined);
+  const now = audio.currentTime;
+  // A bright C–E–G arpeggio with a soft bell tail.
+  const notes = [523.25, 659.25, 783.99];
+  notes.forEach((freq, i) => {
+    const start = now + i * 0.12;
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.16, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.5);
+    osc.connect(gain).connect(audio.destination);
+    osc.start(start);
+    osc.stop(start + 0.52);
+  });
+}

@@ -5,6 +5,124 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 056 — Festivals phase one (legacy 030) (2026-06-21)
+
+A seasonal **festival framework** on the foundation, with the three phase-one
+festivals — **Spring Seed Blessing, Summer Glowtide Night, Fall Harvest Fair** —
+fully playable. On a festival day the town visibly changes: NPC schedules move to
+the festival grounds, regular shops close in favor of a festival stall, festival
+dressing + music come up, and the player can play a non-sport minigame, buy from
+the special stall, and share a relationship moment. Mirrors the Prompt 054/055
+architecture (rich schema in the validated content pipeline + pure engine +
+defaulted save state + overlay panels + scene wiring + unit & e2e). Frostlight
+(winter) stays a thin entry — its content lands in Prompt 057.
+
+**Schema.** `festivalSchema` upgraded from a 5-field stub to a rich model
+(relocated below `questRewardSchema` so it can reuse it): `startMinutes`/
+`endMinutes` window, `music`, `venue`, and nullable `minigame` (kind +
+rounds/goal/slots/targetLabel + rewards), `stall` (named entries), and
+`relationship` (npcId + line + rewards). Every gameplay field is optional with a
+default, so the thin Frostlight entry still validates.
+
+**Engine (pure, unit-tested).** New `src/engine/festival.ts`: `festivalForDay` /
+`isFestivalActiveNow` detection, a deterministic **seed-driven minigame state
+machine** (`startFestivalMinigame` / `tapFestivalSlot` — tap the lit slot each
+round, win when `score ≥ goal`), reward-once-per-year gating
+(`recordMinigameRun` / `claimRelationshipMoment` / `canClaim*` keyed by calendar
+year), and selectors. Runtime glue in `src/engine/festival-tracking.ts` (active
+festival, prize/stall/relationship outcomes on the active save). Reward
+summaries extracted to shared `src/engine/rewards.ts` (`describeReward` /
+`summarizeRewards`).
+
+**Save.** `src/engine/saveModel.ts` gains a defaulted `festivals` record
+(`festivalStateSchema`: attendedYear / bestScore / minigameWonYear /
+relationshipYear), no `SAVE_VERSION` bump.
+
+**Content.** `src/data/content/festivals.json` enriches the trio with a minigame
+(forage-hunt / lantern-release / cook-off), a special stall, and a relationship
+opportunity; `content.ts` `checkReferences` validates every stall item, minigame
+reward, and relationship NPC/reward reference.
+
+**UI.** `src/ui/overlay.ts` `showFestivalPanel` (touch-friendly activity cards
+for the minigame, stall, and relationship moment, with once-per-year "done this
+year" badges) and `showFestivalMinigame` (the lit-slot board → won/lost result +
+prize); the special stall reuses the existing `showShopPanel`. Styled in
+`src/styles.css`; festival cue `playFestivalChime` added to `src/audio/cues.ts`.
+
+**Integration (visible town change).** `TownScene` builds festival dressing
+(banner arch, stage, lantern string — hidden until the festival day), wires
+`scheduleContext().festivalId` to today's festival (activating the `byFestival`
+schedule layer — `schedules.json` gains festival layers routing the four NPCs to
+the festival grounds), closes regular shop doors on the festival day, plays the
+festival cue + marks attendance on enter, and adds a **festival-stage**
+interaction target that opens the hub. `main.ts` wires the debug schedule
+overlay's `festivalId` too.
+
+Files: `src/engine/festival.ts` (new), `src/engine/festival-tracking.ts` (new),
+`src/engine/rewards.ts`, `src/engine/saveModel.ts`, `src/data/schemas.ts`,
+`src/data/content.ts`, `src/data/content/festivals.json`,
+`src/data/content/schedules.json`, `src/ui/overlay.ts`, `src/styles.css`,
+`src/audio/cues.ts`, `src/scenes/TownScene.ts`, `src/main.ts`,
+`tests/unit/festival.test.ts` (new), `tests/unit/overlay.test.ts`,
+`tests/unit/content.test.ts`, `tests/unit/dayResolution.test.ts`,
+`tests/e2e/festival.spec.ts` (new).
+
+**Acceptance criteria**
+
+- [x] **Festival days alter schedules, shops, map setup, and music** — the
+  `byFestival` schedule layer activates (festivalId wired in `scheduleContext`;
+  schedules.json routes the four NPCs to the festival grounds); regular shop
+  doors read "closed for the festival" (`isShopOpen` festival-active path);
+  festival dressing meshes are revealed; `playFestivalChime` plays on enter (the
+  full music manager is Prompt 061).
+- [x] **Each festival has ≥1 non-sport minigame, special shop, and relationship
+  opportunity** — Seed Scramble (forage-hunt), Lantern Launch (lantern-release),
+  and the Harvest Cook-Off; each with a Blessing/Glowtide/Harvest stall and a
+  shared moment with Sol / Lio / Jun. No sport content (§1.4 purge honored).
+- [x] **Multiplayer hooks considered** — the minigame is a pure, seed-driven,
+  fully-serializable state machine seeded from the festival id + calendar day, so
+  a future networked layer can replay/share an identical run unchanged, and
+  per-participant state can key off the same `FestivalRecord` shape (documented
+  in `festival.ts`).
+- [x] Visible in the running game + Playwright-verified (§0.8) — reachable via
+  the TownScene festival-stage prop on a festival day; the e2e plays the minigame
+  to a win in the real DOM and asserts the prize lands on the wallet, on desktop
+  + Pixel 5.
+
+**Decision record**
+
+- **Rich `festivalSchema` in the existing JSON content pipeline** (not a parallel
+  TS module) — matches the 054/055 data-driven pattern; the thin Frostlight entry
+  still parses because every gameplay field is optional with a default.
+- **Whole-day festival, finer window as flavor.** Festival-day behaviors
+  (dressing, schedule layer, shop closure, panel) key off "today is the festival
+  day"; `startMinutes`/`endMinutes` drive only the "happening now" HUD flair —
+  keeps the e2e clock-independent and matches cozy-sim convention.
+- **Deterministic, seed-driven minigame** (mirrors `fishing.ts`) — pure
+  state→step with hit/finished/won; the seed is festival-id + absolute-day so a
+  run is reproducible (and the multiplayer hook is structural, not bolted on).
+- **One-per-year reward gating** keyed by calendar year — the minigame prize and
+  the relationship moment can't be farmed; the best score is always recorded.
+- **No `SAVE_VERSION` bump** — defaulted `festivals` record; versioning is
+  Prompt 067.
+
+**Verify gate** — `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **679 passed** (+23) · `validate:assets` 0 · `build` 0 ·
+Playwright **317 passed + 1 skipped** on `desktop-chromium` + `mobile-chromium`
+(+10 festival specs) · GitDoctor **100/100**.
+
+**Honest gaps / deferred.** The festival "music" is the single `playFestivalChime`
+cue (the full music manager + regional/seasonal stingers are Prompt 061). The
+schedule change is asserted at the layer level in e2e (the `byFestival` precedence
+is unit-tested in `npcSchedule`), not by walking an NPC to its festival waypoint.
+Festivals are hosted in `TownScene` only (the legacy Town scene); the WEF
+`BallastBayTownScene` does not host festivals yet. Town interaction remains
+keyboard/`E` only — touch-interact parity for non-Farm scenes is the spawned
+Prompt-068 follow-up. Year-two festival variants + the restoration-gated Founders
+Harvest Fair are Prompt 057.
+
+---
+
 ## Prompt 055 — Community restoration projects (legacy 029) (2026-06-21)
 
 A civic restoration system on the foundation: a town project board, phased

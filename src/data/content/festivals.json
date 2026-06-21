@@ -1,6 +1,117 @@
 [
-  { "id": "seed-blessing", "name": "Seed Blessing", "season": "spring", "day": 13, "description": "The town blesses the season's first seeds and shares planting tips." },
-  { "id": "glowtide-night", "name": "Glowtide Night", "season": "summer", "day": 18, "description": "A lantern-lit night market along the shore as the tide glows." },
-  { "id": "harvest-fair", "name": "Harvest Fair", "season": "fall", "day": 16, "description": "A harvest market with stalls, contests, and shared meals." },
+  {
+    "id": "seed-blessing",
+    "name": "Seed Blessing",
+    "season": "spring",
+    "day": 13,
+    "description": "The town blesses the season's first seeds and shares planting tips on the village common.",
+    "startMinutes": 540,
+    "endMinutes": 1320,
+    "music": "festival-spring",
+    "venue": "Town",
+    "minigame": {
+      "id": "seed-scramble",
+      "kind": "forage-hunt",
+      "name": "Seed Scramble",
+      "description": "Blessed seed pods are tucked across the common — snatch the glowing one before it settles.",
+      "rounds": 8,
+      "goalScore": 5,
+      "slots": 4,
+      "targetLabel": "pod",
+      "rewards": [
+        { "kind": "gold", "amount": 150 },
+        { "kind": "item", "itemId": "blush-radish-seeds", "qty": 5 }
+      ]
+    },
+    "stall": {
+      "name": "Blessing Stall",
+      "entries": [
+        { "itemId": "bell-pea-seeds", "price": 12 },
+        { "itemId": "blush-radish-seeds", "price": 16 },
+        { "itemId": "tide-turnip-seeds", "price": 10 }
+      ]
+    },
+    "relationship": {
+      "npcId": "sol-aranda",
+      "line": "You came to the blessing! Here — press your thumb to the seed bowl with me. The bluff will remember it.",
+      "rewards": [{ "kind": "relationship", "npcId": "sol-aranda", "delta": 40 }]
+    }
+  },
+  {
+    "id": "glowtide-night",
+    "name": "Glowtide Night",
+    "season": "summer",
+    "day": 18,
+    "description": "A lantern-lit night market along the shore as the tide glows. Stalls stay open past midnight.",
+    "startMinutes": 1080,
+    "endMinutes": 1560,
+    "music": "festival-glowtide",
+    "venue": "Town",
+    "minigame": {
+      "id": "lantern-launch",
+      "kind": "lantern-release",
+      "name": "Lantern Launch",
+      "description": "Light each tide-lantern the moment it drifts past, before the current pulls it under.",
+      "rounds": 10,
+      "goalScore": 6,
+      "slots": 5,
+      "targetLabel": "lantern",
+      "rewards": [
+        { "kind": "gold", "amount": 220 },
+        { "kind": "item", "itemId": "shell-charm", "qty": 1 }
+      ]
+    },
+    "stall": {
+      "name": "Glowtide Stall",
+      "entries": [
+        { "itemId": "harborlime-tart", "price": 90 },
+        { "itemId": "sunmelon-juice", "price": 60 },
+        { "itemId": "tide-shell", "price": 20 }
+      ]
+    },
+    "relationship": {
+      "npcId": "lio-marin",
+      "line": "Quiet a second — watch the tide light up. I save this spot every Glowtide. Glad it's you standing here.",
+      "rewards": [{ "kind": "relationship", "npcId": "lio-marin", "delta": 40 }]
+    }
+  },
+  {
+    "id": "harvest-fair",
+    "name": "Harvest Fair",
+    "season": "fall",
+    "day": 16,
+    "description": "A harvest market with stalls, a cook-off, and shared meals down the market lane.",
+    "startMinutes": 540,
+    "endMinutes": 1320,
+    "music": "festival-harvest",
+    "venue": "Town",
+    "minigame": {
+      "id": "harvest-cook-off",
+      "kind": "cook-off",
+      "name": "Harvest Cook-Off",
+      "description": "Plate each harvest dish the instant it's ready — let one sit and the judges move on.",
+      "rounds": 9,
+      "goalScore": 5,
+      "slots": 4,
+      "targetLabel": "dish",
+      "rewards": [
+        { "kind": "gold", "amount": 260 },
+        { "kind": "item", "itemId": "pea-jam", "qty": 2 }
+      ]
+    },
+    "stall": {
+      "name": "Harvest Stall",
+      "entries": [
+        { "itemId": "honey-jar", "price": 140 },
+        { "itemId": "pea-jam", "price": 80 },
+        { "itemId": "garden-omelet", "price": 110 }
+      ]
+    },
+    "relationship": {
+      "npcId": "jun-park",
+      "line": "Saved you a plate from the cook-off — still warm. Sit, eat. The fair's better with company.",
+      "rewards": [{ "kind": "relationship", "npcId": "jun-park", "delta": 40 }]
+    }
+  },
   { "id": "frostlight-festival", "name": "Frostlight Festival", "season": "winter", "day": 8, "description": "Warm cider and lanterns against the longest nights of the year." }
 ]

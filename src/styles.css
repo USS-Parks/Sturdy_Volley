@@ -870,6 +870,51 @@ body {
 .ceremony-speaker { font-weight: 700; color: var(--sv-accent); }
 .ceremony-line { font-style: italic; }
 
+/* Festivals (Prompt 056). */
+.festival-panel { width: min(540px, 96vw); }
+.festival-desc { font-size: 13px; margin: 0 0 10px; opacity: 0.9; }
+.festival-actions { display: flex; flex-direction: column; gap: 10px; max-height: min(56vh, 460px); overflow-y: auto; }
+.festival-card {
+  padding: 10px 12px;
+  background: var(--sv-parchment);
+  border: 1px solid var(--sv-wood);
+  border-left: 4px solid #c9a23a;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.festival-card-title { font-weight: 700; }
+.festival-card-meta { font-size: 12px; opacity: 0.85; }
+.festival-card .menu-button { align-self: flex-start; min-width: 120px; }
+
+.festival-minigame-panel { width: min(520px, 96vw); }
+.festival-minigame-status { font-size: 13px; margin-bottom: 10px; min-height: 1.4em; }
+.festival-minigame-reward { font-weight: 700; color: var(--sv-accent); margin-bottom: 10px; }
+.festival-slots { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.festival-slot {
+  flex: 1 1 40%;
+  min-width: 120px;
+  min-height: 56px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--sv-wood);
+  background: var(--sv-parchment);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-transform: capitalize;
+  opacity: 0.55;
+  transition: opacity 0.1s ease, transform 0.1s ease;
+}
+.festival-slot-active {
+  opacity: 1;
+  font-weight: 700;
+  border-color: var(--sv-accent);
+  background: rgba(201, 162, 58, 0.28);
+  transform: translateY(-2px);
+}
+
 /* Pet panel (Prompt 020). */
 .pet-panel { width: min(520px, 96vw); }
 .pet-stats { font-weight: 700; }

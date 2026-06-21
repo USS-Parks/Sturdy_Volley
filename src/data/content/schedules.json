@@ -12,6 +12,20 @@
         { "startMinutes": 1320, "waypoint": { "sceneKey": "Interior", "x": 0, "z": 0, "posture": "sit" } }
       ]
     },
+    "byFestival": {
+      "seed-blessing": [
+        { "startMinutes": 360, "waypoint": { "sceneKey": "Town", "x": -4, "z": 1, "posture": "idle" } },
+        { "startMinutes": 540, "waypoint": { "sceneKey": "Town", "x": -4, "z": 1, "posture": "work" } }
+      ],
+      "glowtide-night": [
+        { "startMinutes": 1020, "waypoint": { "sceneKey": "Town", "x": -4, "z": 1, "posture": "idle" } },
+        { "startMinutes": 1080, "waypoint": { "sceneKey": "Town", "x": -4, "z": 1, "posture": "lean" } }
+      ],
+      "harvest-fair": [
+        { "startMinutes": 360, "waypoint": { "sceneKey": "Town", "x": -4, "z": 1, "posture": "idle" } },
+        { "startMinutes": 540, "waypoint": { "sceneKey": "Town", "x": -4, "z": 1, "posture": "work" } }
+      ]
+    },
     "byEvent": {
       "civic:netlight-beacon": [
         { "startMinutes": 360, "waypoint": { "sceneKey": "Town", "x": -8, "z": -4, "posture": "idle" } },
@@ -26,14 +40,36 @@
       { "startMinutes": 720, "waypoint": { "sceneKey": "Town", "x": -4, "z": -6, "posture": "idle" } },
       { "startMinutes": 1080, "waypoint": { "sceneKey": "Beach", "x": -2, "z": 8, "posture": "lean" } },
       { "startMinutes": 1260, "waypoint": { "sceneKey": "Interior", "x": -2, "z": 0, "posture": "sit" } }
-    ]
+    ],
+    "byFestival": {
+      "seed-blessing": [
+        { "startMinutes": 360, "waypoint": { "sceneKey": "Town", "x": -1, "z": 2, "posture": "work" } }
+      ],
+      "glowtide-night": [
+        { "startMinutes": 1020, "waypoint": { "sceneKey": "Town", "x": -1, "z": 2, "posture": "work" } }
+      ],
+      "harvest-fair": [
+        { "startMinutes": 360, "waypoint": { "sceneKey": "Town", "x": -1, "z": 2, "posture": "work" } }
+      ]
+    }
   },
   "sol-aranda": {
     "default": [
       { "startMinutes": 420, "waypoint": { "sceneKey": "Farm", "x": -2, "z": 3, "posture": "work" } },
       { "startMinutes": 900, "waypoint": { "sceneKey": "Town", "x": 5, "z": -4, "posture": "lean" } },
       { "startMinutes": 1140, "waypoint": { "sceneKey": "Interior", "x": 0, "z": 0, "posture": "idle" } }
-    ]
+    ],
+    "byFestival": {
+      "seed-blessing": [
+        { "startMinutes": 360, "waypoint": { "sceneKey": "Town", "x": 3, "z": 1, "posture": "idle" } }
+      ],
+      "glowtide-night": [
+        { "startMinutes": 1020, "waypoint": { "sceneKey": "Town", "x": 3, "z": 1, "posture": "idle" } }
+      ],
+      "harvest-fair": [
+        { "startMinutes": 360, "waypoint": { "sceneKey": "Town", "x": 3, "z": 1, "posture": "idle" } }
+      ]
+    }
   },
   "lio-marin": {
     "default": [
@@ -41,6 +77,17 @@
       { "startMinutes": 720, "waypoint": { "sceneKey": "Town", "x": 0, "z": -4, "posture": "lean" } },
       { "startMinutes": 1080, "waypoint": { "sceneKey": "Beach", "x": -4, "z": 2, "posture": "lean" } },
       { "startMinutes": 1260, "waypoint": { "sceneKey": "Interior", "x": 0, "z": 0, "posture": "sit" } }
-    ]
+    ],
+    "byFestival": {
+      "seed-blessing": [
+        { "startMinutes": 360, "waypoint": { "sceneKey": "Town", "x": 1, "z": -2, "posture": "lean" } }
+      ],
+      "glowtide-night": [
+        { "startMinutes": 1020, "waypoint": { "sceneKey": "Town", "x": 1, "z": -2, "posture": "lean" } }
+      ],
+      "harvest-fair": [
+        { "startMinutes": 360, "waypoint": { "sceneKey": "Town", "x": 1, "z": -2, "posture": "lean" } }
+      ]
+    }
   }
 }

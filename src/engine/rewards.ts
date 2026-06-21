@@ -32,3 +32,33 @@ export function grantRewards(save: SaveData, rewards: readonly QuestReward[]): v
     }
   }
 }
+
+/** Name resolvers for human-readable reward summaries. */
+export interface RewardNameResolvers {
+  item?: (id: string) => string;
+  npc?: (id: string) => string;
+  recipe?: (id: string) => string;
+}
+
+/** One reward as a short display string ("150 g", "5× Blush Radish Seeds", "+40 with Sol"). */
+export function describeReward(reward: QuestReward, names: RewardNameResolvers = {}): string {
+  switch (reward.kind) {
+    case 'gold':
+      return `${reward.amount} g`;
+    case 'item':
+      return `${reward.qty}× ${names.item?.(reward.itemId) ?? reward.itemId}`;
+    case 'recipe':
+      return `Recipe: ${names.recipe?.(reward.recipeId) ?? reward.recipeId}`;
+    case 'relationship': {
+      const who = names.npc?.(reward.npcId) ?? reward.npcId;
+      return `${reward.delta >= 0 ? '+' : ''}${reward.delta} with ${who}`;
+    }
+    case 'flag':
+      return 'Town progress';
+  }
+}
+
+/** Join a list of rewards into a single " · "-separated summary ("No reward" if empty). */
+export function summarizeRewards(rewards: readonly QuestReward[], names: RewardNameResolvers = {}): string {
+  return rewards.map((r) => describeReward(r, names)).join(' · ') || 'No reward';
+}

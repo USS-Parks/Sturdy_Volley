@@ -113,16 +113,8 @@ export const weatherSchema = z
   .strict();
 export type Weather = z.infer<typeof weatherSchema>;
 
-export const festivalSchema = z
-  .object({
-    id: idSchema,
-    name: z.string().min(1),
-    season: seasonSchema,
-    day: z.number().int().min(1).max(28),
-    description: z.string().min(1),
-  })
-  .strict();
-export type Festival = z.infer<typeof festivalSchema>;
+// `festivalSchema` (Prompt 056) is defined below `questRewardSchema`, which it
+// reuses for the minigame + relationship-opportunity rewards.
 
 /**
  * Quest taxonomy (Prompt 054).
@@ -201,6 +193,97 @@ export const questRewardSchema = z.discriminatedUnion('kind', [
     .strict(),
 ]);
 export type QuestReward = z.infer<typeof questRewardSchema>;
+
+/**
+ * Seasonal festivals (Prompt 056). A festival lands on a fixed season + day and,
+ * on that day, reshapes the host scene: NPC schedules move to the festival
+ * grounds (the `byFestival` schedule layer keys off this id), regular shops
+ * close, festival dressing + music come up, and the player can play a non-sport
+ * minigame, visit a special stall, and share a relationship moment.
+ *
+ * Every gameplay field is optional with a default so a thin entry (id + name +
+ * season + day + description) still validates — `frostlight-festival` ships thin
+ * (its full content lands in Prompt 057), while the phase-one trio is enriched.
+ */
+export const festivalMinigameKindSchema = z.enum([
+  'forage-hunt',
+  'lantern-release',
+  'cook-off',
+  'fishing-contest',
+]);
+export type FestivalMinigameKind = z.infer<typeof festivalMinigameKindSchema>;
+
+/**
+ * A deterministic, seed-driven round game: each of `rounds` rounds lights one of
+ * `slots` targets; tapping the lit target scores a point. Reaching `goalScore`
+ * wins the (once-per-year) prize. Seed-driven + serializable so a later
+ * multiplayer layer can replay/share a run (multiplayer hook — Prompt 056).
+ */
+export const festivalMinigameSchema = z
+  .object({
+    id: idSchema,
+    kind: festivalMinigameKindSchema,
+    name: z.string().min(1),
+    description: z.string().min(1),
+    rounds: z.number().int().min(1).max(40).default(8),
+    goalScore: z.number().int().positive().default(5),
+    slots: z.number().int().min(2).max(8).default(4),
+    /** Label for one target slot (flavor: "pod", "lantern", "dish", "cast"). */
+    targetLabel: z.string().min(1).default('target'),
+    /** Granted once per year on a win. */
+    rewards: z.array(questRewardSchema).default([]),
+  })
+  .strict();
+export type FestivalMinigame = z.infer<typeof festivalMinigameSchema>;
+
+export const festivalStallEntrySchema = z
+  .object({ itemId: idSchema, price: z.number().int().positive() })
+  .strict();
+export type FestivalStallEntry = z.infer<typeof festivalStallEntrySchema>;
+
+export const festivalStallSchema = z
+  .object({
+    name: z.string().min(1),
+    /** Festival-only stock at festival prices. */
+    entries: z.array(festivalStallEntrySchema).min(1),
+  })
+  .strict();
+export type FestivalStall = z.infer<typeof festivalStallSchema>;
+
+export const festivalRelationshipSchema = z
+  .object({
+    npcId: idSchema,
+    /** What the NPC says when you share the festival moment. */
+    line: z.string().min(1),
+    /** Granted once per year when the moment is shared (usually a relationship bump). */
+    rewards: z.array(questRewardSchema).default([]),
+  })
+  .strict();
+export type FestivalRelationship = z.infer<typeof festivalRelationshipSchema>;
+
+export const festivalSchema = z
+  .object({
+    id: idSchema,
+    name: z.string().min(1),
+    season: seasonSchema,
+    day: z.number().int().min(1).max(28),
+    description: z.string().min(1),
+    /** Festival active window in minutes-from-midnight (default 9:00 AM → midnight). */
+    startMinutes: z.number().int().min(0).max(26 * 60).default(9 * 60),
+    endMinutes: z.number().int().min(0).max(26 * 60).default(24 * 60),
+    /** Music-cue id for the festival theme (the full music manager lands in Prompt 061). */
+    music: z.string().min(1).default('festival'),
+    /** Scene that hosts the festival. */
+    venue: z.string().min(1).default('Town'),
+    /** A non-sport minigame: a foraging hunt, lantern release, cook-off, or fishing contest. */
+    minigame: festivalMinigameSchema.nullable().default(null),
+    /** The festival special stall. */
+    stall: festivalStallSchema.nullable().default(null),
+    /** A festival-only relationship opportunity. */
+    relationship: festivalRelationshipSchema.nullable().default(null),
+  })
+  .strict();
+export type Festival = z.infer<typeof festivalSchema>;
 
 export const questSchema = z
   .object({

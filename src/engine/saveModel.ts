@@ -77,6 +77,24 @@ export const projectStateSchema = z
 export type ProjectState = z.infer<typeof projectStateSchema>;
 export type ProjectRecord = Record<string, ProjectState>;
 
+/**
+ * Per-festival participation (Prompt 056). Tracks attendance + the best minigame
+ * score ever, and the year each one-per-year reward (minigame prize, shared
+ * relationship moment) was last claimed so they can't be farmed. `*Year` fields
+ * store the in-game calendar year. Defaulted field, no `SAVE_VERSION` bump —
+ * pre-festival saves parse to `{}` (real migration lands in Prompt 067).
+ */
+export const festivalStateSchema = z
+  .object({
+    attendedYear: z.number().int().positive().nullable().default(null),
+    bestScore: z.number().int().nonnegative().default(0),
+    minigameWonYear: z.number().int().positive().nullable().default(null),
+    relationshipYear: z.number().int().positive().nullable().default(null),
+  })
+  .strict();
+export type FestivalState = z.infer<typeof festivalStateSchema>;
+export type FestivalRecord = Record<string, FestivalState>;
+
 export const saveSchema = z
   .object({
     version: z.literal(SAVE_VERSION),
@@ -133,6 +151,7 @@ export const saveSchema = z
     flags: z.record(z.string(), z.union([z.boolean(), z.number(), z.string()])),
     quests: z.record(z.string(), questStateSchema).default({}),
     projects: z.record(z.string(), projectStateSchema).default({}),
+    festivals: z.record(z.string(), festivalStateSchema).default({}),
     mapState: z.record(z.string(), z.unknown()),
     machines: z
       .record(
@@ -314,6 +333,7 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
     flags: {},
     quests: {},
     projects: {},
+    festivals: {},
     mapState: {},
     machines: defaultFarmMachines(),
     animals: defaultFarmAnimals(),

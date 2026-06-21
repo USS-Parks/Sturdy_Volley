@@ -8,11 +8,13 @@ import {
   DEFAULT_COLLAPSE_PENALTY,
 } from '../../src/engine/dayResolution';
 import { DAY_END_MIN, DAY_START_MIN } from '../../src/engine/timeSystem';
-import type { Festival, Item, Npc } from '../../src/data/schemas';
+import { festivalSchema, type Festival, type Item, type Npc } from '../../src/data/schemas';
 import { addItem } from '../../src/engine/inventory';
 
+// Parse through the schema so the optional Prompt 056 fields default in (the
+// day-resolution path only reads season/day/name here).
 const FESTIVALS: Festival[] = [
-  { id: 'seed-blessing', name: 'Seed Blessing', season: 'spring', day: 2, description: 'x' },
+  festivalSchema.parse({ id: 'seed-blessing', name: 'Seed Blessing', season: 'spring', day: 2, description: 'x' }),
 ];
 const ITEMS: Item[] = [
   { id: 'bell-peas', name: 'Bell Peas', description: 'x', category: 'crop', sellPrice: 24, stackable: true, tags: ['spring'] },

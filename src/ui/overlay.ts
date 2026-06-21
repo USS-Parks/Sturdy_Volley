@@ -180,6 +180,59 @@ export interface CeremonyOptions {
   onClose: () => void;
 }
 
+export interface FestivalPanelMinigame {
+  name: string;
+  description: string;
+  rewardSummary: string;
+  bestScore: number;
+  goal: number;
+  /** True when the once-per-year prize has already been won this year. */
+  claimedThisYear: boolean;
+}
+
+export interface FestivalPanelRelationship {
+  npcName: string;
+  rewardSummary: string;
+  /** True when the moment has already been shared this year. */
+  claimedThisYear: boolean;
+}
+
+export interface FestivalPanelOptions {
+  name: string;
+  description: string;
+  /** "9:00 AM–10:00 PM". */
+  windowLabel: string;
+  /** True when the festival is within its active window right now. */
+  activeNow: boolean;
+  minigame?: FestivalPanelMinigame | null;
+  stallName?: string | null;
+  relationship?: FestivalPanelRelationship | null;
+  onPlayMinigame: () => void;
+  onVisitStall: () => void;
+  onShareMoment: () => void;
+  onClose: () => void;
+}
+
+export interface FestivalMinigameOptions {
+  title: string;
+  instruction: string;
+  /** Flavor noun for one target ("pod", "lantern", "dish", "cast"). */
+  targetLabel: string;
+  slots: number;
+  /** The lit slot the player should tap this round. */
+  activeSlot: number;
+  round: number;
+  rounds: number;
+  score: number;
+  goal: number;
+  phase: 'play' | 'won' | 'lost';
+  /** Reward summary shown on a win, when a prize was granted. */
+  resultSummary?: string | null;
+  onTap: (slot: number) => void;
+  onReplay: () => void;
+  onClose: () => void;
+}
+
 export interface ElevatorPanelOption {
   level: number;
   name: string;
@@ -1199,6 +1252,169 @@ export class UIOverlay {
     close.className = 'menu-button';
     close.textContent = 'Continue';
     close.dataset.testid = 'ceremony-continue';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /**
+   * Festival hub panel (Prompt 056). Shown on a festival day: the festival name,
+   * description, hours, and a touch-friendly stack of activity buttons — play the
+   * non-sport minigame, visit the special stall, and share the relationship
+   * moment. Once-per-year activities show a "done this year" badge when claimed.
+   */
+  showFestivalPanel(opts: FestivalPanelOptions): void {
+    this.clear();
+    const subtitle = `${opts.windowLabel}${opts.activeNow ? ' · happening now' : ''}`;
+    const panel = this.createPanel(opts.name, subtitle);
+    panel.classList.add('festival-panel');
+    panel.dataset.testid = 'festival-panel';
+
+    const desc = document.createElement('p');
+    desc.className = 'festival-desc';
+    desc.textContent = opts.description;
+    panel.appendChild(desc);
+
+    const actions = document.createElement('div');
+    actions.className = 'festival-actions';
+
+    if (opts.minigame) {
+      const card = document.createElement('div');
+      card.className = 'festival-card';
+      card.dataset.testid = 'festival-minigame-card';
+      const heading = document.createElement('div');
+      heading.className = 'festival-card-title';
+      heading.textContent = opts.minigame.name;
+      const meta = document.createElement('div');
+      meta.className = 'festival-card-meta';
+      const prizeNote = opts.minigame.claimedThisYear ? 'Prize claimed this year' : `Prize: ${opts.minigame.rewardSummary}`;
+      meta.textContent = `${opts.minigame.description} · Goal ${opts.minigame.goal} · Best ${opts.minigame.bestScore} · ${prizeNote}`;
+      const play = document.createElement('button');
+      play.type = 'button';
+      play.className = 'menu-button';
+      play.textContent = 'Play';
+      play.dataset.testid = 'festival-play-minigame';
+      play.addEventListener('click', opts.onPlayMinigame);
+      card.append(heading, meta, play);
+      actions.appendChild(card);
+    }
+
+    if (opts.stallName) {
+      const card = document.createElement('div');
+      card.className = 'festival-card';
+      card.dataset.testid = 'festival-stall-card';
+      const heading = document.createElement('div');
+      heading.className = 'festival-card-title';
+      heading.textContent = opts.stallName;
+      const visit = document.createElement('button');
+      visit.type = 'button';
+      visit.className = 'menu-button';
+      visit.textContent = 'Visit stall';
+      visit.dataset.testid = 'festival-visit-stall';
+      visit.addEventListener('click', opts.onVisitStall);
+      card.append(heading, visit);
+      actions.appendChild(card);
+    }
+
+    if (opts.relationship) {
+      const card = document.createElement('div');
+      card.className = 'festival-card';
+      card.dataset.testid = 'festival-relationship-card';
+      const heading = document.createElement('div');
+      heading.className = 'festival-card-title';
+      heading.textContent = `Share the moment with ${opts.relationship.npcName}`;
+      const meta = document.createElement('div');
+      meta.className = 'festival-card-meta';
+      meta.textContent = opts.relationship.claimedThisYear
+        ? 'Shared this year'
+        : opts.relationship.rewardSummary;
+      const share = document.createElement('button');
+      share.type = 'button';
+      share.className = 'menu-button';
+      share.textContent = opts.relationship.claimedThisYear ? 'Already shared' : 'Share';
+      share.dataset.testid = 'festival-share-moment';
+      share.disabled = opts.relationship.claimedThisYear;
+      share.addEventListener('click', opts.onShareMoment);
+      card.append(heading, meta, share);
+      actions.appendChild(card);
+    }
+
+    panel.appendChild(actions);
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'menu-button';
+    close.textContent = 'Leave the festival';
+    close.dataset.testid = 'festival-close';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
+  }
+
+  /**
+   * Festival minigame board (Prompt 056). A row of target slots with the lit one
+   * highlighted; tapping the lit slot scores a point. Re-rendered by the scene
+   * each tap. On finish it shows a won/lost result with the prize summary +
+   * Replay / Back. Deterministic + touch-friendly (full-width slot buttons).
+   */
+  showFestivalMinigame(opts: FestivalMinigameOptions): void {
+    this.clear();
+    const panel = this.createPanel(opts.title, `Round ${Math.min(opts.round + 1, opts.rounds)}/${opts.rounds} · Score ${opts.score}/${opts.goal}`);
+    panel.classList.add('festival-minigame-panel');
+    panel.dataset.testid = 'festival-minigame';
+
+    const status = document.createElement('div');
+    status.className = 'festival-minigame-status';
+    status.dataset.testid = 'festival-minigame-status';
+    status.textContent =
+      opts.phase === 'won'
+        ? `You won! Score ${opts.score}/${opts.goal}.`
+        : opts.phase === 'lost'
+          ? `Score ${opts.score}/${opts.goal} — try again next round.`
+          : opts.instruction;
+    panel.appendChild(status);
+
+    if (opts.phase === 'play') {
+      const board = document.createElement('div');
+      board.className = 'festival-slots';
+      board.dataset.testid = 'festival-slots';
+      for (let i = 0; i < opts.slots; i++) {
+        const slot = document.createElement('button');
+        slot.type = 'button';
+        slot.className = `festival-slot${i === opts.activeSlot ? ' festival-slot-active' : ''}`;
+        slot.dataset.testid = `festival-slot-${i}`;
+        if (i === opts.activeSlot) slot.dataset.active = '1';
+        slot.textContent = i === opts.activeSlot ? `★ ${opts.targetLabel}` : opts.targetLabel;
+        slot.addEventListener('click', () => opts.onTap(i));
+        board.appendChild(slot);
+      }
+      panel.appendChild(board);
+    } else {
+      if (opts.phase === 'won' && opts.resultSummary) {
+        const reward = document.createElement('div');
+        reward.className = 'festival-minigame-reward';
+        reward.dataset.testid = 'festival-minigame-reward';
+        reward.textContent = `Prize: ${opts.resultSummary}`;
+        panel.appendChild(reward);
+      }
+      const replay = document.createElement('button');
+      replay.type = 'button';
+      replay.className = 'menu-button';
+      replay.textContent = 'Play again';
+      replay.dataset.testid = 'festival-minigame-replay';
+      replay.addEventListener('click', opts.onReplay);
+      panel.appendChild(replay);
+    }
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'menu-button menu-button-secondary';
+    close.textContent = 'Back';
+    close.dataset.testid = 'festival-minigame-close';
     close.addEventListener('click', opts.onClose);
     panel.appendChild(close);
 

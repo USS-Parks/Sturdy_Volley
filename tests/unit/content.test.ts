@@ -123,4 +123,25 @@ describe('content validation errors are useful', () => {
     const { issues } = validateContent(raw);
     expect(issues.some((i) => i.message.includes('duplicate id'))).toBe(true);
   });
+
+  it('flags a festival stall / relationship reference that does not resolve (Prompt 056)', () => {
+    const raw: RawContent = {
+      ...EMPTY_RAW,
+      festivals: [
+        {
+          id: 'bad-fair',
+          name: 'Bad Fair',
+          season: 'fall',
+          day: 16,
+          description: 'x',
+          stall: { name: 'Stall', entries: [{ itemId: 'no-such-item', price: 10 }] },
+          relationship: { npcId: 'no-such-npc', line: 'hi', rewards: [] },
+        },
+      ],
+    };
+    const { content, issues } = validateContent(raw);
+    expect(content).toBeNull();
+    expect(issues.some((i) => i.collection === 'festivals' && i.message.includes('no-such-item'))).toBe(true);
+    expect(issues.some((i) => i.collection === 'festivals' && i.message.includes('no-such-npc'))).toBe(true);
+  });
 });

@@ -21,7 +21,29 @@ import {
   contributeActive,
   reconcileActiveProjects,
 } from '../engine/civic-tracking';
-import type { CivicProject } from '../data/schemas';
+import {
+  activeFestival,
+  activeFestivalStallRows,
+  buyFestivalStallItem,
+  claimActiveFestivalRelationship,
+  festivalBestScore,
+  festivalMinigameSeed,
+  isFestivalActiveNowOnSave,
+  markActiveFestivalAttended,
+  recordActiveMinigameRun,
+} from '../engine/festival-tracking';
+import {
+  canClaimMinigame,
+  canClaimRelationship,
+  festivalWindowLabel,
+  minigameRewardSummary,
+  relationshipRewardSummary,
+  startFestivalMinigame,
+  tapFestivalSlot,
+  type FestivalMinigameState,
+} from '../engine/festival';
+import { playFestivalChime } from '../audio/cues';
+import type { CivicProject, Festival, Season } from '../data/schemas';
 import { formatWorldStatus } from '../engine/format';
 import { computeMoveVector, type MoveInput } from '../engine/movement';
 import { createControllerState, stepController, type ControllerState } from '../engine/controller';
@@ -204,6 +226,11 @@ export class TownScene extends GameScene {
   private tastingTable: TastingTable = {};
   /** Prompt 055: per-project graybox meshes shown when that project completes. */
   private readonly civicMeshes = new Map<string, AbstractMesh[]>();
+  /** Prompt 056: today's festival (null on an ordinary day) + festival dressing meshes. */
+  private festival: Festival | null = null;
+  private readonly festivalMeshes: AbstractMesh[] = [];
+  private festivalMinigame: FestivalMinigameState | null = null;
+  private festivalMinigameResult: string | null = null;
 
   build(): Scene {
     const scene = makeScene(this.ctx.engine, PALETTE.sky);
@@ -230,6 +257,7 @@ export class TownScene extends GameScene {
     this.buildLanternPoles(scene);
     this.buildCivicBoard(scene);
     this.buildCivicAssets(scene);
+    this.buildFestivalDressing(scene);
 
     const player = MeshBuilder.CreateCapsule('player', { height: 1.8, radius: 0.4 }, scene);
     player.position.set(0, 0.9, 8);
@@ -362,6 +390,41 @@ export class TownScene extends GameScene {
     this.civicMeshes.set('belltide-boardwalk', planks);
   }
 
+  /**
+   * Prompt 056: festival dressing built hidden near the market-lane common — a
+   * banner arch, a small stage platform, and a string of festival lanterns.
+   * `refreshFestival()` toggles them on the festival day (the visible map setup).
+   * The stage at (-2, 2) is the festival interaction anchor.
+   */
+  private buildFestivalDressing(scene: Scene): void {
+    const stage = MeshBuilder.CreateCylinder('festival-stage', { height: 0.3, diameter: 3.2, tessellation: 8 }, scene);
+    stage.position.set(-2, 0.15, 2);
+    stage.material = flatMaterial(scene, 'festival-stage', PALETTE.wood, 0.2);
+    this.festivalMeshes.push(stage);
+
+    // Banner arch — two posts + a bunting beam over the common.
+    for (const [i, x] of [-5, 1].entries()) {
+      const post = MeshBuilder.CreateCylinder(`festival-post-${i}`, { height: 3.4, diameter: 0.18 }, scene);
+      post.position.set(x, 1.7, 2);
+      post.material = flatMaterial(scene, `festival-post-${i}`, PALETTE.cliff, 0.2);
+      this.festivalMeshes.push(post);
+    }
+    const banner = MeshBuilder.CreateBox('festival-banner', { width: 6.4, depth: 0.12, height: 0.7 }, scene);
+    banner.position.set(-2, 3.4, 2);
+    banner.material = flatMaterial(scene, 'festival-banner', PALETTE.accent, 0.32);
+    this.festivalMeshes.push(banner);
+
+    // A string of festival lanterns along the lane.
+    for (const [i, x] of [-6, -3, 0, 3].entries()) {
+      const lamp = MeshBuilder.CreateSphere(`festival-lantern-${i}`, { diameter: 0.5 }, scene);
+      lamp.position.set(x, 3.2, 2);
+      lamp.material = flatMaterial(scene, `festival-lantern-${i}`, PALETTE.warmLight, 0.5);
+      this.festivalMeshes.push(lamp);
+    }
+
+    for (const mesh of this.festivalMeshes) mesh.isVisible = false;
+  }
+
   /** Reveal the completion meshes for every finished project. */
   private applyCivicState(): void {
     const completed = new Set(
@@ -423,6 +486,10 @@ export class TownScene extends GameScene {
     reconcileActiveProjects();
     this.applyCivicState();
 
+    // Prompt 056: if today is a festival, raise the dressing, play the festival
+    // cue, and mark attendance (the schedule + shop changes flow from `festival`).
+    this.refreshFestival(true);
+
     this.rebuildTargets();
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
@@ -443,6 +510,19 @@ export class TownScene extends GameScene {
         civicMeshVisible: (id: string) => boolean;
         grantItem: (itemId: string, qty: number) => void;
         setRelationship: (npcId: string, points: number) => void;
+        // Prompt 056 — festivals.
+        setDate: (season: string, day: number) => void;
+        festivalToday: () => { id: string; name: string } | null;
+        festivalActiveNow: () => boolean;
+        festivalScheduleId: () => string | null;
+        festivalDressingVisible: () => boolean;
+        openFestival: () => void;
+        minigameState: () => { round: number; rounds: number; score: number; goal: number; activeSlot: number; finished: boolean; won: boolean } | null;
+        playMinigameToWin: () => { won: boolean; score: number; granted: boolean; rewardSummary: string | null };
+        stallRows: () => Array<{ itemId: string; name: string; price: number }>;
+        buyStall: (itemId: string) => { bought: boolean; reason?: string; price: number };
+        shareMoment: () => { claimed: boolean; npcId: string | null; rewardSummary: string | null };
+        walletGold: () => number;
       };
     }).sturdyVolleyTown = {
       npcs: () => {
@@ -483,7 +563,58 @@ export class TownScene extends GameScene {
         this.save.relationships[npcId] = points;
         persistActiveSave();
       },
+      // Prompt 056 — festivals.
+      setDate: (season: string, day: number) => this.debugSetDate(season as Season, day),
+      festivalToday: () => (this.festival ? { id: this.festival.id, name: this.festival.name } : null),
+      festivalActiveNow: () => isFestivalActiveNowOnSave(),
+      festivalScheduleId: () => this.scheduleContext().festivalId,
+      festivalDressingVisible: () => this.festivalMeshes.length > 0 && this.festivalMeshes.every((m) => m.isVisible),
+      openFestival: () => this.openFestival(),
+      minigameState: () => {
+        const s = this.festivalMinigame;
+        return s
+          ? { round: s.round, rounds: s.rounds, score: s.score, goal: s.goal, activeSlot: s.activeSlot, finished: s.finished, won: s.won }
+          : null;
+      },
+      playMinigameToWin: () => this.debugPlayMinigameToWin(),
+      stallRows: () => activeFestivalStallRows(),
+      buyStall: (itemId: string) => {
+        const id = this.festival?.id ?? '';
+        const r = buyFestivalStallItem(id, itemId);
+        return { bought: r.bought, reason: r.reason, price: r.price };
+      },
+      shareMoment: () => {
+        const id = this.festival?.id ?? '';
+        const r = claimActiveFestivalRelationship(id);
+        return { claimed: r.claimed, npcId: r.npcId, rewardSummary: r.rewardSummary };
+      },
+      walletGold: () => this.save.wallet.gold,
     };
+  }
+
+  /** Debug/e2e: jump the active save to a season + day, then re-resolve the festival. */
+  private debugSetDate(season: Season, day: number): void {
+    this.save.calendar.season = season;
+    this.save.calendar.day = day;
+    this.clock.time.season = season;
+    this.clock.time.day = day;
+    persistActiveSave();
+    this.refreshFestival(true);
+    this.rebuildTargets();
+  }
+
+  /** Debug/e2e: start the festival minigame and tap the lit slot every round to win, then record it. */
+  private debugPlayMinigameToWin(): { won: boolean; score: number; granted: boolean; rewardSummary: string | null } {
+    if (!this.festival || !this.festival.minigame) return { won: false, score: 0, granted: false, rewardSummary: null };
+    const seed = festivalMinigameSeed(this.festival);
+    let state = startFestivalMinigame(this.festival, seed);
+    if (!state) return { won: false, score: 0, granted: false, rewardSummary: null };
+    while (!state.finished) {
+      state = tapFestivalSlot(state, state.activeSlot, seed).state;
+    }
+    this.festivalMinigame = state;
+    const outcome = recordActiveMinigameRun(this.festival.id, state.score, state.won);
+    return { won: state.won, score: state.score, granted: outcome.granted, rewardSummary: outcome.rewardSummary };
   }
 
   /** Debug-only contribution that also applies the map change + ceremony, returning a serializable result. */
@@ -502,7 +633,9 @@ export class TownScene extends GameScene {
       minutes: this.clock.time.minutes,
       season: this.save.calendar.season,
       weatherId: this.weather?.id ?? null,
-      festivalId: null,
+      // Prompt 056: on a festival day the `byFestival` schedule layer routes NPCs
+      // to the festival grounds instead of their ordinary day.
+      festivalId: this.festival?.id ?? null,
       relationshipLevel: 0,
       // Prompt 055: completed projects activate `byEvent` schedule layers
       // (e.g. Mara tends the relit beacon in the evening instead of leaving town).
@@ -577,6 +710,170 @@ export class TownScene extends GameScene {
     });
   }
 
+  /* Prompt 056 — festivals ------------------------------------------- */
+
+  /**
+   * Resolve today's festival for the active save and toggle the festival
+   * dressing. On a festival day (`playCue`) it also plays the festival cue and
+   * marks attendance. Called on scene-enter and on a debug date jump.
+   */
+  private refreshFestival(playCue: boolean): void {
+    this.festival = activeFestival();
+    const visible = this.festival !== null;
+    for (const mesh of this.festivalMeshes) mesh.isVisible = visible;
+    if (this.festival && playCue) {
+      markActiveFestivalAttended(this.festival.id);
+      playFestivalChime();
+    }
+  }
+
+  private openFestival(): void {
+    if (!this.festival) return;
+    this.menuOpen = true;
+    markActiveFestivalAttended(this.festival.id);
+    this.renderFestivalPanel();
+  }
+
+  private festivalRewardNames() {
+    const content = loadGameContent();
+    const items = new Map(content.items.map((i) => [i.id, i.name] as const));
+    return {
+      item: (id: string) => items.get(id) ?? id,
+      npc: (id: string) => this.npcName(id) ?? id,
+    };
+  }
+
+  private renderFestivalPanel(): void {
+    const festival = this.festival;
+    if (!festival) {
+      this.menuOpen = false;
+      this.refreshHud();
+      return;
+    }
+    this.menuOpen = true;
+    const names = this.festivalRewardNames();
+    const year = this.save.calendar.year;
+    this.ctx.overlay.showFestivalPanel({
+      name: festival.name,
+      description: festival.description,
+      windowLabel: festivalWindowLabel(festival),
+      activeNow: isFestivalActiveNowOnSave(),
+      minigame: festival.minigame
+        ? {
+            name: festival.minigame.name,
+            description: festival.minigame.description,
+            rewardSummary: minigameRewardSummary(festival, names),
+            bestScore: festivalBestScore(festival.id),
+            goal: festival.minigame.goalScore,
+            claimedThisYear: !canClaimMinigame(this.save.festivals, festival, year),
+          }
+        : null,
+      stallName: festival.stall?.name ?? null,
+      relationship: festival.relationship
+        ? {
+            npcName: this.npcName(festival.relationship.npcId) ?? festival.relationship.npcId,
+            rewardSummary: relationshipRewardSummary(festival, names),
+            claimedThisYear: !canClaimRelationship(this.save.festivals, festival, year),
+          }
+        : null,
+      onPlayMinigame: () => this.startFestivalMinigame(),
+      onVisitStall: () => this.openFestivalStall(),
+      onShareMoment: () => this.shareFestivalMoment(),
+      onClose: () => {
+        this.menuOpen = false;
+        this.refreshHud();
+      },
+    });
+  }
+
+  private startFestivalMinigame(): void {
+    if (!this.festival || !this.festival.minigame) return;
+    const seed = festivalMinigameSeed(this.festival);
+    this.festivalMinigame = startFestivalMinigame(this.festival, seed);
+    this.festivalMinigameResult = null;
+    this.renderFestivalMinigame();
+  }
+
+  private renderFestivalMinigame(): void {
+    const festival = this.festival;
+    const state = this.festivalMinigame;
+    if (!festival || !festival.minigame || !state) {
+      this.renderFestivalPanel();
+      return;
+    }
+    const phase: 'play' | 'won' | 'lost' = !state.finished ? 'play' : state.won ? 'won' : 'lost';
+    this.ctx.overlay.showFestivalMinigame({
+      title: festival.minigame.name,
+      instruction: festival.minigame.description,
+      targetLabel: state.targetLabel,
+      slots: state.slots,
+      activeSlot: state.activeSlot,
+      round: state.round,
+      rounds: state.rounds,
+      score: state.score,
+      goal: state.goal,
+      phase,
+      resultSummary: this.festivalMinigameResult,
+      onTap: (slot) => this.tapFestivalMinigame(slot),
+      onReplay: () => this.startFestivalMinigame(),
+      onClose: () => this.renderFestivalPanel(),
+    });
+  }
+
+  private tapFestivalMinigame(slot: number): void {
+    const festival = this.festival;
+    const state = this.festivalMinigame;
+    if (!festival || !state || state.finished) return;
+    const seed = festivalMinigameSeed(festival);
+    const result = tapFestivalSlot(state, slot, seed);
+    this.festivalMinigame = result.state;
+    if (result.finished) {
+      const outcome = recordActiveMinigameRun(festival.id, result.state.score, result.state.won);
+      this.festivalMinigameResult = outcome.rewardSummary;
+      if (result.won) playFestivalChime();
+    }
+    this.renderFestivalMinigame();
+  }
+
+  private openFestivalStall(): void {
+    const festival = this.festival;
+    if (!festival || !festival.stall) {
+      this.renderFestivalPanel();
+      return;
+    }
+    const rows = activeFestivalStallRows();
+    this.ctx.overlay.showShopPanel({
+      shopName: festival.stall.name,
+      walletGold: this.save.wallet.gold,
+      entries: rows.map((r) => ({ itemId: r.itemId, itemName: r.name, price: r.price, remaining: -1 })),
+      onBuy: (itemId) => {
+        buyFestivalStallItem(festival.id, itemId);
+        this.openFestivalStall(); // re-render with the updated wallet
+      },
+      onClose: () => this.renderFestivalPanel(),
+    });
+  }
+
+  private shareFestivalMoment(): void {
+    const festival = this.festival;
+    if (!festival || !festival.relationship) {
+      this.renderFestivalPanel();
+      return;
+    }
+    const result = claimActiveFestivalRelationship(festival.id);
+    const speaker = this.npcName(festival.relationship.npcId) ?? festival.relationship.npcId;
+    if (!result.claimed) {
+      this.renderFestivalPanel();
+      return;
+    }
+    this.ctx.overlay.showDialoguePanel({
+      speaker,
+      body: result.line ?? festival.relationship.line,
+      tierFlash: result.rewardSummary ? { tier: 'love', deltaText: result.rewardSummary } : undefined,
+      onDismiss: () => this.renderFestivalPanel(),
+    });
+  }
+
   private rebuildTargets(): void {
     const base: InteractTarget[] = [];
     for (const npc of this.npcs.values()) {
@@ -597,15 +894,19 @@ export class TownScene extends GameScene {
     // labeled with the building name and an open/closed badge based on
     // `engine/shops.ts` hours.
     const minutes = this.clock?.time?.minutes ?? this.save.calendar.timeMinutes;
+    // Prompt 056: regular storefronts close on a festival day — the stalls move
+    // to the festival grounds instead.
+    const festivalActive = this.festival !== null;
     for (const b of BUILDINGS) {
       const [x, z] = b.position;
       const doorZ = z + b.depth / 2 + 0.4;
       const hours = hoursFor(b.id);
-      const open = hours ? isShopOpen(hours, minutes, false) : true;
+      const open = hours ? isShopOpen(hours, minutes, festivalActive) : !festivalActive;
+      const closedLabel = festivalActive ? `${b.label} — closed for the festival` : `${b.label} — closed today`;
       base.push({
         id: `door:${b.id}`,
         kind: 'door',
-        label: open ? `Enter the ${b.label}` : `${b.label} — closed today`,
+        label: open ? `Enter the ${b.label}` : closedLabel,
         x,
         z: doorZ,
         radius: 1.2,
@@ -622,6 +923,18 @@ export class TownScene extends GameScene {
       radius: 1.5,
       priority: 3,
     });
+    // Prompt 056: the festival stage anchor (only present on a festival day).
+    if (this.festival) {
+      base.push({
+        id: 'festival-stage',
+        kind: 'prop',
+        label: `Join the ${this.festival.name}`,
+        x: -2,
+        z: 2,
+        radius: 2.0,
+        priority: 5,
+      });
+    }
     this.targets = base;
   }
 
@@ -680,6 +993,7 @@ export class TownScene extends GameScene {
       if (this.nearest.id.startsWith('npc:')) this.openNpcGreeting(this.nearest.id.slice('npc:'.length));
       else if (this.nearest.id.startsWith('door:')) this.handleDoor(this.nearest.id.slice('door:'.length));
       else if (this.nearest.id === 'civic-board') this.openCivicBoard();
+      else if (this.nearest.id === 'festival-stage') this.openFestival();
       else {
         this.actionLabel = this.nearest.label;
         this.actionTimer = 1.6;
@@ -755,6 +1069,10 @@ export class TownScene extends GameScene {
       gold: this.save.wallet.gold,
     });
     let line = `${status} · energy ${stamina}%`;
+    // Prompt 056: a festival-day banner so the player knows the town has changed.
+    if (this.festival) {
+      line = `🎏 ${this.festival.name} today${isFestivalActiveNowOnSave() ? ' — happening now' : ''} · ${line}`;
+    }
     if (this.actionTimer > 0) line += ` · ✔ ${this.actionLabel}`;
     else if (this.nearest) line += ` · [E] ${this.nearest.label}`;
     // Prompt 024: rotate a small "unscripted moment" line behind the
@@ -810,10 +1128,13 @@ export class TownScene extends GameScene {
   private handleDoor(buildingId: string): void {
     const minutes = this.clock.time.minutes;
     const hours = hoursFor(buildingId);
-    const open = hours ? isShopOpen(hours, minutes, false) : true;
+    const festivalActive = this.festival !== null;
+    const open = hours ? isShopOpen(hours, minutes, festivalActive) : !festivalActive;
     if (!open) {
       const building = BUILDINGS.find((b) => b.id === buildingId);
-      this.actionLabel = `${building?.label ?? 'Shop'} is closed (${this.formatHours(hours)}).`;
+      this.actionLabel = festivalActive
+        ? `${building?.label ?? 'Shop'} is closed for the ${this.festival?.name ?? 'festival'} — visit the stalls!`
+        : `${building?.label ?? 'Shop'} is closed (${this.formatHours(hours)}).`;
       this.actionTimer = 1.8;
       return;
     }

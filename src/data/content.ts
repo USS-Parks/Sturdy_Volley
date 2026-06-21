@@ -14,6 +14,7 @@ import {
   mapSchema,
   dialogueSchema,
   type GameContent,
+  type QuestReward,
 } from './schemas';
 
 import itemsJson from './content/items.json';
@@ -261,6 +262,42 @@ function checkReferences(content: GameContent, issues: ValidationIssue[]): void 
         issues.push({ collection: 'projects', path: `[${i}].ceremony[${j}].npcId`, message: `ceremony npcId "${reaction.npcId}" does not match any NPC` });
       }
     });
+  });
+
+  // Festivals (Prompt 056): validate the special-stall stock, minigame rewards,
+  // and the relationship opportunity's NPC + rewards so a typo fails the content
+  // gate instead of producing an unbuyable stall or an ungrantable prize.
+  const validateRewardRefs = (
+    rewards: readonly QuestReward[],
+    base: string,
+  ): void => {
+    rewards.forEach((reward, j) => {
+      const path = `${base}[${j}]`;
+      if (reward.kind === 'item') {
+        requireItem('festivals', `${path}.itemId`, reward.itemId, 'reward itemId');
+      } else if (reward.kind === 'recipe' && !recipeIds.has(reward.recipeId)) {
+        issues.push({ collection: 'festivals', path: `${path}.recipeId`, message: `reward recipeId "${reward.recipeId}" does not match any recipe` });
+      } else if (reward.kind === 'relationship' && !npcIds.has(reward.npcId)) {
+        issues.push({ collection: 'festivals', path: `${path}.npcId`, message: `reward npcId "${reward.npcId}" does not match any NPC` });
+      }
+    });
+  };
+
+  content.festivals.forEach((festival, i) => {
+    if (festival.stall) {
+      festival.stall.entries.forEach((entry, j) => {
+        requireItem('festivals', `[${i}].stall.entries[${j}].itemId`, entry.itemId, 'stall itemId');
+      });
+    }
+    if (festival.minigame) {
+      validateRewardRefs(festival.minigame.rewards, `[${i}].minigame.rewards`);
+    }
+    if (festival.relationship) {
+      if (!npcIds.has(festival.relationship.npcId)) {
+        issues.push({ collection: 'festivals', path: `[${i}].relationship.npcId`, message: `relationship npcId "${festival.relationship.npcId}" does not match any NPC` });
+      }
+      validateRewardRefs(festival.relationship.rewards, `[${i}].relationship.rewards`);
+    }
   });
 }
 

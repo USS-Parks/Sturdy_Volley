@@ -15,6 +15,7 @@ import {
 } from './render/schedule-overlay';
 import { getActiveSave } from './engine/gameState';
 import { forecastFor } from './engine/weather';
+import { festivalForDay } from './engine/festival';
 import { loadGameContent } from './data/content';
 import './styles.css';
 
@@ -81,7 +82,9 @@ function bootstrap(): void {
         minutes: save.calendar.timeMinutes,
         season: save.calendar.season,
         weatherId: weather?.id ?? null,
-        festivalId: null,
+        // Prompt 056: surface the festival schedule layer in the debug overlay.
+        festivalId:
+          festivalForDay({ season: save.calendar.season, day: save.calendar.day }, content.festivals)?.id ?? null,
         relationshipLevel: 0,
         activeEventFlags: [],
       });

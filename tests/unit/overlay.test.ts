@@ -457,4 +457,85 @@ describe('UIOverlay', () => {
     document.querySelector<HTMLButtonElement>('[data-testid="ceremony-continue"]')?.click();
     expect(continued).toBe(true);
   });
+
+  it('Prompt 056: showFestivalPanel renders the activity cards and wires the buttons', () => {
+    const overlay = new UIOverlay();
+    let played = false;
+    let visited = false;
+    let shared = false;
+    overlay.showFestivalPanel({
+      name: 'Seed Blessing',
+      description: 'The town blesses the season.',
+      windowLabel: '9:00 AM–10:00 PM',
+      activeNow: true,
+      minigame: { name: 'Seed Scramble', description: 'find the pod', rewardSummary: '150 g · 5× Blush Radish Seeds', bestScore: 0, goal: 5, claimedThisYear: false },
+      stallName: 'Blessing Stall',
+      relationship: { npcName: 'Sol Aranda', rewardSummary: '+40 with Sol Aranda', claimedThisYear: false },
+      onPlayMinigame: () => { played = true; },
+      onVisitStall: () => { visited = true; },
+      onShareMoment: () => { shared = true; },
+      onClose: () => {},
+    });
+    expect(document.querySelector('[data-testid="festival-panel"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="festival-minigame-card"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="festival-stall-card"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="festival-relationship-card"]')).toBeTruthy();
+    document.querySelector<HTMLButtonElement>('[data-testid="festival-play-minigame"]')?.click();
+    document.querySelector<HTMLButtonElement>('[data-testid="festival-visit-stall"]')?.click();
+    document.querySelector<HTMLButtonElement>('[data-testid="festival-share-moment"]')?.click();
+    expect([played, visited, shared]).toEqual([true, true, true]);
+  });
+
+  it('Prompt 056: a claimed relationship moment disables the Share button', () => {
+    const overlay = new UIOverlay();
+    overlay.showFestivalPanel({
+      name: 'Seed Blessing',
+      description: 'x',
+      windowLabel: '9:00 AM–10:00 PM',
+      activeNow: false,
+      minigame: null,
+      stallName: null,
+      relationship: { npcName: 'Sol Aranda', rewardSummary: '+40', claimedThisYear: true },
+      onPlayMinigame: () => {},
+      onVisitStall: () => {},
+      onShareMoment: () => {},
+      onClose: () => {},
+    });
+    const share = document.querySelector<HTMLButtonElement>('[data-testid="festival-share-moment"]');
+    expect(share?.disabled).toBe(true);
+  });
+
+  it('Prompt 056: showFestivalMinigame lights the active slot and reports a win', () => {
+    const overlay = new UIOverlay();
+    const taps: number[] = [];
+    overlay.showFestivalMinigame({
+      title: 'Seed Scramble',
+      instruction: 'tap the pod',
+      targetLabel: 'pod',
+      slots: 4,
+      activeSlot: 2,
+      round: 1,
+      rounds: 8,
+      score: 1,
+      goal: 5,
+      phase: 'play',
+      onTap: (slot) => taps.push(slot),
+      onReplay: () => {},
+      onClose: () => {},
+    });
+    expect(document.querySelector('[data-testid="festival-minigame"]')).toBeTruthy();
+    expect(document.querySelectorAll('[data-testid^="festival-slot-"]')).toHaveLength(4);
+    expect(document.querySelector('[data-testid="festival-slot-2"]')?.getAttribute('data-active')).toBe('1');
+    document.querySelector<HTMLButtonElement>('[data-testid="festival-slot-2"]')?.click();
+    expect(taps).toEqual([2]);
+
+    overlay.showFestivalMinigame({
+      title: 'Seed Scramble', instruction: 'x', targetLabel: 'pod', slots: 4, activeSlot: 0,
+      round: 8, rounds: 8, score: 6, goal: 5, phase: 'won', resultSummary: '150 g',
+      onTap: () => {}, onReplay: () => {}, onClose: () => {},
+    });
+    expect(document.querySelector('[data-testid="festival-minigame-status"]')?.textContent).toContain('won');
+    expect(document.querySelector('[data-testid="festival-minigame-reward"]')?.textContent).toContain('150 g');
+    expect(document.querySelector('[data-testid="festival-slots"]')).toBeNull();
+  });
 });
