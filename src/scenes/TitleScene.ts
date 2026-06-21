@@ -104,6 +104,7 @@ export class TitleScene extends GameScene {
       items.push({ id: 'dev-farmhouse', label: 'Dev · Farmhouse', enabled: true, testId: 'title-dev-farmhouse' });
       items.push({ id: 'dev-ballast-bay-town', label: 'Dev · Ballast Bay Town', enabled: true, testId: 'title-dev-ballast-bay-town' });
       items.push({ id: 'dev-klamity-river', label: 'Dev · Klam-ity River', enabled: true, testId: 'title-dev-klamity-river' });
+      items.push({ id: 'dev-rainhall-cavern', label: 'Dev · Rainhall Caverns', enabled: true, testId: 'title-dev-rainhall-cavern' });
     }
     this.ctx.overlay.showMenu(
       'Sturdy Volley',
@@ -174,6 +175,9 @@ export class TitleScene extends GameScene {
         break;
       case 'dev-klamity-river':
         this.goTo('KlamityRiver');
+        break;
+      case 'dev-rainhall-cavern':
+        this.goTo('RainhallCavern');
         break;
     }
   }

@@ -5,6 +5,72 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 049 — Production-foundation map IV: cavern slice (WEF-10c-ii) (2026-06-21)
+
+Built the **Rainhall Caverns** cave slice — the fourth and final production-
+foundation map. Graybox from `sv_map_019_rainhall_caverns_layout.png` +
+`sv_env_055_cavern_lantern_pool.png`: a **tight entrance passage**, an **open
+lantern-lit chamber** around the luminous **mineral-spring pool** (the landmark)
+with stepping stones, a **slope/stair** up to an upper ledge, an authored
+**ledge-link** climb (the motor's scripted traversal — no free jump), echo **cave
+creatures** in the combat/navigation space, crystal seams + lanterns, and a
+**sea-cave mouth** that transitions to Ballast Bay Town.
+
+**Cavern (`src/scenes/RainhallCavernScene.ts`, new).** On the shared camera-rig +
+kinematic-motor + interaction stack: the **cave** camera context with a tight→open
+framing swing (a `cave:near` volume in the entrance passage over the
+`cave:standard` base — the atlas's "tight→open swings"); `stepMotor` over the cave
+walls (multi-AABB) + ledge ground-height + pool water; `beginTraversal` drives the
+authored ledge-link climb/drop; two `cave-creature`-family echo creatures wander
+the rear chamber. **Five debug layers** toggle independently.
+
+**Town → cavern.** The town's terrace cave mouth (`terrace-stair-top`) transitions
+into the cavern; the cavern's sea-cave mouth transitions back to the town —
+**town → cavern → town** round-trips with clock + NPC preserved.
+
+Files: `src/scenes/RainhallCavernScene.ts` (new), `tests/e2e/rainhall-cavern.spec.ts`
+(new), `src/scenes/BallastBayTownScene.ts` (cave-mouth trigger),
+`src/scenes/registry.ts`, `src/scenes/dev-route.ts`, `src/scenes/TitleScene.ts`.
+
+**Acceptance criteria**
+
+- [x] Reachable through ordinary transitions using the shared stack (town →
+  cavern inbound; cavern → town outbound); demonstrates tight/open framing + ledge
+  traversal + combat/navigation space (tight passage → open chamber; the stair
+  ramp + the authored ledge-link both reach the upper ledge; echo creatures patrol
+  the rear chamber).
+- [x] Boundaries read as geography (rock walls, crystal seams, the pool); routes
+  legible at phone scale; all five debug layers toggle (e2e-asserted on both
+  projects).
+- [x] Automated tours cover every transition + representative interaction (cave
+  camera swing, stair climb, ledge-link traversal, pool wade, cavern↔town) on both
+  Playwright projects; graybox primitives stay inside the budget envelope.
+- [x] **Art reference:** the cavern follows `sv_map_019_rainhall_caverns_layout.png`
+  (tight passage, open lantern-lit room around the mineral pool, ledge links) +
+  the `sv_env_055` lantern-pool mood.
+
+**Decision record**
+
+- **Cave camera = base `cave` + a `cave:near` tight-passage volume.** Realises the
+  atlas's "tight→open framing swings" with one authored volume over the base
+  context — proven by the variant flip (near in the passage, standard in the
+  chamber).
+- **Ledge link = the motor's authored traversal**, not a free jump (§1.1). The
+  `beginTraversal` scripted move is the contextual climb/drop the doctrine
+  mandates; the stair ramp is the always-walkable alternate.
+- **Closes the §4.1 production-foundation maps.** Farm + farmhouse (046), town
+  (047), river corridor + mounted traversal (048), and this cavern (049) are all
+  playable through ordinary transitions on the shared stack with toggleable debug
+  layers — the four maps the WEF block required.
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **587 passed** (motor/mount unit coverage covers the ledge
+traversal; no new unit test) · Playwright **285 passed + 1 skipped** (desktop-only
+aspect sweep) on both `desktop-chromium` + `mobile-chromium` (+12 rainhall-cavern)
+· `validate:assets` 0 · `build` 0 · GitDoctor **100/100**.
+
+---
+
 ## Prompt 048 — Production-foundation map III: Klam-ity River corridor + mounted traversal (WEF-10c-i) (2026-06-21)
 
 Built the **Klam-ity River corridor** — the showcase that exercises the Prompt 044

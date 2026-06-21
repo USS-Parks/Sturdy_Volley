@@ -20,6 +20,7 @@ import { BreakpointFarmScene } from './BreakpointFarmScene';
 import { FarmhouseInteriorScene } from './FarmhouseInteriorScene';
 import { BallastBayTownScene } from './BallastBayTownScene';
 import { KlamityRiverScene } from './KlamityRiverScene';
+import { RainhallCavernScene } from './RainhallCavernScene';
 
 /** All game scenes, keyed by the names used in save.location.sceneKey + transitions. */
 export const SCENE_FACTORIES: Record<string, SceneFactory> = {
@@ -57,4 +58,6 @@ export const SCENE_FACTORIES: Record<string, SceneFactory> = {
   BallastBayTown: (ctx) => new BallastBayTownScene(ctx),
   // Production-foundation map III (WEF-10c-i, Prompt 048). `?scene=KlamityRiver`.
   KlamityRiver: (ctx) => new KlamityRiverScene(ctx),
+  // Production-foundation map IV — cave slice (WEF-10c-ii, Prompt 049). `?scene=RainhallCavern`.
+  RainhallCavern: (ctx) => new RainhallCavernScene(ctx),
 };

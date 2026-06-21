@@ -10,7 +10,7 @@
  */
 
 /** Scene keys that may be entered directly via `?scene=<key>`. */
-export const DEV_SCENES: ReadonlySet<string> = new Set(['CameraLab', 'StreamingLab', 'InteriorLab', 'NavLab', 'FaunaLab', 'WildLab', 'MountLab', 'FloraLab', 'BreakpointFarm', 'FarmhouseInterior', 'BallastBayTown', 'KlamityRiver']);
+export const DEV_SCENES: ReadonlySet<string> = new Set(['CameraLab', 'StreamingLab', 'InteriorLab', 'NavLab', 'FaunaLab', 'WildLab', 'MountLab', 'FloraLab', 'BreakpointFarm', 'FarmhouseInterior', 'BallastBayTown', 'KlamityRiver', 'RainhallCavern']);
 
 /**
  * Returns the requested dev scene key when the current URL carries a valid

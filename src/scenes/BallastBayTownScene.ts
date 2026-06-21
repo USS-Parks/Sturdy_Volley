@@ -342,18 +342,35 @@ export class BallastBayTownScene extends GameScene {
     return Math.hypot(this.motor.position.x - g.x, this.motor.position.z - g.z) <= 3;
   }
 
+  private nearAnchorWithin(id: string, reach: number): boolean {
+    const g = this.anchorAt(id);
+    if (!g) return false;
+    return Math.hypot(this.motor.position.x - g.x, this.motor.position.z - g.z) <= reach;
+  }
+
   private pressAction(): boolean {
-    if (this.transitioning || !this.nearGate()) return false;
-    this.transitioning = true;
-    const data: RegionTransitionData = {
-      toAnchor: { x: 120, z: 64 },
-      facing: Math.PI / 2,
-      cameraContext: 'farm',
-      clockMinutes: this.clockMinutes,
-      npcToken: this.npcToken,
-    };
-    void this.ctx.manager.goTo('BreakpointFarm', data);
-    return true;
+    if (this.transitioning) return false;
+    // West gate → Breakpoint Farm.
+    if (this.nearGate()) {
+      this.transitioning = true;
+      const data: RegionTransitionData = {
+        toAnchor: { x: 120, z: 64 }, facing: Math.PI / 2, cameraContext: 'farm',
+        clockMinutes: this.clockMinutes, npcToken: this.npcToken,
+      };
+      void this.ctx.manager.goTo('BreakpointFarm', data);
+      return true;
+    }
+    // Terrace cave mouth → Rainhall Caverns (the cave slice).
+    if (this.nearAnchorWithin('terrace-stair-top', 3)) {
+      this.transitioning = true;
+      const data: RegionTransitionData = {
+        toAnchor: { x: 32, z: 4 }, facing: 0, cameraContext: 'cave',
+        clockMinutes: this.clockMinutes, npcToken: this.npcToken,
+      };
+      void this.ctx.manager.goTo('RainhallCavern', data);
+      return true;
+    }
+    return false;
   }
 
   // --- Geometry -------------------------------------------------------------
