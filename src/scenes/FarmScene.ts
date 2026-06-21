@@ -211,6 +211,8 @@ export class FarmScene extends GameScene {
 
   private readonly pressed = new Set<string>();
   private touch = { active: false, dx: 0, dy: 0, ox: 0, oy: 0 };
+  /** One-shot: set by a touch tap, consumed as an interact next update frame. */
+  private touchInteractPending = false;
   private readonly onKeyDown = (e: KeyboardEvent) => this.pressed.add(e.key.toLowerCase());
   private readonly onKeyUp = (e: KeyboardEvent) => this.pressed.delete(e.key.toLowerCase());
 
@@ -580,9 +582,16 @@ export class FarmScene extends GameScene {
 
   override update(dt: number): void {
     if (!this.player) return;
-    // RF-14: cutscene ticks while it's running and blocks gameplay.
-    if (this.cutsceneRunner && !this.cutsceneRunner.isFinished()) {
-      this.cutsceneRunner.tick(dt);
+    // RF-14: cutscene ticks while it's running and blocks gameplay. The Skip
+    // button finishes the runner synchronously (outside tick), so a finished
+    // runner — from skip OR from a tick reaching the end — must always run
+    // endCutscene(); otherwise the camera's lockedTarget is never restored and
+    // it freezes at the origin while the player walks off-frame (Bug: invisible
+    // player in portrait after skipping the intro).
+    if (this.cutsceneRunner) {
+      if (!this.cutsceneRunner.isFinished()) {
+        this.cutsceneRunner.tick(dt);
+      }
       if (this.cutsceneRunner.isFinished()) {
         this.endCutscene();
       } else {
@@ -610,7 +619,7 @@ export class FarmScene extends GameScene {
 
     this.nearest = resolveInteraction(this.targets, this.player.position.x, this.player.position.z);
 
-    const interact = this.pressed.has('e') || this.pressed.has(' ');
+    const interact = this.pressed.has('e') || this.pressed.has(' ') || this.touchInteractPending;
     if (interact && !this.ePrev && this.nearest) {
       if (this.nearest.id === 'farmhouse-door') {
         this.goTo('Interior', { entry: 'inside-door' });
@@ -637,6 +646,7 @@ export class FarmScene extends GameScene {
       }
     }
     this.ePrev = interact;
+    this.touchInteractPending = false;
 
     const inventoryKey = this.pressed.has('i');
     if (inventoryKey && !this.iPrev) this.openInventory(null);
@@ -739,6 +749,11 @@ export class FarmScene extends GameScene {
     this.touch.dy = e.clientY - this.touch.oy;
   };
   private readonly onPointerUp = () => {
+    // A tap (press + release with negligible drag) is the touch "interact" —
+    // it fires the same contextual action as the E key on the nearest target.
+    if (this.touch.active && Math.hypot(this.touch.dx, this.touch.dy) < 12) {
+      this.touchInteractPending = true;
+    }
     this.touch = { active: false, dx: 0, dy: 0, ox: 0, oy: 0 };
   };
 
