@@ -21,6 +21,7 @@ import { FarmhouseInteriorScene } from './FarmhouseInteriorScene';
 import { BallastBayTownScene } from './BallastBayTownScene';
 import { KlamityRiverScene } from './KlamityRiverScene';
 import { RainhallCavernScene } from './RainhallCavernScene';
+import { AssetSwapLabScene } from './AssetSwapLabScene';
 
 /** All game scenes, keyed by the names used in save.location.sceneKey + transitions. */
 export const SCENE_FACTORIES: Record<string, SceneFactory> = {
@@ -60,4 +61,6 @@ export const SCENE_FACTORIES: Record<string, SceneFactory> = {
   KlamityRiver: (ctx) => new KlamityRiverScene(ctx),
   // Production-foundation map IV — cave slice (WEF-10c-ii, Prompt 049). `?scene=RainhallCavern`.
   RainhallCavern: (ctx) => new RainhallCavernScene(ctx),
+  // Dev-only asset-swap proving ground (WEF-11b, Prompt 051). `?scene=AssetSwapLab`.
+  AssetSwapLab: (ctx) => new AssetSwapLabScene(ctx),
 };

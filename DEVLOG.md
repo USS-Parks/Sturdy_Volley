@@ -5,6 +5,75 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 051 — Swap factories + end-to-end asset fixtures (WEF-11b) (2026-06-21)
+
+Built the asset **swap factory** + five reference fixtures that prove the pipeline:
+a graybox's render geometry swaps for a validated production asset while its
+**anchors / collision / navigation / save identity** are never touched, the
+graybox is retained as a fallback, the swap is reversible, and a non-conformant
+asset is refused.
+
+**Factory (`src/render/asset-factory.ts`, new, pure + generic).** Generic over the
+mesh type `M` (unit-tested with a mock mesh; the scene binds `M = Babylon Mesh`).
+`SwappableEntity` separates the **semantic layer** (`anchorIds`, `collisionId`,
+`navId`) + `saveId` from the render mesh. `applySwap(entity, manifest, buildAsset)`
+calls the Prompt 050 validator first — `buildAsset` runs **only** when the manifest
+is conformant (a rejected asset never even constructs geometry); `revertSwap`
+restores the graybox; `activeMesh` picks the live mesh; `semanticSnapshot` +
+`semanticUnchanged` make the identity-preservation assertion explicit.
+
+**Fixtures (`src/render/asset-fixtures.ts`, new).** Five conformant reference
+manifests — humanoid (`character`), `animal`, `flora`, `building`, `prop` — the
+representative families the acceptance names. A unit test asserts all five pass the
+contract; a real `.glb` loader replaces each fixture's `buildAsset` callback
+without touching the factory.
+
+**Proving ground (`src/scenes/AssetSwapLabScene.ts`, new).** Spawns the five
+fixtures as grayboxes; swaps each to a visibly distinct asset stand-in via the
+factory, retaining the graybox (disabled) as the fallback. Debug API swaps /
+reverts / attempts a refused swap and reports the active mesh + the full semantic
+layer for before/after equality.
+
+Files: `src/render/asset-factory.ts` (new), `src/render/asset-fixtures.ts` (new),
+`src/scenes/AssetSwapLabScene.ts` (new), `tests/unit/asset-factory.test.ts` (new),
+`tests/e2e/asset-swap-lab.spec.ts` (new), `src/scenes/registry.ts`,
+`src/scenes/dev-route.ts`, `src/scenes/TitleScene.ts`.
+
+**Acceptance criteria**
+
+- [x] A representative humanoid, animal, flora, building module, and loose-prop
+  fixture each swap end to end via the factory, preserving anchors/collision/
+  navigation/save identity (e2e: all five swap; `saveId`/`collisionId`/`navId`/
+  `anchorIds` byte-identical before/after; the factory's own `semanticUnchanged`
+  also asserts it).
+- [x] Grayboxes remain available as development + asset-failure fallbacks (the
+  graybox mesh is retained, disabled, and re-enabled on revert; a refused swap
+  leaves the graybox active and never builds the asset).
+- [x] Swap is reversible and Playwright-verified on both projects
+  (`asset-swap-lab.spec.ts`: swap → revert → graybox returns; non-conformant
+  refused; on `desktop-chromium` + `mobile-chromium`).
+
+**Decision record**
+
+- **Generic over the mesh type.** The factory's swap-state logic is pure +
+  unit-testable with `M = string`/mock; the scene binds `M = Mesh`. The identity
+  layer is a plain object the swap never reaches, so preservation is structural,
+  not by convention.
+- **Validate before build.** `buildAsset` runs only after `canSwap` passes, so a
+  non-conformant asset can't even construct geometry — the graybox stays as the
+  asset-failure fallback (§0.10).
+- **Asset stand-in, not a real `.glb`.** No production `.glb` exists yet; the
+  fixture's `buildAsset` returns a distinct graybox to prove the swap mechanism +
+  identity preservation. The real `.glb` loader plugs into the same callback.
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **605 passed** (+6 asset-factory) · Playwright **293 passed
++ 1 skipped** (desktop-only aspect sweep) on both `desktop-chromium` +
+`mobile-chromium` (+8 asset-swap-lab) · `validate:assets` 0 · `build` 0 ·
+GitDoctor **100/100**.
+
+---
+
 ## Prompt 050 — Asset & rig contract + validator (WEF-11a) (2026-06-21)
 
 Authored the asset & rig contract and built the validator that enforces it, so a
