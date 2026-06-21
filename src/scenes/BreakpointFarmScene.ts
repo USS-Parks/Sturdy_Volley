@@ -344,8 +344,27 @@ export class BreakpointFarmScene extends GameScene {
     return Math.hypot(this.motor.position.x - d.x, this.motor.position.z - d.z) <= 2.2;
   }
 
+  private nearTownGate(): boolean {
+    const g = this.anchorAt('farm-gate-town');
+    if (!g) return false;
+    return Math.hypot(this.motor.position.x - g.x, this.motor.position.z - g.z) <= 3;
+  }
+
   private pressAction(): boolean {
     if (this.transitioning) return false;
+    // West/town gate → Ballast Bay town district (the reciprocal of town-to-farm).
+    if (this.nearTownGate()) {
+      this.transitioning = true;
+      const data: RegionTransitionData = {
+        toAnchor: { x: 6, z: 64 },
+        facing: -Math.PI / 2,
+        cameraContext: 'exterior',
+        clockMinutes: this.clockMinutes,
+        npcToken: this.npcToken,
+      };
+      void this.ctx.manager.goTo('BallastBayTown', data);
+      return true;
+    }
     if (this.nearFarmhouseDoor()) {
       this.transitioning = true;
       // Return to the yard side of the door, facing into the yard (−Z).

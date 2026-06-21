@@ -18,6 +18,7 @@ import { MountLabScene } from './MountLabScene';
 import { FloraLabScene } from './FloraLabScene';
 import { BreakpointFarmScene } from './BreakpointFarmScene';
 import { FarmhouseInteriorScene } from './FarmhouseInteriorScene';
+import { BallastBayTownScene } from './BallastBayTownScene';
 
 /** All game scenes, keyed by the names used in save.location.sceneKey + transitions. */
 export const SCENE_FACTORIES: Record<string, SceneFactory> = {
@@ -51,4 +52,6 @@ export const SCENE_FACTORIES: Record<string, SceneFactory> = {
   // Production-foundation map I (WEF-10a, Prompt 046). `?scene=BreakpointFarm`.
   BreakpointFarm: (ctx) => new BreakpointFarmScene(ctx),
   FarmhouseInterior: (ctx) => new FarmhouseInteriorScene(ctx),
+  // Production-foundation map II (WEF-10b, Prompt 047). `?scene=BallastBayTown`.
+  BallastBayTown: (ctx) => new BallastBayTownScene(ctx),
 };

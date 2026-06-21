@@ -5,6 +5,83 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 047 — Production-foundation map II: Ballast Bay town district (WEF-10b) (2026-06-21)
+
+Built the representative **Ballast Bay town district** (market lane + harbor
+approach + an elevation change) from the dimensioned blockout, as graybox over
+production collision / navigation / anchor / camera-volume / transition data on
+the shared camera-rig + kinematic-motor + interaction stack — and wired the real
+**Farm ↔ Town** region transition (both directions) preserving clock + NPC state.
+
+**Ballast Bay town (`src/scenes/BallastBayTownScene.ts`, new).** Reads
+`BALLAST_BAY_DISTRICT_BLOCKOUT` (160×128 m, 5×4 chunk grid). Graybox matches
+`sv_map_013_ballast_bay_town_layout.png` + `sv_map_022` + the mood of
+`sv_map_026`/`sv_map_027`: harbor bay + walkable dock + moored boat, central
+market lane with canvas-canopy produce stalls (the §1.4 cozy substitution — no
+sport gear; canopies luff via the `hanging` flora family) + the four shop fronts
+(community hall, bakery, fishmonger, general store) + market well, a lighthouse
+landmark on the point, the river-through-town + footbridge, the **upper terrace +
+stair flight** (the required elevation change), beach access, and a redwood ring +
+ocean cliff boundary. The shared `CameraRig` consumes the blockout's authored
+volumes (market-lane `exterior:standard`, harborfront `exterior:near`); the shared
+`stepMotor` drives the player over multi-AABB collision + terrace ground-height +
+harbor/river/beach water; two townsfolk walk the lane (NPC case). **Five debug
+layers** toggle independently.
+
+**Farm ↔ Town transition.** `BallastBayTownScene` accepts `RegionTransitionData`
+on arrival and transitions back at the west gate; `BreakpointFarmScene` gains the
+reciprocal trigger at its `farm-gate-town` anchor, so the full farm→town→farm loop
+runs through real `SceneManager.goTo` transitions, e2e-round-tripped with the clock
++ NPC token preserved across both seams.
+
+Files: `src/scenes/BallastBayTownScene.ts` (new), `tests/unit/ballast-bay-town.test.ts`
+(new), `tests/e2e/ballast-bay-town.spec.ts` (new), `src/scenes/BreakpointFarmScene.ts`
+(reciprocal town-gate trigger), `src/scenes/registry.ts`, `src/scenes/dev-route.ts`,
+`src/scenes/TitleScene.ts`.
+
+**Acceptance criteria**
+
+- [x] Reachable through ordinary transitions using the shared stack (real
+  farm→town→farm `goTo` loop); demonstrates market/harbor activities, elevation,
+  traversal, camera, and NPC cases; boundaries read as architecture (terrace
+  retaining wall, ocean cliff, redwood ring).
+- [x] Critical routes + the lighthouse landmark are legible at phone scale
+  (graybox silhouettes verified on `mobile-chromium`; lane + harbor + terrace read
+  without a minimap).
+- [x] All proxy/nav/anchor/volume/mesh layers toggle in debug (5 `TownLayer`s,
+  e2e-asserted); town region + 20-chunk grid + anchors come from the validated
+  blockout (save identities are the stable anchor/region ids, preserved for the
+  053 migration); automated tour on both Playwright projects; graybox primitives
+  stay inside the budget envelope.
+- [x] **Art reference:** graybox layout + silhouettes match `sv_map_013`,
+  `sv_map_022`, `sv_map_026`, `sv_map_027` (harbor docks, lighthouse point,
+  river-through-town, terraced lanes).
+
+**Decision record**
+
+- **Mirrors the Prompt 046 farm scene.** Same shared-stack composition (rig +
+  authored volumes, `stepMotor` + multi-AABB collision + ground-height + water,
+  `metadata.layer` debug toggles, `RegionTransitionData` handoff) — the production
+  map pattern is now consistent across regions.
+- **The Farm↔Town loop is real, both ways.** Rather than a one-way demo, the farm
+  gained the reciprocal trigger so the two committed regions transition into each
+  other through the SceneManager — the strongest proof of "reachable through
+  ordinary transitions."
+- **Harbor/market/elevation are the load-bearing cases.** The district leads with
+  the three §4.1 town requirements (market lane, harbor approach, ≥1 elevation
+  change); the river/lighthouse/beach are art-match dressing on the same stack.
+- **Kept the foundation general** (per the user's 2026-06-21 world-scope note):
+  the region is one modular streamable map among many to come; nothing hardcodes a
+  two-community world.
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **587 passed** (+3 ballast-bay-town) · Playwright **261
+passed + 1 skipped** (desktop-only aspect sweep) on both `desktop-chromium` +
+`mobile-chromium` (+10 ballast-bay-town) · `validate:assets` 0 · `build` 0 ·
+GitDoctor **100/100**.
+
+---
+
 ## Prompt 046 — Production-foundation maps I: Farm exterior + Farmhouse interior (WEF-10a) (2026-06-21)
 
 Built the first two production-foundation maps — **Breakpoint Farm** (exterior)
