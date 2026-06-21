@@ -15,6 +15,7 @@ import { NavLabScene } from './NavLabScene';
 import { FaunaLabScene } from './FaunaLabScene';
 import { WildLabScene } from './WildLabScene';
 import { MountLabScene } from './MountLabScene';
+import { FloraLabScene } from './FloraLabScene';
 
 /** All game scenes, keyed by the names used in save.location.sceneKey + transitions. */
 export const SCENE_FACTORIES: Record<string, SceneFactory> = {
@@ -43,4 +44,6 @@ export const SCENE_FACTORIES: Record<string, SceneFactory> = {
   WildLab: (ctx) => new WildLabScene(ctx),
   // Dev-only mount-system proving ground (Prompt 044). `?scene=MountLab`.
   MountLab: (ctx) => new MountLabScene(ctx),
+  // Dev-only flora/environment-motion proving ground (WEF-09). `?scene=FloraLab`.
+  FloraLab: (ctx) => new FloraLabScene(ctx),
 };

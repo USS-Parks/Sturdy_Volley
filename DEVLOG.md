@@ -5,6 +5,80 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 045 — Flora and environmental-motion tiers (WEF-09) (2026-06-21)
+
+Shared, deterministic flora/environment-motion layer for nine families — grass,
+crops, shrubs, flowers, trees, reeds, kelp, hanging props, shoreline foam — with
+coherent gusting wind, per-instance phase (no lockstep), mover interaction bend,
+distance tiers, reduced motion, season/weather inputs, and a hard
+active-deformation ceiling. A **Tier-1 visual** layer that never writes gameplay
+state (crop/forage outcomes stay deterministic, §3.2).
+
+**Core (`src/engine/flora-motion.ts`, new, pure).** `FLORA_FAMILIES` — per-family
+motion source (wind/water/tide), bend points, stiffness, sway + secondary
+amplitude, gust response, interaction (`part`/`brush`/`push`/`none`), winter
+dormancy, distance tiers, reduced-motion amplitude, mobile fallback. `windStrength`
+(base + two incommensurate gust waves → coherent, non-robotic), `windVector`,
+`modulateWind` (season/weather: storm ×2.2 … fog ×0.5, winter ×0.85). `swayAngle`
+(per-instance phase, source-specific drive, reduced-motion collapse),
+`interactionBend` (mover-owned, preserved under reduced motion). `floraTier` +
+`assignFloraTiers` enforce the active-deformation ceiling (default 48 full / 96
+reduced), `activeDeformingCount` reports it.
+
+**Proving ground (`src/scenes/FloraLabScene.ts`, new).** ~200 instances across all
+nine families (a deep grass field that exercises the ceiling, a crop row carrying
+deterministic growth, shrubs/flowers/trees, reeds + kelp + foam at a pond/shore, a
+hanging flag). Each instance leans via `swayAngle` about a base pivot; the field is
+distance-tiered each frame; a movable player bends interactive flora it passes;
+reduced motion stills ambient sway while preserving the interaction cue; the crop
+`growth` value is never written by the motion loop.
+
+Files: `src/engine/flora-motion.ts` (new), `src/scenes/FloraLabScene.ts` (new),
+`tests/unit/flora-motion.test.ts` (new), `tests/e2e/flora-lab.spec.ts` (new),
+`docs/FLORA_AND_ENVIRONMENT_MOTION.md` (new), `src/scenes/registry.ts`,
+`src/scenes/dev-route.ts`, `src/scenes/TitleScene.ts`.
+
+**Acceptance criteria**
+
+- [x] `docs/FLORA_AND_ENVIRONMENT_MOTION.md` defines motion source, bend points,
+  phase variation, interaction response, season/weather inputs, distance tiers,
+  reduced-motion behaviour, and mobile fallback **per family** (§1–§5 table + text).
+- [x] Wind has **coherent direction + gust timing** while repeated plants avoid
+  lockstep (per-instance phase); player/tool/animal/weather responses have clear
+  ownership and **do not alter deterministic crop/forage outcomes** (motion is
+  read-only; e2e: crop growth unchanged after 300 sway ticks).
+- [x] Trees/canopies, reeds/grass, crops, and shoreline vegetation show **distinct**
+  believable responses (stiffness/amplitude/source/interaction differ per family);
+  instancing/batching stays available (tiering is pure data over instance refs);
+  reduced-motion/low-quality preserve gameplay cues (interaction bend survives);
+  **performance tests enforce** the active-deformation + draw-tier ceiling
+  (`assignFloraTiers`; e2e: `activeDeforming ≤ activeCap`, distant → billboard).
+- [x] **Art reference:** flora silhouettes follow the shape-language families;
+  distant plants/FX fall back to billboards/impostors (per-family `mobileFallback`).
+
+**Decision record**
+
+- **Pure module + lab, mirroring 043.** `flora-motion.ts` is Babylon-free pure math
+  (like `fauna-behavior.ts`); the scene applies the returned angle as a base-pivot
+  lean. Keeps it unit-testable and a clean future-renderer contract.
+- **Deterministic-from-time wind.** §3.2 permits nondeterministic ambient motion,
+  but driving wind from explicit `time` makes the proving ground reproducible and
+  testable at zero gameplay cost — strictly better than `Math.random`.
+- **Interaction cue survives reduced motion.** Reduced motion stills *ambient*
+  sway but keeps the mover bend — it's a gameplay readability cue (you can see
+  you're wading through reeds), per the "preserve gameplay cues" acceptance.
+- **Ceiling = LOD assignment, not per-instance flags.** `assignFloraTiers` caps the
+  `full` tier globally (nearest-first) so a dense field can't blow the mobile
+  active-deformation budget regardless of how many instances exist.
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **580 passed** (+13 flora-motion) · Playwright **239 passed
++ 1 skipped** (desktop-only aspect sweep) on both `desktop-chromium` +
+`mobile-chromium` (+10 flora-lab) · `validate:assets` 0 · `build` 0 ·
+GitDoctor **100/100**.
+
+---
+
 ## Prompt 044 — Mount system: rideable horse + mount/dismount + ridden motor (2026-06-20)
 
 Delivered horseback as a cohesive vertical slice — the early-game faster-transport
