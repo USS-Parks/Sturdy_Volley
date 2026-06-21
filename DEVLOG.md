@@ -5,6 +5,109 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 044 — Mount system: rideable horse + mount/dismount + ridden motor (2026-06-20)
+
+Delivered horseback as a cohesive vertical slice — the early-game faster-transport
+option between Willa Crick and Ballast Bay. A new `rideable-mount` animal family
+(the horse *body*) plus a pure `mount.ts` *ridden* layer (ridden motor profile +
+ridden vs. free gait bands + mount/dismount state machine + mounted-camera handoff
++ save/restore), proven in a new `MountLab` scene that hands the real `CameraRig`
+to the Prompt 030 `mounted` baseline and rides a course of slope / ford / bridge /
+community-seam / obstruction.
+
+**Horse body (`src/engine/animal-families.ts`).** New `rideable-mount` family —
+the largest animal (scale 1.0, proxy r 0.70 / h 1.70), **free / riderless** gaits
+(graze 0 · amble 1.0 · trot 3.0), turn 2.2 rad/s, slope 40°, **water-capable
+(fords shallow water)**, mount reach 2.0 m, **full save authority (location +
+tame/ownership)**, and a **mount-anchor socket** at (0, 1.5, 0). New `rideable?` +
+`mountAnchor?` fields; `isRideableFamily` / `rideableFamilies` helpers.
+
+**Ridden layer (`src/engine/mount.ts`, new, pure + deterministic).**
+`RIDDEN_MOTOR_CONFIG` — a distinct, faster profile vs. the on-foot player (capsule
+2.6 m × 0.70 m, turn 6 rad/s = wider arc, stepOffset 0.45 for bridge decks,
+swimDepth 1.3 so it fords/wades). `RIDDEN_GAITS` halt→**gallop 11 m/s** with a
+momentum `rampSpeed` (accel 6 / brake 9). Mount state machine `free → mounting →
+ridden → dismounting → free` driven by a contextual **one-button** `toggleMount`,
+blended over `MOUNT_DURATION` (0.45 s); `dismountPose` returns the rider beside the
+horse; `shouldUseMountedCamera` is the engine-decoupled boolean the scene reads to
+swap to the `mounted` camera baseline; `serializeMount`/`restoreMount` persist the
+stable phase + horse pose + ownership.
+
+**Proving ground (`src/scenes/MountLabScene.ts`, new).** A graybox horse
+(`buildHorseGraybox`: faceted body + neck + head + four legs + tail + saddle marker
+at the mount anchor, withers ≈ 1.6 m, OoT-era low-poly per
+`sv_theme_03_004_shape_language.png` panel 11) on a course with a shallow **ford**
+(wade), a **slope** hump, a **bridge** deck, the **Willa Crick ↔ Ballast Bay seam**
+arch, and a solid **obstruction** (circle-vs-AABB wall probe). Mounting hands the
+real `CameraRig` to the `mounted` baseline and blends back to `exterior` on
+dismount; a riderless horse wanders the paddock and recovers. Camera + controller/
+touch input via the Prompt 029 `CameraRig` + `CameraInputController`; keyboard
+(`E`/`W`/`S`) wired in `enter()`.
+
+Files: `src/engine/mount.ts` (new), `src/scenes/MountLabScene.ts` (new),
+`tests/unit/mount.test.ts` (new), `tests/e2e/mount-lab.spec.ts` (new),
+`src/engine/animal-families.ts`, `tests/unit/animal-families.test.ts`,
+`docs/ANIMAL_AND_FAUNA_PHYSICS.md`, `src/scenes/registry.ts`,
+`src/scenes/dev-route.ts`, `src/scenes/TitleScene.ts`.
+
+**Acceptance criteria**
+
+- [x] The rideable horse body extends `docs/ANIMAL_AND_FAUNA_PHYSICS.md` with a
+  larger body proxy, **ridden vs. free gait bands** (free on the family, ridden in
+  `mount.ts`), ford/shallow-water capability, navigation + recovery bounds when
+  riderless (paddock wander + clamp), and a mount-anchor socket; saves location +
+  tame/ownership (`saveAuthority: 'full'`, `serializeMount`).
+- [x] **Mount and dismount are contextual one-button actions** (`toggleMount`/
+  `pressAction`); ridden locomotion uses a documented faster speed/turn/accel
+  profile (`RIDDEN_MOTOR_CONFIG` + `RIDDEN_GAITS` + `rampSpeed`) and hands the
+  camera to the mounted context; **dismount returns a valid grounded pose**
+  (`dismountPose` + `groundedPoseAt`) **with no camera discontinuity** (rig blends
+  beta/FOV/distance) — e2e asserts grounded + rider gap > 0.5 m + context reverts.
+- [x] Mounted traversal is **stable across slopes, fords, bridges, doorways/seam
+  transitions, and obstruction**; never tunnels/traps/strands (e2e: forded +
+  crossedBridge + crossedSeam true, tunneled false, minRiderY > 0.5, finite);
+  **save/load restores the mounted/dismounted state** (e2e round-trips both).
+- [x] Works with keyboard/mouse, controller, and touch (`CameraInputController`
+  camera + keyboard action/move; unified `setMove`/`pressAction` path);
+  **reduced-motion honored** (`rig.setReducedMotion`; e2e rides under it).
+- [x] **Deterministic unit coverage** for the ridden motor + mount state machine
+  (`mount.test.ts`, 18 cases incl. a deterministic ridden-motor integration);
+  proving-ground Playwright on **both** projects (`mount-lab.spec.ts`, 12 cases).
+- [x] **Art reference:** the horse stays within the OoT-era low-poly silhouette +
+  the panel-11 model economy; mounted framing consumes the §2 mounted baseline
+  (`mounted:standard`).
+
+**Decision record**
+
+- **Body family vs. ridden layer split.** The horse *body* (proxy, free gaits,
+  ford, socket, save) lives in `animal-families.ts` as `rideable-mount`; the
+  *ridden* layer (ridden gaits, faster motor config, mount state machine, camera
+  decision, save) lives in a new `mount.ts`. Keeps the shared `AnimalFamily` shape
+  clean and mirrors how `fauna-behavior.ts` (043) sits beside the family data.
+- **Reuse `stepMotor`, don't fork it.** The ridden motor is `stepMotor` driven by
+  a distinct `MotorConfig` + a momentum-ramped speed, not a new integrator — same
+  grounding/slope/wade/penetration guarantees as on-foot, so fording/bridges/slopes
+  are stable for free.
+- **Turn is *slower* on horseback (6 vs 12 rad/s).** "Faster speed/turn/accel
+  profile" reads as a *distinct* profile: faster top speed + momentum accel, but a
+  **wider** turn arc — a horse can't pivot like a person. Documented.
+- **Camera handoff via a boolean.** `mount.ts` returns `shouldUseMountedCamera`
+  (true for mounting+ridden) so the engine layer never imports the camera profile
+  catalogue; the scene maps it to `baselineProfile('mounted'|'exterior')` and the
+  rig's built-in blend gives the no-discontinuity dismount.
+- **Seam = continuous ride, not a teleport.** The community-to-community transition
+  is modeled as riding continuously from Willa-Crick-tinted ground across the arch
+  onto Ballast-Bay-tinted ground — proving "without seam pop" by being genuinely
+  pop-free, not by faking a re-anchor snap.
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **567 passed** (+22: mount 18, animal-families rideable 4) ·
+Playwright **229 passed + 1 skipped** (desktop-only aspect sweep) on both
+`desktop-chromium` + `mobile-chromium` (+12 mount-lab) · `validate:assets` 0 ·
+`build` 0 · GitDoctor **100/100**.
+
+---
+
 ## Prompt 043 — Wild-fauna movement families (WEF-08b) (2026-06-20)
 
 Implemented the four wild families — bird, shoreline crawler, swimming fauna,

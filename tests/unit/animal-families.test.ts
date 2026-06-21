@@ -7,13 +7,16 @@ import {
   familyForPetKind,
   familyOf,
   gaitSpeed,
+  isRideableFamily,
+  rideableFamilies,
 } from '../../src/engine/animal-families';
 
 const DOMESTIC = Object.values(ANIMAL_FAMILIES).filter((f) => !f.wild);
 
 describe('animal families — definitions', () => {
-  it('defines the three domestic families with all required per-family fields', () => {
-    expect(DOMESTIC.length).toBe(3);
+  it('defines the four domestic families with all required per-family fields', () => {
+    // small-quadruped-pet, grazing-livestock, poultry, rideable-mount (Prompt 044).
+    expect(DOMESTIC.length).toBe(4);
     for (const fam of DOMESTIC) {
       expect(fam.scale).toBeGreaterThan(0);
       expect(fam.bodyProxyRadius).toBeGreaterThan(0);
@@ -62,8 +65,10 @@ describe('animal families — capability helpers', () => {
     expect(gaitSpeed(goat, 'gallop')).toBe(gaitSpeed(goat, 'trot')); // unknown → fastest
   });
 
-  it('water capability gates pond entry (domestic animals stay dry)', () => {
-    for (const fam of DOMESTIC) {
+  it('water capability gates pond entry (domestic farm animals stay dry)', () => {
+    // The rideable mount fords shallow water (asserted separately); the pet +
+    // farm animals never enter the pond.
+    for (const fam of DOMESTIC.filter((f) => !f.rideable)) {
       expect(familyCanEnterWater(fam)).toBe(false);
     }
   });
@@ -73,5 +78,35 @@ describe('animal families — capability helpers', () => {
     const hen = familyOf('poultry');
     expect(familyCanWalkSlope(goat, 48)).toBe(true);
     expect(familyCanWalkSlope(hen, 48)).toBe(false);
+  });
+});
+
+describe('animal families — rideable mount (Prompt 044)', () => {
+  const horse = familyOf('rideable-mount');
+
+  it('is the rideable family, with a mount-anchor socket', () => {
+    expect(isRideableFamily(horse)).toBe(true);
+    expect(rideableFamilies().map((f) => f.id)).toEqual(['rideable-mount']);
+    expect(horse.mountAnchor).toBeDefined();
+    expect(horse.mountAnchor!.y).toBeGreaterThan(1); // saddle sits above the body
+  });
+
+  it('is the largest animal body and fords shallow water', () => {
+    const goat = familyOf('grazing-livestock');
+    // Larger proxy + scale than the grazing livestock it extends.
+    expect(horse.bodyProxyRadius).toBeGreaterThan(goat.bodyProxyRadius);
+    expect(horse.scale).toBeGreaterThan(goat.scale);
+    // Ford capability (shallow water), and a full save (location + ownership).
+    expect(familyCanEnterWater(horse)).toBe(true);
+    expect(horse.saveAuthority).toBe('full');
+  });
+
+  it('carries free / riderless gait bands (the ridden bands live in mount.ts)', () => {
+    expect(horse.gaits[0].speed).toBe(0); // graze/halt at rest
+    expect(gaitSpeed(horse, 'trot')).toBeGreaterThan(gaitSpeed(horse, 'amble'));
+  });
+
+  it('is not a wild family', () => {
+    expect(horse.wild).not.toBe(true);
   });
 });

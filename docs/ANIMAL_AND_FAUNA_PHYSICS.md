@@ -1,6 +1,6 @@
 # Animal & Fauna Physics — Sturdy Volley
 
-Last revised: 2026-06-20 (Prompt 042 / WEF-08a)
+Last revised: 2026-06-20 (Prompt 044 — rideable mount)
 
 Normative for animal movement/physics. Defines movement **families** (not one
 generic mover): each family declares scale, body proxy, gait bands, turning,
@@ -125,8 +125,59 @@ respect, and the skinned-body ceiling. Unit: `tests/unit/fauna-behavior.test.ts`
 
 ---
 
-## 6. What this layer does **not** do
+## 6. Rideable mount — the horse (Prompt 044)
 
-- The rideable horse — Prompt 044 (extends grazing-livestock with ridden gaits).
+The horse is the largest animal: a **`rideable-mount`** family (the *body*) plus a
+dedicated *ridden* layer in `src/engine/mount.ts`. Horseback is the early-game
+faster-transport option between Willa Crick and Ballast Bay (§1.3). Silhouette +
+economy follow the OoT-era low-poly horse (`sv_theme_03_004_shape_language.png`
+panel 11), withers ≈ 1.6 m against the 1.7–1.8 m human in
+`sv_style_007_camera_scale_guide.png`.
+
+**Body family (`rideable-mount`).** Scale 1.0 · proxy r 0.70 / h 1.70 (largest
+body) · **free / riderless** gaits graze 0 · amble 1.0 · trot 3.0 · turn 2.2 rad/s
+· slope 40° · **water-capable (fords shallow water)** · interaction (mount reach)
+2.0 m · save authority **full (location + tame/ownership)** · a **mount-anchor
+socket** at local (0, 1.5, 0) for the rider seat. `isRideableFamily` /
+`rideableFamilies` query it.
+
+**Ridden layer (`mount.ts`, pure + deterministic).**
+
+- **Ridden motor profile** — `RIDDEN_MOTOR_CONFIG`: a **distinct, faster** profile
+  vs. the on-foot player (`DEFAULT_MOTOR_CONFIG`). Capsule 2.6 m × 0.70 m (horse +
+  seated rider); turn 6 rad/s (a **wider arc** than the on-foot 12 — a horse can't
+  pivot); `stepOffset` 0.45 (onto bridge decks); `swimDepth` 1.3 (fords/**wades**
+  shallow water, swims only deeper).
+- **Ridden gait bands** — `RIDDEN_GAITS` halt 0 · walk 2.0 · trot 5.0 · canter 8.0
+  · **gallop 11.0** (far above the player run, so horseback is a real upgrade),
+  with a **momentum ramp** (`rampSpeed`, accel 6 / brake 9 m/s²) for the "accel"
+  half of the profile.
+- **Mount/dismount state machine** — `free → mounting → ridden → dismounting →
+  free`, a contextual **one-button** `toggleMount` (mount when free + owned + in
+  reach, dismount when ridden) blended over `MOUNT_DURATION` (0.45 s). Dismount
+  returns a **valid grounded pose beside the horse** (`dismountPose`, never inside
+  the body).
+- **Mounted-camera handoff** — `shouldUseMountedCamera` is true for `mounting` +
+  `ridden`; the scene swaps the real `CameraRig` to the Prompt 030 **`mounted`**
+  baseline and blends back to `exterior` on dismount with **no discontinuity**
+  (the rig eases beta/FOV/distance). The engine layer returns a boolean so it
+  stays decoupled from the camera catalogue.
+- **Save/restore** — `serializeMount`/`restoreMount` persist the stable phase
+  (`free`/`ridden`; a mid-transition save snaps to its endpoint) + horse pose +
+  ownership.
+
+**Proving ground:** `?scene=MountLab` — a graybox horse on a course with a
+shallow **ford**, a **slope** hump, a **bridge** deck, the **Willa Crick ↔ Ballast
+Bay seam** arch, and a solid **obstruction**. Mounting hands the camera to the
+mounted baseline; the ride wades the ford, crosses the bridge + seam, and stops at
+the obstruction without tunnelling; a riderless horse wanders the paddock and
+recovers. `tests/e2e/mount-lab.spec.ts` (both projects) + `tests/unit/mount.test.ts`
+(ridden motor + state machine) + `tests/unit/animal-families.test.ts` (the family).
+
+---
+
+## 7. What this layer does **not** do
+
 - The live FarmScene animal migration onto the framework — Prompt 053.
+- The river-corridor map that exercises the mount end-to-end — Prompt 048.
 - Final animal art / animation libraries — graybox proxies only (§0.9).

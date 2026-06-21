@@ -25,7 +25,9 @@ export type AnimalFamilyId =
   | 'bird'
   | 'shoreline-crawler'
   | 'swimming-fauna'
-  | 'cave-creature';
+  | 'cave-creature'
+  // Rideable mount (Prompt 044) — the horse body; the ridden layer is mount.ts.
+  | 'rideable-mount';
 
 /** The behaviours a family exhibits (assembled from `fauna-behavior.ts`). */
 export type FaunaBehavior = 'patrol' | 'forage' | 'flee' | 'flock' | 'swim';
@@ -69,6 +71,10 @@ export interface AnimalFamily {
   wild?: boolean;
   /** Behaviours this family exhibits (wild families, Prompt 043). */
   behaviors?: FaunaBehavior[];
+  /** Whether the player can ride this family (Prompt 044). */
+  rideable?: boolean;
+  /** Rider seat socket, local offset from the body origin (m). Rideable only. */
+  mountAnchor?: { x: number; y: number; z: number };
 }
 
 export const ANIMAL_FAMILIES: Record<AnimalFamilyId, AnimalFamily> = {
@@ -230,6 +236,37 @@ export const ANIMAL_FAMILIES: Record<AnimalFamilyId, AnimalFamily> = {
     wild: true,
     behaviors: ['patrol', 'flee'],
   },
+  // --- Rideable mount (Prompt 044) ------------------------------------------
+  // The horse body — the largest animal, extending the domestic quadruped line
+  // (grazing-livestock) with a larger proxy, ford capability, a rider socket,
+  // and full save authority (location + tame/ownership). `gaits` here are the
+  // **free / riderless** bands; the **ridden** gait bands + ridden motor profile
+  // live in `mount.ts`. Silhouette + economy follow the OoT-era low-poly horse
+  // (`sv_theme_03_004_shape_language.png` panel 11) sized against the 1.7–1.8 m
+  // human in `sv_style_007_camera_scale_guide.png` (withers ≈ 1.6 m).
+  'rideable-mount': {
+    id: 'rideable-mount',
+    label: 'Rideable mount (horse)',
+    scale: 1.0,
+    bodyProxyRadius: 0.7,
+    bodyProxyHeight: 1.7,
+    gaits: [
+      { name: 'graze', speed: 0 },
+      { name: 'amble', speed: 1.0 },
+      { name: 'trot', speed: 3.0 },
+    ],
+    turnRate: 2.2,
+    slopeLimitDeg: 40,
+    waterCapable: true, // fords shallow water (the ridden layer wades it)
+    obstaclePolicy: 'avoid',
+    interactionDistance: 2.0, // mount reach
+    animationClips: ['idle', 'graze', 'walk', 'trot', 'canter', 'gallop'],
+    lodTiers: [24, 48],
+    activationRadius: 40, // visible/usable from far — horse-speed traversal
+    saveAuthority: 'full', // location + tame/ownership
+    rideable: true,
+    mountAnchor: { x: 0, y: 1.5, z: 0 }, // saddle seat above the body
+  },
 };
 
 /** Family for a farm-animal kind (`animals.ts`). */
@@ -264,6 +301,16 @@ export function familyCanWalkSlope(family: AnimalFamily, deg: number): boolean {
 /** All wild families (Prompt 043). */
 export function wildFamilies(): AnimalFamily[] {
   return Object.values(ANIMAL_FAMILIES).filter((f) => f.wild === true);
+}
+
+/** Whether a family can be ridden (Prompt 044). */
+export function isRideableFamily(family: AnimalFamily): boolean {
+  return family.rideable === true;
+}
+
+/** All rideable families (Prompt 044). */
+export function rideableFamilies(): AnimalFamily[] {
+  return Object.values(ANIMAL_FAMILIES).filter((f) => f.rideable === true);
 }
 
 /** Whether a family exhibits a given behaviour. */
