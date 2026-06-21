@@ -2,18 +2,23 @@ import { loadGameContent } from '../data/content';
 import { getActiveSave, persistActiveSave } from './gameState';
 import { absoluteDayFor } from './quest-tracking';
 import { addItem } from './inventory';
+import { relationshipLevel } from './friendship';
+import { completedProjectFlags } from './civic';
 import { grantRewards, summarizeRewards, type RewardNameResolvers } from './rewards';
 import {
+  availableFestivalForDay,
   claimRelationshipMoment,
-  festivalForDay,
+  effectiveFestival,
   festivalStallRows,
   festivalStateFor,
   isFestivalActiveNow,
   markAttended,
   recordMinigameRun,
+  type FestivalAvailabilityContext,
   type FestivalStallRow,
 } from './festival';
 import type { Festival } from '../data/schemas';
+import type { SaveData } from './saveModel';
 
 /**
  * Runtime glue between TownScene and the pure festival engine (`festival.ts`).
@@ -34,14 +39,33 @@ export function festivalNameResolvers(): RewardNameResolvers {
   };
 }
 
-/** The festival on the active save's current date, or null. */
+/**
+ * Availability context for gated festivals (Prompt 057): a flag is set when it's
+ * a truthy save flag OR a completed civic project's `civic:<id>` flag; the
+ * relationship level reads from the friendship engine.
+ */
+export function festivalAvailabilityContextFor(save: SaveData): FestivalAvailabilityContext {
+  const civicFlags = new Set(completedProjectFlags(save.projects));
+  return {
+    hasFlag: (flag) => Boolean(save.flags[flag]) || civicFlags.has(flag),
+    relationshipLevel: (npcId) => relationshipLevel(save.relationships[npcId] ?? 0),
+  };
+}
+
+/**
+ * The festival on the active save's current date, or null. Gated festivals only
+ * surface once their restoration/relationship requirements are met (Prompt 057),
+ * and the year-two+ variation is applied when the calendar year ≥ 2.
+ */
 export function activeFestival(): Festival | null {
   const save = getActiveSave();
   if (!save) return null;
-  return festivalForDay(
+  const festival = availableFestivalForDay(
     { season: save.calendar.season, day: save.calendar.day },
     loadGameContent().festivals,
+    festivalAvailabilityContextFor(save),
   );
+  return festival ? effectiveFestival(festival, save.calendar.year) : null;
 }
 
 /** True when today is a festival day on the active save (whole-day, clock-independent). */

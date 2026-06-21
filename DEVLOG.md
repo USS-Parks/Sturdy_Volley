@@ -5,6 +5,100 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 057 — Festivals phase two (legacy 031) (2026-06-21)
+
+The second festival wave on the Prompt-056 framework: the **Frostlight Festival**
+enriched from a thin stub, three new festivals — **Marsh Chorus** (spring),
+**Lantern Tide** (fall), and the **Founders Harvest Fair** (winter) — plus **year-two
+variations** for every phase-two festival. The Founders Harvest Fair is the
+capstone: it stays hidden until the town's **restoration trio is complete**
+(the Prompt-055 `civic:<id>` flags) **and** a relationship arc is built, then opens
+as the year's grand celebration. Festival rewards are unique but never required for
+main progression (the festival surface is entirely optional).
+
+**Schema.** `festivalSchema` gains three optional fields (all defaulted, so the
+phase-one entries are unchanged): `requiresFlags` + `requiresRelationship`
+(availability gates) and a `yearTwo` override (`festivalYearTwoSchema`:
+description / minigame flavor / relationship line / `bonusReward` / `extraDressing`).
+
+**Engine (pure, unit-tested).** `src/engine/festival.ts` adds `festivalAvailable`
+(every flag set AND every relationship arc met), `availableFestivalForDay` (hides a
+gated festival until available), and `effectiveFestival(festival, year)` (applies
+the year-two variation when `year ≥ 2` — varied description, bonus reward appended
+to the minigame prize, varied lines; pure, never mutates the definition).
+`festival-tracking.ts` `activeFestival()` now assembles an availability context
+(civic-completion flags via `completedProjectFlags` ∪ save flags; relationship
+levels via the friendship engine) and applies `effectiveFestival`.
+
+**Content.** `festivals.json` enriches `frostlight-festival` and adds
+`marsh-chorus` (fishing-contest), `lantern-tide` (lantern-release), and
+`founders-harvest-fair` (cook-off, gated on the three civic flags + a mara-vale arc);
+each carries a `yearTwo` variant. `content.ts` validates the new gate + year-two
+references (a `civic:<id>` flag must name a real project; gate/bonus-reward refs
+must resolve). `schedules.json` gains `byFestival` layers for the four festivals.
+
+**Integration.** `TownScene` raises a **commemorative dressing element** on a
+year-two+ festival whose `yearTwo.extraDressing` is set (the visible "year-two map
+variation"); the gating + year-two content otherwise flow automatically through
+`activeFestival()`. New debug hooks: `setYear`, `completeRestoration`,
+`festivalYearTwoDressingVisible`.
+
+Files: `src/data/schemas.ts`, `src/data/content.ts`,
+`src/data/content/festivals.json`, `src/data/content/schedules.json`,
+`src/engine/festival.ts`, `src/engine/festival-tracking.ts`,
+`src/scenes/TownScene.ts`, `tests/unit/festival.test.ts`, `tests/e2e/festival.spec.ts`.
+
+**Acceptance criteria**
+
+- [x] **Add Winter Frostlight Festival, Lantern Tide, Marsh Chorus, the Founders
+  Harvest Fair, and rotating year-two variants** — all four ship (Frostlight
+  enriched; Marsh Chorus / Lantern Tide / Founders new), each with a non-sport
+  minigame + stall + relationship moment + a `yearTwo` variation.
+- [x] **Festivals have year-two dialogue/map variations** — `effectiveFestival`
+  swaps the description + relationship line + minigame flavor and appends a bonus
+  prize in year two; the host scene raises commemorative dressing (e2e asserts the
+  year-two dressing appears in year two, not year one).
+- [x] **The Founders Harvest Fair depends on town-restoration progress + NPC
+  relationship arcs** — `requiresFlags: [civic:netlight-beacon, civic:market-canopies,
+  civic:belltide-boardwalk]` + `requiresRelationship: [{mara-vale, level 3}]`; e2e
+  asserts it is `null` before restoration and resolves after `completeRestoration`
+  + the relationship arc.
+- [x] **Rewards are unique but not mandatory for main progression** — the entire
+  festival surface is optional (no quest/story gate depends on it); prizes are
+  once-per-year cosmetics/economy, never progression-blocking.
+- [x] Visible in the running game + Playwright-verified (§0.8) — reachable via the
+  TownScene festival-stage prop on each festival day, desktop + Pixel 5.
+
+**Decision record**
+
+- **Availability gating is a pure predicate over a flag-set + relationship fn**, so
+  the engine stays DOM/clock-free; `festival-tracking` supplies the context (civic
+  completions ∪ save flags). A `civic:<id>` `requiresFlags` entry is validated
+  against real projects at content-gate time.
+- **Year-two via a pure `effectiveFestival` transform** applied at read time in
+  `activeFestival()` — the stored definition is never mutated, and the variation is
+  data-driven (`yearTwo`), not branched in code.
+- **Unique season+day per festival** (locked by a unit test) so `festivalForDay`
+  resolves at most one; the Founders Fair's gating is what hides it, not a day clash.
+- **Commemorative dressing as the "map variation"** — a single year-two mesh keeps
+  the graybox change visible + testable without a second map.
+
+**Verify gate** — `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **689 passed** (+10) · `validate:assets` 0 · `build` 0 ·
+Playwright festival suite **16 passed** on `desktop-chromium` + `mobile-chromium`
+(+6 phase-two specs); full suite **323 passed + 1 skipped** (`--retries=2`, exit 0)
+· GitDoctor **100/100**.
+
+**Honest gaps / deferred.** Year-two "dialogue/map variations" are implemented as a
+description/line/reward swap + one commemorative mesh — a fuller year-two map
+re-dress is future art (Prompts 062–063). The relationship-arc gate is a single
+heart-level threshold, not a multi-beat story arc (narrative arcs are a later
+phase). Festivals are still hosted in the legacy `TownScene` only;
+`BallastBayTownScene` does not host them. Festival music remains the single
+`playFestivalChime` cue (Prompt 061).
+
+---
+
 ## Prompt 056 — Festivals phase one (legacy 030) (2026-06-21)
 
 A seasonal **festival framework** on the foundation, with the three phase-one

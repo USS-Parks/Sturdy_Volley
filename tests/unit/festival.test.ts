@@ -4,10 +4,13 @@ import { createNewSave } from '../../src/engine/saveModel';
 import { loadGameContent } from '../../src/data/content';
 import {
   activeSlotFor,
+  availableFestivalForDay,
   canClaimMinigame,
   canClaimRelationship,
   claimRelationshipMoment,
+  effectiveFestival,
   emptyFestivalState,
+  festivalAvailable,
   festivalForDay,
   festivalStallRows,
   festivalWindowLabel,
@@ -16,6 +19,7 @@ import {
   recordMinigameRun,
   startFestivalMinigame,
   tapFestivalSlot,
+  type FestivalAvailabilityContext,
 } from '../../src/engine/festival';
 import { grantRewards } from '../../src/engine/rewards';
 
@@ -240,6 +244,125 @@ describe('content acceptance — festivals (Prompt 056)', () => {
       const f = festivals.find((x) => x.id === id)!;
       let state = startFestivalMinigame(f, 1234)!;
       while (!state.finished) state = tapFestivalSlot(state, state.activeSlot, 1234).state;
+      expect(state.won, `${id} should be winnable`).toBe(true);
+    }
+  });
+});
+
+/* Prompt 057 — phase two: gating + year-two variants ----------------- */
+
+const GATED = fest({
+  id: 'gated-fair',
+  name: 'Gated Fair',
+  season: 'winter',
+  day: 25,
+  description: 'restored-only',
+  requiresFlags: ['civic:netlight-beacon', 'civic:market-canopies'],
+  requiresRelationship: [{ npcId: 'mara-vale', level: 3 }],
+  minigame: {
+    id: 'gated-game', kind: 'cook-off', name: 'Gated Game', description: 'tap', rounds: 6, goalScore: 4, slots: 4,
+    targetLabel: 'dish', rewards: [{ kind: 'gold', amount: 300 }],
+  },
+  stall: { name: 'Gated Stall', entries: [{ itemId: 'honey-jar', price: 140 }] },
+  relationship: { npcId: 'mara-vale', line: 'we did it', rewards: [{ kind: 'relationship', npcId: 'mara-vale', delta: 60 }] },
+  yearTwo: {
+    description: 'year two',
+    minigameDescription: 'doubled feast',
+    relationshipLine: 'two years on',
+    bonusReward: { kind: 'item', itemId: 'sun-jam', qty: 1 },
+    extraDressing: true,
+  },
+});
+
+const ctx = (flags: string[], levels: Record<string, number> = {}): FestivalAvailabilityContext => ({
+  hasFlag: (f) => flags.includes(f),
+  relationshipLevel: (id) => levels[id] ?? 0,
+});
+
+describe('festival availability gating (Prompt 057)', () => {
+  it('an ungated festival is always available', () => {
+    expect(festivalAvailable(FAIR, ctx([]))).toBe(true);
+    expect(festivalAvailable(FAIR)).toBe(true); // default context
+  });
+
+  it('a gated festival needs every flag AND every relationship arc', () => {
+    expect(festivalAvailable(GATED, ctx([]))).toBe(false);
+    // All flags but relationship too low.
+    expect(festivalAvailable(GATED, ctx(['civic:netlight-beacon', 'civic:market-canopies'], { 'mara-vale': 2 }))).toBe(false);
+    // One flag missing.
+    expect(festivalAvailable(GATED, ctx(['civic:netlight-beacon'], { 'mara-vale': 5 }))).toBe(false);
+    // Everything met.
+    expect(festivalAvailable(GATED, ctx(['civic:netlight-beacon', 'civic:market-canopies'], { 'mara-vale': 3 }))).toBe(true);
+  });
+
+  it('availableFestivalForDay hides a gated festival until it is available', () => {
+    const list = [GATED];
+    const point = { season: 'winter' as const, day: 25 };
+    expect(availableFestivalForDay(point, list, ctx([]))).toBeNull();
+    const open = availableFestivalForDay(point, list, ctx(['civic:netlight-beacon', 'civic:market-canopies'], { 'mara-vale': 4 }));
+    expect(open?.id).toBe('gated-fair');
+    // A non-festival day is still null.
+    expect(availableFestivalForDay({ season: 'winter', day: 24 }, list, ctx(['civic:netlight-beacon', 'civic:market-canopies'], { 'mara-vale': 4 }))).toBeNull();
+  });
+});
+
+describe('effectiveFestival year-two variation (Prompt 057)', () => {
+  it('returns the festival unchanged in year one', () => {
+    expect(effectiveFestival(GATED, 1)).toBe(GATED);
+  });
+
+  it('returns a festival without yearTwo unchanged in year two', () => {
+    expect(effectiveFestival(FAIR, 2)).toBe(FAIR);
+  });
+
+  it('applies the year-two description, bonus reward, and varied lines in year two+', () => {
+    const e = effectiveFestival(GATED, 2);
+    expect(e.description).toBe('year two');
+    expect(e.minigame!.description).toBe('doubled feast');
+    // Bonus reward appended to the base minigame prize.
+    expect(e.minigame!.rewards).toHaveLength(2);
+    expect(e.minigame!.rewards[1]).toMatchObject({ kind: 'item', itemId: 'sun-jam', qty: 1 });
+    expect(e.relationship!.line).toBe('two years on');
+    // The original definition is untouched (pure).
+    expect(GATED.minigame!.rewards).toHaveLength(1);
+    expect(GATED.description).toBe('restored-only');
+  });
+});
+
+describe('content acceptance — festivals phase two (Prompt 057)', () => {
+  const festivals = loadGameContent().festivals;
+  const PHASE_TWO = ['frostlight-festival', 'marsh-chorus', 'lantern-tide', 'founders-harvest-fair'];
+
+  it('ships the phase-two festivals, each fully enriched with a year-two variant', () => {
+    for (const id of PHASE_TWO) {
+      const f = festivals.find((x) => x.id === id);
+      expect(f, `${id} exists`).toBeTruthy();
+      expect(f!.minigame, `${id} minigame`).not.toBeNull();
+      expect(f!.stall, `${id} stall`).not.toBeNull();
+      expect(f!.relationship, `${id} relationship`).not.toBeNull();
+      expect(f!.yearTwo, `${id} yearTwo`).not.toBeNull();
+      expect(f!.minigame!.goalScore).toBeLessThanOrEqual(f!.minigame!.rounds);
+    }
+  });
+
+  it('the Founders Harvest Fair gates on the restoration trio + a relationship arc', () => {
+    const founders = festivals.find((f) => f.id === 'founders-harvest-fair')!;
+    expect(founders.requiresFlags).toEqual(
+      expect.arrayContaining(['civic:netlight-beacon', 'civic:market-canopies', 'civic:belltide-boardwalk']),
+    );
+    expect(founders.requiresRelationship.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('no two festivals collide on the same season + day', () => {
+    const keys = festivals.map((f) => `${f.season}-${f.day}`);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('every phase-two festival minigame is winnable', () => {
+    for (const id of PHASE_TWO) {
+      const f = festivals.find((x) => x.id === id)!;
+      let state = startFestivalMinigame(f, 99)!;
+      while (!state.finished) state = tapFestivalSlot(state, state.activeSlot, 99).state;
       expect(state.won, `${id} should be winnable`).toBe(true);
     }
   });

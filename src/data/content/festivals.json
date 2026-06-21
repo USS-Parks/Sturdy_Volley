@@ -113,5 +113,181 @@
       "rewards": [{ "kind": "relationship", "npcId": "jun-park", "delta": 40 }]
     }
   },
-  { "id": "frostlight-festival", "name": "Frostlight Festival", "season": "winter", "day": 8, "description": "Warm cider and lanterns against the longest nights of the year." }
+  {
+    "id": "frostlight-festival",
+    "name": "Frostlight Festival",
+    "season": "winter",
+    "day": 8,
+    "description": "Warm cider and lanterns against the longest nights of the year, strung the length of the market lane.",
+    "startMinutes": 960,
+    "endMinutes": 1440,
+    "music": "festival-frostlight",
+    "venue": "Town",
+    "minigame": {
+      "id": "frostlight-lanterns",
+      "kind": "lantern-release",
+      "name": "Frostlight Lanterns",
+      "description": "Kindle each frost-lantern the moment it glows, before the cold snuffs it out.",
+      "rounds": 9,
+      "goalScore": 5,
+      "slots": 4,
+      "targetLabel": "lantern",
+      "rewards": [
+        { "kind": "gold", "amount": 200 },
+        { "kind": "item", "itemId": "dried-harborlime", "qty": 3 }
+      ]
+    },
+    "stall": {
+      "name": "Frostlight Stall",
+      "entries": [
+        { "itemId": "honey-jar", "price": 140 },
+        { "itemId": "goat-cheese", "price": 95 },
+        { "itemId": "dried-harborlime", "price": 70 }
+      ]
+    },
+    "relationship": {
+      "npcId": "jun-park",
+      "line": "Cider's hot and the lanterns are lit. Stand by the brazier with me a while — winters are long, but not tonight.",
+      "rewards": [{ "kind": "relationship", "npcId": "jun-park", "delta": 40 }]
+    },
+    "yearTwo": {
+      "description": "The second Frostlight: more lanterns than last year, and the whole lane turns out for the cider.",
+      "minigameDescription": "Twice the lanterns this year — kindle each glowing one before the frost takes it.",
+      "relationshipLine": "Second Frostlight together. Same brazier, warmer crowd. Glad the town's finding its feet again.",
+      "bonusReward": { "kind": "item", "itemId": "honey-jar", "qty": 1 },
+      "extraDressing": true
+    }
+  },
+  {
+    "id": "marsh-chorus",
+    "name": "Marsh Chorus",
+    "season": "spring",
+    "day": 24,
+    "description": "Reed flutes and frog-song carry across Belltide Marsh as the town gathers to sing in the thaw.",
+    "startMinutes": 540,
+    "endMinutes": 1200,
+    "music": "festival-marsh",
+    "venue": "Town",
+    "minigame": {
+      "id": "marsh-catch",
+      "kind": "fishing-contest",
+      "name": "Marsh Catch",
+      "description": "Hook each marsh-fish the instant it surfaces among the reeds.",
+      "rounds": 8,
+      "goalScore": 5,
+      "slots": 4,
+      "targetLabel": "cast",
+      "rewards": [
+        { "kind": "gold", "amount": 160 },
+        { "kind": "item", "itemId": "bait", "qty": 8 }
+      ]
+    },
+    "stall": {
+      "name": "Marsh Stall",
+      "entries": [
+        { "itemId": "sea-lettuce", "price": 28 },
+        { "itemId": "bait", "price": 6 },
+        { "itemId": "tide-turnip-seeds", "price": 10 }
+      ]
+    },
+    "relationship": {
+      "npcId": "sol-aranda",
+      "line": "You found the chorus! Take a reed flute — the marsh keeps better time than I do. Play the low note with me.",
+      "rewards": [{ "kind": "relationship", "npcId": "sol-aranda", "delta": 40 }]
+    },
+    "yearTwo": {
+      "description": "The marsh runs fuller this spring, and the chorus has new voices — the town is putting down roots.",
+      "extraDressing": true
+    }
+  },
+  {
+    "id": "lantern-tide",
+    "name": "Lantern Tide",
+    "season": "fall",
+    "day": 26,
+    "description": "Hundreds of paper lanterns ride the autumn tide out past the harbor mouth, each carrying a wish for the coming winter.",
+    "startMinutes": 1080,
+    "endMinutes": 1560,
+    "music": "festival-lanterntide",
+    "venue": "Town",
+    "minigame": {
+      "id": "tide-lanterns",
+      "kind": "lantern-release",
+      "name": "Tide Lanterns",
+      "description": "Set each lantern adrift on the falling tide before the next wave breaks.",
+      "rounds": 10,
+      "goalScore": 6,
+      "slots": 5,
+      "targetLabel": "lantern",
+      "rewards": [
+        { "kind": "gold", "amount": 180 },
+        { "kind": "item", "itemId": "shell-charm", "qty": 1 }
+      ]
+    },
+    "stall": {
+      "name": "Lantern Stall",
+      "entries": [
+        { "itemId": "tide-shell", "price": 20 },
+        { "itemId": "shell-charm", "price": 95 },
+        { "itemId": "harborlime", "price": 22 }
+      ]
+    },
+    "relationship": {
+      "npcId": "lio-marin",
+      "line": "Write a wish on the last lantern with me — I always send one for a calm winter on the water. This year I'll send two.",
+      "rewards": [{ "kind": "relationship", "npcId": "lio-marin", "delta": 40 }]
+    },
+    "yearTwo": {
+      "description": "The tide carries more lanterns out than ever — a whole harbor's worth of wishes for the rebuilt town.",
+      "relationshipLine": "Two winters of wishes now. The water's been kinder since you came. Send the last one far.",
+      "extraDressing": true
+    }
+  },
+  {
+    "id": "founders-harvest-fair",
+    "name": "Founders Harvest Fair",
+    "season": "winter",
+    "day": 25,
+    "description": "The town's oldest celebration, revived at last: a feast in the restored harbor honoring the founders and a year of rebuilding.",
+    "startMinutes": 540,
+    "endMinutes": 1320,
+    "music": "festival-founders",
+    "venue": "Town",
+    "requiresFlags": ["civic:netlight-beacon", "civic:market-canopies", "civic:belltide-boardwalk"],
+    "requiresRelationship": [{ "npcId": "mara-vale", "level": 3 }],
+    "minigame": {
+      "id": "founders-feast",
+      "kind": "cook-off",
+      "name": "Founders Feast",
+      "description": "Plate each founders' feast dish the instant the harbor bell rings.",
+      "rounds": 10,
+      "goalScore": 6,
+      "slots": 4,
+      "targetLabel": "dish",
+      "rewards": [
+        { "kind": "gold", "amount": 400 },
+        { "kind": "item", "itemId": "honey-jar", "qty": 2 }
+      ]
+    },
+    "stall": {
+      "name": "Founders Stall",
+      "entries": [
+        { "itemId": "honey-jar", "price": 140 },
+        { "itemId": "sun-jam", "price": 180 },
+        { "itemId": "pea-jam", "price": 80 }
+      ]
+    },
+    "relationship": {
+      "npcId": "mara-vale",
+      "line": "We did it — the beacon's lit, the lane's covered, the boardwalk holds. The founders would know the place. Thank you for all of it.",
+      "rewards": [{ "kind": "relationship", "npcId": "mara-vale", "delta": 60 }]
+    },
+    "yearTwo": {
+      "description": "The second Founders Fair fills the harbor end to end — the town it honors is whole again, and growing.",
+      "minigameDescription": "The feast has doubled — plate every dish before the bell, the town's counting on it.",
+      "relationshipLine": "Two years on and the harbor's never been busier. You didn't just fix the town — you brought the Fair back. That's the founders' work.",
+      "bonusReward": { "kind": "item", "itemId": "sun-jam", "qty": 1 },
+      "extraDressing": true
+    }
+  }
 ]

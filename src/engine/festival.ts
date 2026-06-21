@@ -44,6 +44,68 @@ export function festivalForDay(
   return festivals.find((f) => f.season === point.season && f.day === point.day) ?? null;
 }
 
+/**
+ * Availability context (Prompt 057) for gated festivals: whether a flag is set
+ * (civic-completion `civic:<id>` flags or save flags) and the relationship level
+ * (hearts) held with an NPC.
+ */
+export interface FestivalAvailabilityContext {
+  hasFlag: (flag: string) => boolean;
+  relationshipLevel: (npcId: string) => number;
+}
+
+const ALWAYS_AVAILABLE: FestivalAvailabilityContext = {
+  hasFlag: () => false,
+  relationshipLevel: () => 0,
+};
+
+/**
+ * Whether a festival is available given the world state: every `requiresFlags`
+ * flag is set AND every `requiresRelationship` arc is met. An ungated festival
+ * (no requirements) is always available.
+ */
+export function festivalAvailable(
+  festival: Festival,
+  ctx: FestivalAvailabilityContext = ALWAYS_AVAILABLE,
+): boolean {
+  if (!festival.requiresFlags.every((flag) => ctx.hasFlag(flag))) return false;
+  if (!festival.requiresRelationship.every((gate) => ctx.relationshipLevel(gate.npcId) >= gate.level)) return false;
+  return true;
+}
+
+/** The festival on this season + day **only if** it is currently available, else null. */
+export function availableFestivalForDay(
+  point: Pick<CalendarPoint, 'season' | 'day'>,
+  festivals: readonly Festival[],
+  ctx: FestivalAvailabilityContext = ALWAYS_AVAILABLE,
+): Festival | null {
+  const festival = festivalForDay(point, festivals);
+  if (!festival) return null;
+  return festivalAvailable(festival, ctx) ? festival : null;
+}
+
+/**
+ * Apply the year-two+ variation when `year >= 2`. Returns the festival unchanged
+ * in year one (or when it has no `yearTwo`); otherwise a shallow clone with the
+ * varied description, the minigame's bonus reward appended + flavor swapped, and
+ * the relationship line varied. Pure — never mutates the definition.
+ */
+export function effectiveFestival(festival: Festival, year: number): Festival {
+  const yt = festival.yearTwo;
+  if (!yt || year < 2) return festival;
+  const minigame = festival.minigame
+    ? {
+        ...festival.minigame,
+        description: yt.minigameDescription ?? festival.minigame.description,
+        rewards: yt.bonusReward ? [...festival.minigame.rewards, yt.bonusReward] : festival.minigame.rewards,
+      }
+    : festival.minigame;
+  const relationship = festival.relationship
+    ? { ...festival.relationship, line: yt.relationshipLine ?? festival.relationship.line }
+    : festival.relationship;
+  return { ...festival, description: yt.description, minigame, relationship };
+}
+
 /** True when `minutes` falls inside the festival's active window. */
 export function isFestivalActiveNow(festival: Festival, minutes: number): boolean {
   return minutes >= festival.startMinutes && minutes < festival.endMinutes;

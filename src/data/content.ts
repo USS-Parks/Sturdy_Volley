@@ -283,6 +283,7 @@ function checkReferences(content: GameContent, issues: ValidationIssue[]): void 
     });
   };
 
+  const projectIds = new Set(content.projects.map((p) => p.id));
   content.festivals.forEach((festival, i) => {
     if (festival.stall) {
       festival.stall.entries.forEach((entry, j) => {
@@ -297,6 +298,21 @@ function checkReferences(content: GameContent, issues: ValidationIssue[]): void 
         issues.push({ collection: 'festivals', path: `[${i}].relationship.npcId`, message: `relationship npcId "${festival.relationship.npcId}" does not match any NPC` });
       }
       validateRewardRefs(festival.relationship.rewards, `[${i}].relationship.rewards`);
+    }
+    // Prompt 057: gate + year-two references.
+    festival.requiresFlags.forEach((flag, j) => {
+      // `civic:<id>` flags must name a real civic project; other flags are opaque.
+      if (flag.startsWith('civic:') && !projectIds.has(flag.slice('civic:'.length))) {
+        issues.push({ collection: 'festivals', path: `[${i}].requiresFlags[${j}]`, message: `civic flag "${flag}" does not match any project` });
+      }
+    });
+    festival.requiresRelationship.forEach((gate, j) => {
+      if (!npcIds.has(gate.npcId)) {
+        issues.push({ collection: 'festivals', path: `[${i}].requiresRelationship[${j}].npcId`, message: `gate npcId "${gate.npcId}" does not match any NPC` });
+      }
+    });
+    if (festival.yearTwo?.bonusReward) {
+      validateRewardRefs([festival.yearTwo.bonusReward], `[${i}].yearTwo.bonusReward`);
     }
   });
 }

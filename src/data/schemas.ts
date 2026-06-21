@@ -261,6 +261,37 @@ export const festivalRelationshipSchema = z
   .strict();
 export type FestivalRelationship = z.infer<typeof festivalRelationshipSchema>;
 
+/**
+ * A relationship-arc gate (Prompt 057): the festival is only available once the
+ * player holds at least `level` hearts with `npcId`. Used by the Founders Harvest
+ * Fair, which depends on town-restoration progress AND NPC relationship arcs.
+ */
+export const festivalRelationshipGateSchema = z
+  .object({ npcId: idSchema, level: z.number().int().positive() })
+  .strict();
+export type FestivalRelationshipGate = z.infer<typeof festivalRelationshipGateSchema>;
+
+/**
+ * Year-two (and later) variation (Prompt 057). Applied when `calendar.year >= 2`:
+ * the festival's flavor text shifts, the minigame may gain a bonus prize, and the
+ * host scene can raise a commemorative dressing element (`extraDressing`). Every
+ * field is optional so a year-two entry can be as light as a new description.
+ */
+export const festivalYearTwoSchema = z
+  .object({
+    description: z.string().min(1),
+    /** Optional year-two minigame flavor text. */
+    minigameDescription: z.string().min(1).optional(),
+    /** Optional year-two variation of the relationship-moment line. */
+    relationshipLine: z.string().min(1).optional(),
+    /** Optional extra reward appended to the minigame prize in year two+. */
+    bonusReward: questRewardSchema.optional(),
+    /** When true, the host scene raises an extra commemorative dressing element. */
+    extraDressing: z.boolean().default(false),
+  })
+  .strict();
+export type FestivalYearTwo = z.infer<typeof festivalYearTwoSchema>;
+
 export const festivalSchema = z
   .object({
     id: idSchema,
@@ -281,6 +312,16 @@ export const festivalSchema = z
     stall: festivalStallSchema.nullable().default(null),
     /** A festival-only relationship opportunity. */
     relationship: festivalRelationshipSchema.nullable().default(null),
+    /**
+     * Availability gate (Prompt 057). The festival only happens once every flag is
+     * set — civic-completion flags (`civic:<id>`) or save flags. Empty = always
+     * available. The Founders Harvest Fair gates on the restoration trio.
+     */
+    requiresFlags: z.array(z.string().min(1)).default([]),
+    /** Availability gate: relationship-arc levels that must be held (Prompt 057). */
+    requiresRelationship: z.array(festivalRelationshipGateSchema).default([]),
+    /** Year-two+ variation applied when the calendar year ≥ 2 (Prompt 057). */
+    yearTwo: festivalYearTwoSchema.nullable().default(null),
   })
   .strict();
 export type Festival = z.infer<typeof festivalSchema>;

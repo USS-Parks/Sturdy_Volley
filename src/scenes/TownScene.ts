@@ -229,6 +229,8 @@ export class TownScene extends GameScene {
   /** Prompt 056: today's festival (null on an ordinary day) + festival dressing meshes. */
   private festival: Festival | null = null;
   private readonly festivalMeshes: AbstractMesh[] = [];
+  /** Prompt 057: commemorative dressing raised only on a year-two+ festival. */
+  private readonly festivalYearTwoMeshes: AbstractMesh[] = [];
   private festivalMinigame: FestivalMinigameState | null = null;
   private festivalMinigameResult: string | null = null;
 
@@ -422,7 +424,14 @@ export class TownScene extends GameScene {
       this.festivalMeshes.push(lamp);
     }
 
-    for (const mesh of this.festivalMeshes) mesh.isVisible = false;
+    // Prompt 057: a commemorative founders' pillar raised only on year-two+
+    // festivals (the visible "year-two map variation") — a taller second banner.
+    const commemorative = MeshBuilder.CreateBox('festival-yeartwo-banner', { width: 5.0, depth: 0.12, height: 0.55 }, scene);
+    commemorative.position.set(-2, 4.2, 2);
+    commemorative.material = flatMaterial(scene, 'festival-yeartwo-banner', PALETTE.warmLight, 0.4);
+    this.festivalYearTwoMeshes.push(commemorative);
+
+    for (const mesh of [...this.festivalMeshes, ...this.festivalYearTwoMeshes]) mesh.isVisible = false;
   }
 
   /** Reveal the completion meshes for every finished project. */
@@ -523,6 +532,10 @@ export class TownScene extends GameScene {
         buyStall: (itemId: string) => { bought: boolean; reason?: string; price: number };
         shareMoment: () => { claimed: boolean; npcId: string | null; rewardSummary: string | null };
         walletGold: () => number;
+        // Prompt 057 — phase two: gating + year-two.
+        festivalYearTwoDressingVisible: () => boolean;
+        completeRestoration: () => void;
+        setYear: (year: number) => void;
       };
     }).sturdyVolleyTown = {
       npcs: () => {
@@ -589,7 +602,38 @@ export class TownScene extends GameScene {
         return { claimed: r.claimed, npcId: r.npcId, rewardSummary: r.rewardSummary };
       },
       walletGold: () => this.save.wallet.gold,
+      festivalYearTwoDressingVisible: () =>
+        this.festivalYearTwoMeshes.length > 0 && this.festivalYearTwoMeshes.every((m) => m.isVisible),
+      completeRestoration: () => this.debugCompleteRestoration(),
+      setYear: (year: number) => {
+        this.save.calendar.year = year;
+        this.clock.time.year = year;
+        persistActiveSave();
+        this.refreshFestival(false);
+        this.rebuildTargets();
+      },
     };
+  }
+
+  /**
+   * Debug/e2e: force every civic restoration project complete (sets the
+   * `civic:<id>` flags the Founders Harvest Fair gates on), reveal their meshes,
+   * and persist. Pairs with `setRelationship` to satisfy the festival's gate.
+   */
+  private debugCompleteRestoration(): void {
+    const defs = loadGameContent().projects;
+    for (const def of defs) {
+      this.save.projects[def.id] = {
+        phase: def.phases.length,
+        contributed: def.phases.map((ph) => ph.requirements.map(() => 0)),
+        complete: true,
+        completedDay: 0,
+      };
+    }
+    persistActiveSave();
+    this.applyCivicState();
+    this.refreshFestival(false);
+    this.rebuildTargets();
   }
 
   /** Debug/e2e: jump the active save to a season + day, then re-resolve the festival. */
@@ -721,6 +765,10 @@ export class TownScene extends GameScene {
     this.festival = activeFestival();
     const visible = this.festival !== null;
     for (const mesh of this.festivalMeshes) mesh.isVisible = visible;
+    // Prompt 057: the commemorative dressing is up only on a year-two+ festival
+    // whose `yearTwo.extraDressing` is set.
+    const yearTwoUp = visible && this.save.calendar.year >= 2 && this.festival?.yearTwo?.extraDressing === true;
+    for (const mesh of this.festivalYearTwoMeshes) mesh.isVisible = yearTwoUp;
     if (this.festival && playCue) {
       markActiveFestivalAttended(this.festival.id);
       playFestivalChime();

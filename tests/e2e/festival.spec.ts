@@ -16,6 +16,11 @@ interface TownFestivalDebug {
   buyStall: (itemId: string) => { bought: boolean; reason?: string; price: number };
   shareMoment: () => { claimed: boolean; npcId: string | null; rewardSummary: string | null };
   walletGold: () => number;
+  // Prompt 057 — phase two.
+  setRelationship: (npcId: string, points: number) => void;
+  completeRestoration: () => void;
+  setYear: (year: number) => void;
+  festivalYearTwoDressingVisible: () => boolean;
 }
 
 interface ManagerApi {
@@ -159,5 +164,59 @@ test.describe('Prompt 056 — festivals phase one', () => {
     // Sharing again the same year is a no-op.
     const again = await page.evaluate(() => (window as unknown as { sturdyVolleyTown: TownFestivalDebug }).sturdyVolleyTown.shareMoment());
     expect(again.claimed).toBe(false);
+  });
+});
+
+test.describe('Prompt 057 — festivals phase two', () => {
+  test('a phase-two festival (Marsh Chorus) is reachable and winnable', async ({ page }) => {
+    await newGame(page);
+    await gotoTown(page);
+    await page.evaluate(() => (window as unknown as { sturdyVolleyTown: TownFestivalDebug }).sturdyVolleyTown.setDate('spring', 24));
+
+    const today = await page.evaluate(() => (window as unknown as { sturdyVolleyTown: TownFestivalDebug }).sturdyVolleyTown.festivalToday());
+    expect(today?.id).toBe('marsh-chorus');
+
+    const win = await page.evaluate(() => (window as unknown as { sturdyVolleyTown: TownFestivalDebug }).sturdyVolleyTown.playMinigameToWin());
+    expect(win.won).toBe(true);
+    expect(win.granted).toBe(true);
+  });
+
+  test('the Founders Harvest Fair is gated until restoration + relationship arc are met', async ({ page }) => {
+    await newGame(page);
+    await gotoTown(page);
+
+    // Winter 25 with no restoration done → the Founders Fair is not available.
+    await page.evaluate(() => (window as unknown as { sturdyVolleyTown: TownFestivalDebug }).sturdyVolleyTown.setDate('winter', 25));
+    expect(await page.evaluate(() => (window as unknown as { sturdyVolleyTown: TownFestivalDebug }).sturdyVolleyTown.festivalToday())).toBeNull();
+
+    // Complete the restoration trio + build the relationship arc, then re-resolve.
+    await page.evaluate(() => {
+      const d = (window as unknown as { sturdyVolleyTown: TownFestivalDebug }).sturdyVolleyTown;
+      d.completeRestoration();
+      d.setRelationship('mara-vale', 1000);
+      d.setDate('winter', 25);
+    });
+
+    const today = await page.evaluate(() => (window as unknown as { sturdyVolleyTown: TownFestivalDebug }).sturdyVolleyTown.festivalToday());
+    expect(today?.id).toBe('founders-harvest-fair');
+
+    const win = await page.evaluate(() => (window as unknown as { sturdyVolleyTown: TownFestivalDebug }).sturdyVolleyTown.playMinigameToWin());
+    expect(win.won).toBe(true);
+    expect(win.granted).toBe(true);
+  });
+
+  test('a year-two festival raises the commemorative dressing', async ({ page }) => {
+    await newGame(page);
+    await gotoTown(page);
+
+    // Year one Marsh Chorus: no year-two dressing.
+    await page.evaluate(() => (window as unknown as { sturdyVolleyTown: TownFestivalDebug }).sturdyVolleyTown.setDate('spring', 24));
+    expect(await page.evaluate(() => (window as unknown as { sturdyVolleyTown: TownFestivalDebug }).sturdyVolleyTown.festivalYearTwoDressingVisible())).toBe(false);
+
+    // Year two: the commemorative dressing comes up, festival still resolves.
+    await page.evaluate(() => (window as unknown as { sturdyVolleyTown: TownFestivalDebug }).sturdyVolleyTown.setYear(2));
+    const today = await page.evaluate(() => (window as unknown as { sturdyVolleyTown: TownFestivalDebug }).sturdyVolleyTown.festivalToday());
+    expect(today?.id).toBe('marsh-chorus');
+    expect(await page.evaluate(() => (window as unknown as { sturdyVolleyTown: TownFestivalDebug }).sturdyVolleyTown.festivalYearTwoDressingVisible())).toBe(true);
   });
 });
