@@ -1,8 +1,9 @@
 # Sturdy Volley — Master Roster (Unified P-SPR)
 
 Prepared: 2026-06-19
-Status: **APPROVED 2026-06-19 — this is the active P-SPR. Execution NOT started; STS deferred to a new
-session the user will initiate.**
+Status: **APPROVED 2026-06-19 — this is the active P-SPR. STS in progress.** The **WEF foundation block
+(Prompts 028–053) is COMPLETE** (closed 2026-06-21, WEF-13); gameplay continuation resumes at **Prompt
+054**. Per-prompt commit SHAs + verify gates are in `DEVLOG.md`.
 Supersedes (now active): the standalone `PLANNING/WORLD_EMBODIMENT_FOUNDATION_PSPR.md` draft and the
 roster halves of `STURDY_VOLLEY_PSPR.md`. Both remain valid **historical + product** references.
 Target: browser-first, mobile-ready, controller-friendly low-poly 3D cozy life sim (Theme 3).
@@ -1166,32 +1167,32 @@ bug fixing, performance, save stability, credits, privacy-first telemetry option
 
 **Foundation block (WEF):**
 
-- [ ] 028 — TS config split + camera proving-ground shell (WEF-01a)
-- [ ] 029 — Camera profiles, rig, obstruction, input (WEF-01b)
-- [ ] 030 — Lock camera baselines + telemetry + decision record (WEF-01c)
-- [ ] 031 — Havok adapter + capsule motor core (WEF-02a)
-- [ ] 032 — Motor terrain handling + recovery (WEF-02b)
-- [ ] 033 — Water + traversal links + save recovery (WEF-02c)
-- [ ] 034 — Interaction, facing, tool-targeting (WEF-03)
-- [ ] 035 — Exterior topology, chunks, streaming (WEF-04)
-- [ ] 036 — Interior kit + camera volumes (WEF-05)
-- [ ] 037 — Metric kit + map schemas (WEF-06a)
-- [ ] 038 — World atlas + region sheets (two-community + river spine) (WEF-06b)
-- [ ] 039 — Farm + town blockout diagrams (WEF-06c)
-- [ ] 040 — NPC navigation service core (WEF-07a)
-- [ ] 041 — Avoidance, schedules, offscreen sim (WEF-07b)
-- [ ] 042 — Animal families + domestic migration (WEF-08a)
-- [ ] 043 — Wild-fauna families (WEF-08b)
-- [ ] 044 — Mount system: rideable horse + mount/dismount + ridden motor
-- [ ] 045 — Flora + environmental-motion tiers (WEF-09)
-- [ ] 046 — Maps I: Farm exterior + Farmhouse (WEF-10a)
-- [ ] 047 — Map II: Ballast Bay town district (WEF-10b)
-- [ ] 048 — Map III: Klam-ity River corridor + mounted traversal (WEF-10c-i)
-- [ ] 049 — Map IV: cavern slice (WEF-10c-ii)
-- [ ] 050 — Asset & rig contract + validator (WEF-11a)
-- [ ] 051 — Swap factories + 5 fixtures (WEF-11b)
-- [ ] 052 — Performance + accessibility foundation gate (WEF-12)
-- [ ] 053 — Migrate scenes + close foundation (WEF-13)
+- [x] 028 — TS config split + camera proving-ground shell (WEF-01a)
+- [x] 029 — Camera profiles, rig, obstruction, input (WEF-01b)
+- [x] 030 — Lock camera baselines + telemetry + decision record (WEF-01c)
+- [x] 031 — Havok adapter + capsule motor core (WEF-02a)
+- [x] 032 — Motor terrain handling + recovery (WEF-02b)
+- [x] 033 — Water + traversal links + save recovery (WEF-02c)
+- [x] 034 — Interaction, facing, tool-targeting (WEF-03)
+- [x] 035 — Exterior topology, chunks, streaming (WEF-04)
+- [x] 036 — Interior kit + camera volumes (WEF-05)
+- [x] 037 — Metric kit + map schemas (WEF-06a)
+- [x] 038 — World atlas + region sheets (two-community + river spine) (WEF-06b)
+- [x] 039 — Farm + town blockout diagrams (WEF-06c)
+- [x] 040 — NPC navigation service core (WEF-07a)
+- [x] 041 — Avoidance, schedules, offscreen sim (WEF-07b)
+- [x] 042 — Animal families + domestic migration (WEF-08a)
+- [x] 043 — Wild-fauna families (WEF-08b)
+- [x] 044 — Mount system: rideable horse + mount/dismount + ridden motor
+- [x] 045 — Flora + environmental-motion tiers (WEF-09)
+- [x] 046 — Maps I: Farm exterior + Farmhouse (WEF-10a)
+- [x] 047 — Map II: Ballast Bay town district (WEF-10b)
+- [x] 048 — Map III: Klam-ity River corridor + mounted traversal (WEF-10c-i)
+- [x] 049 — Map IV: cavern slice (WEF-10c-ii)
+- [x] 050 — Asset & rig contract + validator (WEF-11a)
+- [x] 051 — Swap factories + 5 fixtures (WEF-11b)
+- [x] 052 — Performance + accessibility foundation gate (WEF-12)
+- [x] 053 — Migrate scenes + close foundation (WEF-13)
 
 **Gameplay continuation:**
 
@@ -1235,8 +1236,10 @@ basics, no known save-destroying bugs, and complete credits/licenses — with th
   decomp or `HarbourMasters/Shipwright` port source; engine built from neutral first-party sources.
 - User review: **complete (2026-06-19)**
 - Explicit approval: **GRANTED by user 2026-06-19** — this is the active P-SPR.
-- STS authorization: **not yet granted.** The user will start STS in a **new session** they initiate;
-  do not begin execution in the approving session.
-- Execution may begin: **only in that future session**, starting at Prompt 028 after the new-session
-  bootstrap (§0.12): read the latest handoff (none yet — first session starts clean at 028), the top
-  DEVLOG entries, `git log`, and confirm the §0.11 protected files are intact.
+- STS authorization: **GRANTED**; execution began 2026-06-19 and ran per the §0.12 session protocol.
+- **Foundation block (028–053): COMPLETE (2026-06-21, WEF-13).** All 26 foundation prompts shipped with
+  green verify gates (see `DEVLOG.md`); the camera/motor/interaction/navigation/streaming/interior/
+  map-data/fauna/flora/mount/asset stack is in place, the five production-foundation maps are playable
+  through real region transitions, and the foundation gate (budgets/tiers/accessibility) is codified.
+- **Gameplay continuation resumes at Prompt 054** on top of this foundation. The legacy gameplay scenes
+  are preserved (migrated, not discarded — see `docs/ARCHITECTURE.md` "Migration status").

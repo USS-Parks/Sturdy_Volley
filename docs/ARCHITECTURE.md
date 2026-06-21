@@ -53,4 +53,58 @@ until real `.glb` assets land in `public/assets/`.
 
 No assets, code, names, dialogue, maps, or data may be copied from other games.
 Placeholder visuals are generated in-engine (primitives + flat materials) until
-the original Theme-3 art replaces them.
+the original Theme-3 art replaces them. **OoT-era *feel* only** — never the
+`zeldaret/oot` decompilation or any PC port source/assets (master roster §0.7).
+
+## World Embodiment Foundation (WEF, Prompts 028–053 — complete)
+
+The foundation re-platforms the game on one shared, modular, streamable 3D stack.
+Render meshes, collision proxies, navigation surfaces, interaction anchors, camera
+volumes, spawn points, audio zones, streaming bounds, and persistence identifiers
+are **separate concerns** (§3.1).
+
+- **Camera** — `src/camera/`: data-driven `profiles` (one locked baseline per §2
+  context, incl. `mounted`), the `rig` (binds a profile to an `ArcRotateCamera`),
+  authored `volumes` (profile override + obstruction mode + blend hysteresis),
+  `orbit` math, and `input` (keyboard/mouse, controller right-stick, touch drag).
+- **Motor** — `src/engine/motor.ts` (pure kinematic capsule: grounding, gravity,
+  slopes, steps, wade/swim, authored traversal links — no free jump) over
+  `src/physics/` (a narrow Havok adapter + a ray-pick fallback).
+- **Interaction** — `src/engine/interaction-targeting.ts` (candidate discovery →
+  scoring → selection → facing → commit).
+- **Navigation** — `src/engine/navigation.ts` (navmesh + A\* + off-mesh links),
+  `nav-avoidance.ts`, `npc-sim.ts` (sim tiers + offscreen abstraction).
+- **World** — `src/world/`: `topology`/`streaming`/`variants`, `interior-kit`,
+  `metric-kit`, `map-schema` (+ validator), `atlas`, `blockouts/`, and
+  `region-transition` (the `goTo` payload preserving anchor/facing/camera/clock/NPC).
+- **Fauna / flora / mount** — `engine/animal-families.ts` (domestic + wild +
+  `rideable-mount`), `fauna-behavior.ts`, `flora-motion.ts`, and `mount.ts` (ridden
+  motor + mount state machine + mounted-camera handoff). Horse graybox in
+  `render/horse-graybox.ts`.
+- **Production-foundation maps** — `scenes/BreakpointFarmScene`,
+  `FarmhouseInteriorScene`, `BallastBayTownScene`, `KlamityRiverScene`,
+  `RainhallCavernScene`: graybox geometry over production collision / navigation /
+  anchor / camera-volume / transition data, each with five toggleable debug
+  layers, reachable through real region transitions.
+- **Asset pipeline** — `render/asset-contract.{json,ts}` (per-family `.glb`
+  conformance validator), `render/asset-factory.ts` (reversible graybox↔asset swap
+  preserving anchors/collision/nav/save id), `render/asset-fixtures.ts`.
+- **Foundation gate** — `engine/foundation-budget.ts` (hard ceilings, full metric
+  set, per map, desktop+mobile), `quality-tiers.ts` (density/effects only),
+  `accessibility.ts` (twelve controls), `foundation-coverage.ts` (the tour
+  manifest); `docs/SCALE_AND_PERFORMANCE.md` is the normative budget doc.
+
+### Migration status (WEF-13)
+
+The shared stack is the foundation for all gameplay from **Prompt 054**. The new
+production-foundation maps use it end to end. The **legacy gameplay scenes**
+(`FarmScene`, `TownScene`, `InteriorScene`, `BeachScene`, `MineScene`) remain the
+live home of shipped gameplay (save, farming, forage, crops, tools, machines,
+animals, pets, fishing, reefs, mining, combat, shops, NPCs, dialogue, friendship,
+cutscenes, time/weather/tide) and are **migrated, not discarded** — their content
+moves onto the production-foundation maps as the gameplay continuation (054+)
+builds on the shared stack. **Retirement criterion:** a legacy scene's scene-local
+camera/movement/collision/direct-navigation path is removed only when repository
+search proves the equivalent content has moved to a foundation map and no live
+consumer remains. No such path is safely removable at the close of WEF (every
+legacy scene is still a live consumer); the adapters stay until 054+ migrates them.

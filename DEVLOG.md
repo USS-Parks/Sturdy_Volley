@@ -5,6 +5,95 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 053 — Migrate current scenes + close the foundation phase (WEF-13) (2026-06-21)
+
+Closed the **World Embodiment Foundation** (Prompts 028–053). Reconciled the
+documentation so gameplay prompts (054+) build on one foundation, recorded the
+migration status, and ran the full close gate. Docs-only by design: the shared
+stack is already used end to end by the five production-foundation maps, and the
+legacy gameplay scenes are **migrated, not discarded** — so no code is removed at
+the close (every legacy scene is still a live consumer).
+
+**Reconciliation.** `README.md` gains a "World Embodiment Foundation" section + an
+updated project layout (camera/world/render/engine + the production maps +
+proving grounds). `docs/ARCHITECTURE.md` gains the full WEF section (camera, motor,
+interaction, navigation, world, fauna/flora/mount, the production maps, the asset
+pipeline, the foundation gate) + a **Migration status** subsection with the
+retirement criterion. `PLANNING/MASTER_ROSTER.md` marks 028–053 `[x]`, corrects the
+stale header/approval record, and confirms gameplay resumes at 054. `CLAUDE.md`'s
+current-state pointer is updated. `docs/SCALE_AND_PERFORMANCE.md` (052) is already
+the normative budget doc; `docs/world/ATLAS.md` already carries the region
+production order.
+
+Files: `README.md`, `docs/ARCHITECTURE.md`, `PLANNING/MASTER_ROSTER.md`,
+`CLAUDE.md`, `DEVLOG.md`.
+
+**Acceptance criteria**
+
+- [x] Farm, Town, Interior, Beach/coast, and Mine/cavern use the shared camera,
+  motor, interaction, transition, physics, navigation, map-data, and debug
+  contracts **where applicable** — satisfied by the production-foundation maps
+  (BreakpointFarm, FarmhouseInterior, BallastBayTown, KlamityRiver, RainhallCavern),
+  which compose the shared stack end to end; the legacy gameplay scenes migrate
+  content onto them in 054+ (migration status documented).
+- [x] Existing save / farm / forage / crop / tool / machine / animal / pet /
+  fishing / reef / mine / combat / shop / NPC / dialogue / friendship / cutscene /
+  time / weather / tide behaviour has regression coverage and remains playable —
+  the legacy scenes are untouched and their unit + Playwright coverage passes in
+  the full gate.
+- [x] Obsolete implementations removed only when repository search proves no live
+  consumer; compatibility adapters have named retirement criteria — repo search
+  confirms every legacy scene is still a registered, live consumer, so **none** is
+  removed; the retirement criterion (content moved to a foundation map + no live
+  consumer) is recorded in `docs/ARCHITECTURE.md`.
+- [x] README, ARCHITECTURE, SCALE_AND_PERFORMANCE, and the legacy P-SPR accurately
+  describe the resulting foundation; the atlas identifies the next region build
+  order; the full verify gate, full E2E suite, foundation gate, clean-install
+  build, and production preview smoke test pass (the Playwright suite boots the
+  production preview build on both projects = the clean build + preview smoke).
+- [x] A final DEVLOG phase summary lists locked decisions, measured budgets,
+  remaining risks, deferred final-art work, and confirms gameplay resumes at
+  **Prompt 054** (below).
+
+### Foundation phase summary (WEF, Prompts 028–053)
+
+**Locked decisions.** Two connected communities — **Willa Crick** (inland) +
+**Ballast Bay** (coastal) joined by **The Klam-ity River**, selectable starting
+farms, **horseback** early-game traversal, **OoT-era feel** for camera /
+transitions / controls (feel only, never decomp/port source — §0.7). Camera: one
+`standard` baseline per §2 context locked in `CAMERA_BASELINES`. Motor:
+`DEFAULT_MOTOR_CONFIG` (1.8 m capsule, no free jump, authored traversal links).
+Mount: `RIDDEN_MOTOR_CONFIG` (gallop 11 m/s, momentum ramp, wider turn arc, ford);
+horse-feel knobs are all data, tunable to the user's Epona north-star. Production
+maps are graybox over production collision/nav/anchor/volume/transition data;
+finished art swaps via the validated factory without changing semantics.
+
+**Measured budgets.** `FOUNDATION_BUDGETS` per map, desktop + Pixel 5, full metric
+set (FPS, draws, tris, meshes, physics bodies, motors, nav agents, skinned meshes,
+deforming flora, streamed memory, chunk-transition, region download) — the
+normative `docs/SCALE_AND_PERFORMANCE.md`. Every production map boots well inside
+its mesh ceiling on `mobile-chromium` (asserted by the per-map tours). Bundle: main
+chunk ~1.25 MB gzip (budget ≤ 2.5 MB).
+
+**Remaining risks / deferred.** (1) Real-device FPS is a manual check — CI measures
+mesh/draw, not true on-device frame rate (SwiftShader). (2) No production `.glb`
+exists yet — the asset contract + swap factory are ready; all finished
+character/animal/flora/building/prop art is deferred to the gameplay/art prompts
+(062/063 + the art track). (3) The legacy gameplay scenes are not yet
+content-migrated onto the foundation maps — that is the work of 054+. (4) Willa
+Crick has no dimensioned layout board yet; its atlas entry stays provisional.
+
+**Gameplay resumes at Prompt 054** (Quest system) on top of this foundation.
+
+**Verify gate:** `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **617 passed** · Playwright **293 passed + 1 skipped**
+(desktop-only aspect sweep) on both `desktop-chromium` + `mobile-chromium` (full
+suite = clean production build + preview smoke) · foundation gate
+(`foundation-gate.test.ts`) green · `validate:assets` 0 · `build` 0 · GitDoctor
+**100/100**.
+
+---
+
 ## Prompt 052 — Performance, accessibility, and objective foundation gate (WEF-12) (2026-06-21)
 
 Codified the post-foundation **budgets, quality tiers, accessibility floor**, and
