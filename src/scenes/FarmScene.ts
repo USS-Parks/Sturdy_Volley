@@ -161,6 +161,9 @@ interface DebugApi {
   readMail: (id: string) => { read: boolean; attachmentSummary: string; startedQuestId: string | null };
   deliverMail: () => string[];
   setFlag: (flag: string, value: boolean) => void;
+  // Test hooks that drive panel actions without a canvas-load-fragile DOM click.
+  swapPetKind: () => void;
+  dismissDaySummary: () => boolean;
 }
 
 type PartnerKind = 'chest' | 'shipping-bin' | null;
@@ -193,6 +196,8 @@ export class FarmScene extends GameScene {
   private inventoryOpen = false;
   /** Prompt 058: the mailbox flag mesh, raised while unread mail waits. */
   private mailFlag: import('@babylonjs/core').AbstractMesh | null = null;
+  /** Day-summary "Continue" callback, held so a test can dismiss it via debug. */
+  private pendingDaySummaryContinue: (() => void) | null = null;
   private clock!: TimeClockState;
   private weather: Weather | null = null;
   private tide: TideState = 'low';
@@ -624,6 +629,19 @@ export class FarmScene extends GameScene {
       setFlag: (flag: string, value: boolean) => {
         this.save.flags[flag] = value;
         persistActiveSave();
+      },
+      swapPetKind: () => {
+        if (!this.save.pet) return;
+        const nextKind = this.save.pet.kind === 'tide-cat' ? 'bay-dog' : 'tide-cat';
+        this.save.pet = { ...this.save.pet, kind: nextKind, name: nextKind === 'tide-cat' ? 'Pixel' : 'Drift' };
+        persistActiveSave();
+        this.refreshPetMesh();
+        if (this.petPanelOpen) this.renderPetPanel();
+      },
+      dismissDaySummary: () => {
+        if (!this.pendingDaySummaryContinue) return false;
+        this.pendingDaySummaryContinue();
+        return true;
       },
     };
   }
@@ -2058,7 +2076,8 @@ export class FarmScene extends GameScene {
     this.player.position.copyFrom(this.homePosition);
     this.refreshWorldState();
 
-    this.ctx.overlay.showDaySummary(result.summary, () => {
+    const continueDay = (): void => {
+      this.pendingDaySummaryContinue = null;
       this.dayResolving = false;
       this.menuOpen = false;
       this.clock = pauseClock(this.clock, false);
@@ -2071,7 +2090,11 @@ export class FarmScene extends GameScene {
       this.applyAnimalShelterState();
       this.rebuildInteractionTargets();
       this.refreshHud();
-    });
+    };
+    // Held so an e2e can advance the day via debug instead of a canvas-load-
+    // fragile click on the day-summary "Continue" button.
+    this.pendingDaySummaryContinue = continueDay;
+    this.ctx.overlay.showDaySummary(result.summary, continueDay);
   }
 
   override dispose(): void {

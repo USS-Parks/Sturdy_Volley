@@ -32,6 +32,9 @@ declare global {
       recordQuestEvent: (kind: string, target: string | null, qty?: number) => string[];
       acceptQuest: (id: string) => void;
       cancelQuest: (id: string) => void;
+      // Test hooks that drive a panel action without a canvas-load-fragile click.
+      swapPetKind: () => void;
+      dismissDaySummary: () => boolean;
     };
   }
 }
