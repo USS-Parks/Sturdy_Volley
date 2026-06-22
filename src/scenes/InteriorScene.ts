@@ -56,6 +56,9 @@ import {
   type AppearancePart,
 } from '../engine/appearance';
 import { applyPlayerAppearance } from '../render/player-appearance';
+import { applySceneAudio, bindSceneAudioSettings } from '../audio/scene-audio';
+import { getAudioDirector } from '../audio/audio-director';
+import { audioMixRows, musicTrack, type AudioCategory } from '../engine/audio-model';
 import type { Furniture, GameContent } from '../data/schemas';
 import type { HomeTab } from '../ui/overlay';
 import { writeSave } from '../engine/save';
@@ -222,6 +225,7 @@ export class InteriorScene extends GameScene {
   private homeOpen = false;
   private homeTab: HomeTab = 'decorate';
   private photoMode = false;
+  private audioPanelOpen = false;
   private floorMesh: AbstractMesh | null = null;
   private wallMeshes: AbstractMesh[] = [];
   private renovationMeshes: AbstractMesh[] = [];
@@ -443,6 +447,10 @@ export class InteriorScene extends GameScene {
     this.homeOpen = false;
     this.photoMode = false;
     this.placement = null;
+    this.audioPanelOpen = false;
+    // Prompt 061: load mixer settings + persist on change (audio context applied
+    // from refreshWorldState, which already ran above with weather + clock set).
+    bindSceneAudioSettings(save, () => persistActiveSave());
     // Prompt 060: reflect wardrobe choices + home customization on entry.
     if (this.scene) applyPlayerAppearance(this.scene, this.player, save.player.appearance);
     this.applyHomeSurfaces();
@@ -521,7 +529,8 @@ export class InteriorScene extends GameScene {
       this.cookingOpen ||
       this.homeOpen ||
       this.photoMode ||
-      this.placement
+      this.placement ||
+      this.audioPanelOpen
     ) {
       this.clock = pauseClock(this.clock, true);
       this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
@@ -594,6 +603,8 @@ export class InteriorScene extends GameScene {
     const content = loadGameContent();
     this.weather = forecastFor(this.clock.time, content.weather);
     this.tide = tideStateAt(this.clock.time);
+    // Prompt 061: the farmhouse soundtrack (hearth pad + crackle ambience).
+    if (this.save) applySceneAudio('Interior', this.save, { weatherId: this.weather?.id ?? null });
   }
 
   private refreshHud(): void {
@@ -615,6 +626,7 @@ export class InteriorScene extends GameScene {
       'Paused',
       [
         { id: 'resume', label: 'Resume', enabled: true, testId: 'pause-resume' },
+        { id: 'audio', label: 'Audio', enabled: true, testId: 'pause-audio' },
         { id: 'sleep', label: 'Sleep until tomorrow', enabled: true, testId: 'pause-sleep' },
         { id: 'farm', label: 'Step outside', enabled: true, testId: 'nav-farm' },
         { id: 'save-quit', label: 'Save & quit to title', enabled: true, testId: 'nav-save-quit' },
@@ -633,6 +645,10 @@ export class InteriorScene extends GameScene {
       case 'resume':
         this.menuOpen = false;
         this.refreshHud();
+        break;
+      case 'audio':
+        this.menuOpen = false;
+        this.openAudioSettings();
         break;
       case 'sleep':
         this.menuOpen = false;
@@ -995,6 +1011,31 @@ export class InteriorScene extends GameScene {
     }
     root.isPickable = false;
     return root;
+  }
+
+  /* Prompt 061 — audio settings ---------------------------------------- */
+
+  private openAudioSettings(): void {
+    this.audioPanelOpen = true;
+    this.renderAudioSettings();
+  }
+
+  private renderAudioSettings(): void {
+    const dir = getAudioDirector();
+    const current = dir.currentMusic();
+    this.ctx.overlay.showAudioSettingsPanel({
+      rows: audioMixRows(this.save.audio),
+      nowPlaying: current ? `Now playing: ${musicTrack(current)?.name ?? current}` : undefined,
+      onVolume: (cat, v) => dir.setCategoryVolume(cat as AudioCategory, v),
+      onToggleMute: (cat) => {
+        dir.toggleCategoryMute(cat as AudioCategory);
+        this.renderAudioSettings();
+      },
+      onClose: () => {
+        this.audioPanelOpen = false;
+        this.refreshHud();
+      },
+    });
   }
 
   /* Prompt 060 — home, decor, customization, photo mode ---------------- */

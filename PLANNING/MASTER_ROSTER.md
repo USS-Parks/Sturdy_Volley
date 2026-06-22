@@ -3,9 +3,9 @@
 Prepared: 2026-06-19
 Status: **APPROVED 2026-06-19 — this is the active P-SPR. STS in progress.** The **WEF foundation block
 (Prompts 028–053) is COMPLETE** (closed 2026-06-21, WEF-13). The **gameplay continuation is underway:
-Prompts 054–060 are shipped** (quests · civic restoration · festivals I+II · mail/news · cooking/buffs ·
-home/decor & customization); execution resumes at **Prompt 061** (audio architecture). Per-prompt commit
-SHAs + verify gates are in `DEVLOG.md`.
+Prompts 054–061 are shipped** (quests · civic restoration · festivals I+II · mail/news · cooking/buffs ·
+home/decor & customization · audio architecture); execution resumes at **Prompt 062** (visual polish pass
+one). Per-prompt commit SHAs + verify gates are in `DEVLOG.md`.
 Supersedes (now active): the standalone `PLANNING/WORLD_EMBODIMENT_FOUNDATION_PSPR.md` draft and the
 roster halves of `STURDY_VOLLEY_PSPR.md`. Both remain valid **historical + product** references.
 Target: browser-first, mobile-ready, controller-friendly low-poly 3D cozy life sim (Theme 3).
@@ -1199,7 +1199,7 @@ bug fixing, performance, save stability, credits, privacy-first telemetry option
 **Gameplay continuation:**
 
 - [x] 054 Quests · [x] 055 Civic projects · [x] 056 Festivals I · [x] 057 Festivals II ·
-  [x] 058 Mail/news · [x] 059 Cooking · [x] 060 Home/decor · [ ] 061 Audio · [ ] 062 Visual polish I ·
+  [x] 058 Mail/news · [x] 059 Cooking · [x] 060 Home/decor · [x] 061 Audio · [ ] 062 Visual polish I ·
   [ ] 063 Visual polish II · [ ] 064 NPC expansion · [ ] 065 Narrative · [ ] 066 Secrets ·
   [ ] 067 Save migration · [ ] 068 Mobile · [ ] 069 Controller · [ ] 070 Accessibility ·
   [ ] 071 Test suite · [ ] 072 Balancing · [ ] 073 Authoring guide · [ ] 074 Alpha · [ ] 075 Beta ·

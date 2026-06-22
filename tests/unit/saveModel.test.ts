@@ -33,6 +33,16 @@ describe('save model', () => {
     expect(save.home).toEqual({});
   });
 
+  it('a fresh save carries default audio mixer settings (Prompt 061)', () => {
+    const save = createNewSave({ name: 'Wren', farmName: 'Saltbreak' }, 1000);
+    expect(save.audio.master).toEqual({ volume: 0.8, muted: false });
+    expect(save.audio.music.muted).toBe(false);
+    // A pre-061 save (no audio block) parses to the defaults.
+    const legacy = JSON.parse(serializeSave(save)) as Record<string, unknown>;
+    delete legacy.audio;
+    expect(parseSave(JSON.stringify(legacy)).audio.music.volume).toBe(0.7);
+  });
+
   it('a pre-060 save (no appearance / home) parses to the defaults', () => {
     const save = createNewSave({ name: 'Wren', farmName: 'Saltbreak' }, 1000);
     // Strip the Prompt-060 fields the way an older save on disk would lack them.

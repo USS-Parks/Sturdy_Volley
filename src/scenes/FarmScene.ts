@@ -112,6 +112,9 @@ import {
 } from '../engine/machines';
 import { absoluteDay } from '../engine/timeSystem';
 import { playReadyChime } from '../audio/cues';
+import { applySceneAudio, bindSceneAudioSettings } from '../audio/scene-audio';
+import { getAudioDirector } from '../audio/audio-director';
+import { audioMixRows, musicTrack, type AudioCategory } from '../engine/audio-model';
 
 const FARM_HALF = 20;
 
@@ -227,6 +230,7 @@ export class FarmScene extends GameScene {
   private petSeed = 1;
   private professionsPanelOpen = false;
   private questsPanelOpen = false;
+  private audioPanelOpen = false;
   private readonly homePosition = new Vector3(-8, 0.9, -5.4);
   private readonly plotOrigin = new Vector3(-6, 0, -4);
   private static readonly SCENE_KEY = 'Farm';
@@ -416,6 +420,11 @@ export class FarmScene extends GameScene {
 
     // Prompt 060: reflect the player's wardrobe choices on the outdoor capsule.
     if (this.scene) applyPlayerAppearance(this.scene, this.player, save.player.appearance);
+
+    // Prompt 061: load the mixer settings + persist on change (region/season/time/
+    // weather audio is applied from refreshWorldState once the clock + weather exist).
+    bindSceneAudioSettings(save, () => persistActiveSave());
+    this.audioPanelOpen = false;
 
     const content = loadGameContent();
     this.catalog = buildItemCatalog(content.items, content.npcs);
@@ -751,7 +760,7 @@ export class FarmScene extends GameScene {
         return;
       }
     }
-    if (this.menuOpen || this.inventoryOpen || this.dayResolving || this.machinePanelOpen || this.animalsPanelOpen || this.petPanelOpen || this.professionsPanelOpen || this.questsPanelOpen) {
+    if (this.menuOpen || this.inventoryOpen || this.dayResolving || this.machinePanelOpen || this.animalsPanelOpen || this.petPanelOpen || this.professionsPanelOpen || this.questsPanelOpen || this.audioPanelOpen) {
       this.clock = pauseClock(this.clock, true);
       this.controller = stepController(this.controller, { dir: { x: 0, z: 0 }, sprint: false }, dt);
       return;
@@ -915,6 +924,8 @@ export class FarmScene extends GameScene {
     const content = loadGameContent();
     this.weather = forecastFor(this.clock.time, content.weather);
     this.tide = tideStateAt(this.clock.time);
+    // Prompt 061: keep the soundtrack in step with region / season / time / weather.
+    if (this.save) applySceneAudio('Farm', this.save, { weatherId: this.weather?.id ?? null });
   }
 
   private refreshHotbar(): void {
@@ -964,6 +975,7 @@ export class FarmScene extends GameScene {
         { id: 'pet', label: 'Pet', enabled: Boolean(this.save.pet), testId: 'pause-pet' },
         { id: 'skills', label: 'Skills & Professions', enabled: true, testId: 'pause-skills' },
         { id: 'quests', label: 'Quest Journal', enabled: true, testId: 'pause-quests' },
+        { id: 'audio', label: 'Audio', enabled: true, testId: 'pause-audio' },
         { id: 'sleep', label: 'Sleep until tomorrow', enabled: true, testId: 'pause-sleep' },
         { id: 'town', label: 'Walk to Ballast Bay', enabled: true, testId: 'nav-town' },
         { id: 'beach', label: 'Driftwood Beach', enabled: true, testId: 'nav-beach' },
@@ -977,6 +989,31 @@ export class FarmScene extends GameScene {
         gold: this.save.wallet.gold,
       }),
     );
+  }
+
+  private openAudioSettings(): void {
+    this.audioPanelOpen = true;
+    this.renderAudioSettings();
+  }
+
+  private renderAudioSettings(): void {
+    const dir = getAudioDirector();
+    const current = dir.currentMusic();
+    this.ctx.overlay.showAudioSettingsPanel({
+      rows: audioMixRows(this.save.audio),
+      nowPlaying: current ? `Now playing: ${musicTrack(current)?.name ?? current}` : undefined,
+      // Volume drives the engine live without a re-render (keeps slider focus);
+      // mute re-renders to flip the slider's disabled state + the button label.
+      onVolume: (cat, v) => dir.setCategoryVolume(cat as AudioCategory, v),
+      onToggleMute: (cat) => {
+        dir.toggleCategoryMute(cat as AudioCategory);
+        this.renderAudioSettings();
+      },
+      onClose: () => {
+        this.audioPanelOpen = false;
+        this.refreshHud();
+      },
+    });
   }
 
   private onMenu(id: string): void {
@@ -1004,6 +1041,10 @@ export class FarmScene extends GameScene {
       case 'quests':
         this.menuOpen = false;
         this.openQuestPanel();
+        break;
+      case 'audio':
+        this.menuOpen = false;
+        this.openAudioSettings();
         break;
       case 'sleep':
         this.menuOpen = false;

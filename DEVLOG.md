@@ -5,6 +5,107 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## Prompt 061 — Audio architecture (legacy 035) (2026-06-21)
+
+A first-class **audio architecture**: a scene-spanning director picks music +
+ambience from the play context (region / season / time of day / weather / event),
+crossfades between them, and routes everything through a per-category mixer the
+player controls. No audio files exist yet, so — like graybox meshes standing in
+for `.glb` art — the sound is a **procedural WebAudio placeholder**: a detuned
+low-pass pad per music track, filtered looping noise per ambient layer, enveloped
+blips for cues. The earlier one-shot cues (machine-ready, festival) now route
+through this system so they obey the mixer.
+
+**Pure model.** `src/engine/audio-model.ts` — the catalogs (16 music tracks + 11
+ambient layers, each carrying synth params), the deterministic **selection rules**
+(`selectMusicTrack` / `selectAmbientLayers`: event override → cavern/interior →
+town → shore → farm, folding in weather/time/season), `timeOfDay`, and the mixer
+settings (`AudioSettings` per-category volume + mute, `effectiveVolume`,
+`audioSettingsSchema`). Catalog + rules live in the engine (render-coupled, like
+the camera profiles + palette), not the content pipeline.
+
+**Renderer.** `src/audio/audio-engine.ts` — a guarded WebAudio synth (no-ops
+without an AudioContext, e.g. Node/jsdom; all node creation try/caught so a synth
+failure can never break the game), gain graph `master → category → voice`,
+crossfade via gain ramps (`CROSSFADE_MS`). `src/audio/audio-director.ts` — a
+module **singleton** so music carries across scene transitions; owns the live
+settings + current track/layers, exposes telemetry, and installs
+`window.sturdyVolleyAudio` for tests/dev. `src/audio/scene-audio.ts` —
+`applySceneAudio` (build context → director) + `bindSceneAudioSettings` (load
+`save.audio`, persist on change). `cues.ts` refactored to delegate.
+
+**Save.** `audio` — per-category `{ volume, muted }` for master/music/ambient/
+sfx/ui. Defaulted field, **no `SAVE_VERSION` bump** (pre-061 saves parse to the
+defaults; locked by a saveModel test).
+
+**UI.** `overlay.ts` `showAudioSettingsPanel` — a row per category with a volume
+slider + mute toggle; reachable from the in-game pause menu (Farm + Interior).
+Styled in `styles.css`.
+
+**Integration.** `FarmScene`, `InteriorScene`, and `TownScene` apply scene audio
+from `refreshWorldState` (so it tracks weather/season/time changes + sleep) and
+bind the mixer settings on enter; Farm + Interior add an **Audio** pause-menu
+entry. Town swaps to the festival theme on a festival day
+(`isFestivalActiveNowOnSave`).
+
+Files: `src/engine/audio-model.ts` (new), `src/audio/audio-engine.ts` (new),
+`src/audio/audio-director.ts` (new), `src/audio/scene-audio.ts` (new),
+`src/audio/cues.ts`, `src/engine/saveModel.ts`, `src/ui/overlay.ts`,
+`src/styles.css`, `src/scenes/FarmScene.ts`, `src/scenes/InteriorScene.ts`,
+`src/scenes/TownScene.ts`, `tests/unit/audio-model.test.ts` (new),
+`tests/unit/saveModel.test.ts`, `tests/e2e/audio.spec.ts` (new).
+
+**Acceptance criteria**
+
+- [x] **Music changes by region, season, time, weather, and event** —
+  `selectMusicTrack` varies on all five (unit-locked: farm-spring → farm-fall /
+  farm-night / farm-rain / festival-theme / town-market…); region change is
+  exercised in-game + e2e (Farm → Town → Interior reports farm-* → town-* →
+  hearth-*).
+- [x] **Ambience crossfades cleanly** — the engine fades layer gains over
+  `CROSSFADE_MS` when the layer set changes (old layers ramp out + stop, new ramp
+  in); `selectAmbientLayers` is unit-locked and the e2e asserts the layer set
+  tracks the region. The audible crossfade is a named manual check (audio can't be
+  pixel-asserted, §0.2).
+- [x] **Audio can be muted by category** — `AudioSettings` per category +
+  the Audio panel (slider + mute) + persistence; e2e mutes Music (panel click +
+  global) and asserts it sticks across a reload.
+- [x] Visible/audible in the running game + Playwright-verified (§0.8) — the
+  director drives sound across Farm/Town/Interior; the panel opens from the pause
+  menu, on desktop + Pixel 5.
+
+**Decision record**
+
+- **Procedural placeholder synth, not audio files.** No original recorded audio
+  exists yet; a WebAudio synth is the audio analog of graybox meshes (§1.3 /
+  originality §0.7). The eventual scored music + recorded ambience swap in behind
+  the same selection contract.
+- **Director is a module singleton.** Music + ambience persist across scene
+  transitions instead of restarting on every `goTo`.
+- **Selection is pure + deterministic; the synth is best-effort.** State/telemetry
+  is always accurate (unit + e2e testable); the synth no-ops where WebAudio is
+  unavailable or blocked, so audio can never break the game or the gate.
+- **Catalogs + rules in the engine, not content.** Render-coupled cosmetic data,
+  like the camera profiles / palette / appearance swatches.
+- **No `SAVE_VERSION` bump** — defaulted `audio`; versioning is Prompt 067.
+
+**Verify gate** — `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **759 passed** (+12) · `validate:assets` 0 · `build` 0 ·
+Playwright audio suite **6 passed** on `desktop-chromium` + `mobile-chromium`;
+full suite **357 passed** (desktop + mobile, exit 0) · GitDoctor **100/100**.
+
+**Honest gaps / deferred.** Scene audio is applied from `refreshWorldState`
+(enter / sleep / weather refresh), so an in-day day→night music swap lands on the
+next refresh rather than exactly at 21:00 — finer per-hour cadence is a low-risk
+follow-up. The Audio pause-menu entry is wired in Farm + Interior (the scenes with
+a pause menu hosting it); Beach/Mine apply region audio only when reached via a
+future wiring pass (the helper already supports any scene). Positional/3D sound is
+modeled as ambient layers + cues, not true per-source `PannerNode` spatialization
+(deferred with the real audio assets). The audible crossfade is a manual check;
+e2e asserts the selection + mixer telemetry.
+
+---
+
 ## Prompt 060 — Home, decor, and customization (legacy 034) (2026-06-21)
 
 A **Home** system at the farmhouse: buy + freely place furniture, repaint walls

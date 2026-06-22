@@ -43,6 +43,7 @@ import {
   type FestivalMinigameState,
 } from '../engine/festival';
 import { playFestivalChime } from '../audio/cues';
+import { applySceneAudio, bindSceneAudioSettings } from '../audio/scene-audio';
 import { buildActiveNoticeBoard } from '../engine/notice-tracking';
 import type { CivicProject, Festival, Season } from '../data/schemas';
 import { formatWorldStatus } from '../engine/format';
@@ -471,6 +472,9 @@ export class TownScene extends GameScene {
     this.save = save;
     save.location.sceneKey = 'Town';
     writeSave(save);
+    // Prompt 061: load the mixer settings; the Town soundtrack is applied from
+    // refreshWorldState (and swaps to the festival theme on a festival day).
+    bindSceneAudioSettings(save, () => persistActiveSave());
     // Prompt 054: arriving credits "visit Ballast Bay" exploration objectives.
     recordActiveQuestEvent({ kind: 'visit', target: 'Town' });
     this.controller = createControllerState();
@@ -1160,6 +1164,13 @@ export class TownScene extends GameScene {
     const content = loadGameContent();
     this.weather = forecastFor(this.clock.time, content.weather);
     this.tide = tideStateAt(this.clock.time);
+    // Prompt 061: Town music — market lane by day, festival theme on a festival.
+    if (this.save) {
+      applySceneAudio('Town', this.save, {
+        weatherId: this.weather?.id ?? null,
+        event: isFestivalActiveNowOnSave() ? 'festival' : null,
+      });
+    }
   }
 
   private refreshHud(): void {

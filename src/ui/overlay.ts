@@ -382,6 +382,25 @@ export interface PhotoModeBarOptions {
   onExit: () => void;
 }
 
+/* Audio settings (Prompt 061) --------------------------------------------- */
+
+export interface AudioCategoryRow {
+  category: string;
+  label: string;
+  /** 0..1. */
+  volume: number;
+  muted: boolean;
+}
+
+export interface AudioSettingsPanelOptions {
+  rows: AudioCategoryRow[];
+  /** Optional readout of what is currently playing (dev/flavor). */
+  nowPlaying?: string;
+  onVolume: (category: string, volume: number) => void;
+  onToggleMute: (category: string) => void;
+  onClose: () => void;
+}
+
 export interface ElevatorPanelOption {
   level: number;
   name: string;
@@ -2032,6 +2051,66 @@ export class UIOverlay {
       }
       body.appendChild(grid);
     }
+  }
+
+  /**
+   * Audio settings panel (Prompt 061). One row per mixer category (Master /
+   * Music / Ambience / Effects / Interface) with a volume slider + a mute toggle,
+   * so audio is mutable by category. Reachable from the in-game pause menu.
+   */
+  showAudioSettingsPanel(opts: AudioSettingsPanelOptions): void {
+    this.clear();
+    const panel = this.createPanel('Audio', opts.nowPlaying);
+    panel.classList.add('audio-panel');
+    panel.dataset.testid = 'audio-panel';
+
+    const list = document.createElement('ul');
+    list.className = 'audio-list';
+    for (const row of opts.rows) {
+      const li = document.createElement('li');
+      li.className = 'audio-row';
+      li.dataset.testid = `audio-row-${row.category}`;
+
+      const label = document.createElement('span');
+      label.className = 'audio-label';
+      label.textContent = row.label;
+
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = '0';
+      slider.max = '100';
+      slider.step = '5';
+      slider.value = String(Math.round(row.volume * 100));
+      slider.className = 'audio-slider';
+      slider.dataset.testid = `audio-volume-${row.category}`;
+      slider.setAttribute('aria-label', `${row.label} volume`);
+      slider.disabled = row.muted;
+      slider.addEventListener('input', () => opts.onVolume(row.category, slider.valueAsNumber / 100));
+
+      const mute = document.createElement('button');
+      mute.type = 'button';
+      mute.className = 'menu-button audio-mute';
+      if (row.muted) mute.classList.add('audio-muted');
+      mute.textContent = row.muted ? 'Muted' : 'On';
+      mute.dataset.testid = `audio-mute-${row.category}`;
+      mute.setAttribute('aria-pressed', String(row.muted));
+      mute.addEventListener('click', () => opts.onToggleMute(row.category));
+
+      li.append(label, slider, mute);
+      list.appendChild(li);
+    }
+    panel.appendChild(list);
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'menu-button';
+    close.textContent = 'Close';
+    close.dataset.testid = 'audio-close';
+    close.addEventListener('click', opts.onClose);
+    panel.appendChild(close);
+
+    this.root.appendChild(panel);
+    this.focusFirstEnabled(panel);
   }
 
   /**

@@ -1016,6 +1016,25 @@ body {
 .placement-controls .menu-button { min-height: 38px; min-width: 84px; }
 .placement-bar .hud-title, .photo-bar .hud-title { font-weight: 700; }
 
+/* Audio settings (Prompt 061). */
+.audio-panel { width: min(520px, 96vw); }
+.audio-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.audio-row {
+  display: grid;
+  grid-template-columns: 92px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--sv-parchment);
+  border: 1px solid var(--sv-wood);
+  border-left: 4px solid #6c8c5a;
+  border-radius: 8px;
+}
+.audio-label { font-weight: 700; }
+.audio-slider { width: 100%; min-height: 32px; accent-color: #6c8c5a; }
+.audio-mute { min-width: 72px; min-height: 34px; padding: 4px 10px; }
+.audio-muted { border-left: 4px solid #b4543a; opacity: 0.85; }
+
 /* Pet panel (Prompt 020). */
 .pet-panel { width: min(520px, 96vw); }
 .pet-stats { font-weight: 700; }

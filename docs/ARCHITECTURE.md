@@ -26,6 +26,11 @@ until real `.glb` assets land in `public/assets/`.
 - **`src/engine/`** — Renderer-agnostic game logic: save model/store/transfer,
   `gameState`, `format`, `movement`. Kept Babylon-free so it stays unit-testable.
 - **`src/data/`** — Typed, zod-validated, data-driven content (Prompt 002).
+- **`src/audio/`** — The audio system (Prompt 061). A guarded WebAudio synth
+  (`audio-engine.ts`) driven by a scene-spanning singleton `audio-director.ts`
+  that selects music + ambient layers from a pure model (`engine/audio-model.ts`)
+  and a per-category mixer persisted on the save. `scene-audio.ts` is the
+  scene→audio glue; `cues.ts` are one-shot blips routed through the same mixer.
 
 ## Scene contract
 

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { seasonSchema, buffEffectSchema } from '../data/schemas';
 import { appearanceStateSchema, DEFAULT_APPEARANCE } from './appearance';
 import { homeSceneStateSchema } from './home';
+import { audioSettingsSchema, DEFAULT_AUDIO_SETTINGS } from './audio-model';
 
 /**
  * The save model. Versioned for future migrations (Prompt 041). Validated with
@@ -198,6 +199,12 @@ export const saveSchema = z
      * so neither write clobbers the other. Defaulted field, no `SAVE_VERSION` bump.
      */
     home: z.record(z.string(), homeSceneStateSchema).default({}),
+    /**
+     * Per-category audio mixer settings (Prompt 061): master / music / ambient /
+     * sfx / ui volume + mute. Defaulted field, no `SAVE_VERSION` bump — pre-061
+     * saves parse to the defaults.
+     */
+    audio: audioSettingsSchema.default(DEFAULT_AUDIO_SETTINGS),
     mapState: z.record(z.string(), z.unknown()),
     machines: z
       .record(
@@ -384,6 +391,13 @@ export function createNewSave(opts: NewSaveOptions, now: number = Date.now()): S
     mail: {},
     activeBuffs: [],
     home: {},
+    audio: {
+      master: { ...DEFAULT_AUDIO_SETTINGS.master },
+      music: { ...DEFAULT_AUDIO_SETTINGS.music },
+      ambient: { ...DEFAULT_AUDIO_SETTINGS.ambient },
+      sfx: { ...DEFAULT_AUDIO_SETTINGS.sfx },
+      ui: { ...DEFAULT_AUDIO_SETTINGS.ui },
+    },
     mapState: {},
     machines: defaultFarmMachines(),
     animals: defaultFarmAnimals(),
