@@ -5,6 +5,67 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## GML-01 — Core gray-model helper layer and Blender proof pipeline (2026-07-02)
+
+The reusable gray-model foundation now spans both runtime and source art: typed
+source-traceable registry records, scene-shared honest-review materials, base-contact
+faceted primitive builders, live Asset Swap Lab consumption, and a Blender 5.1 helper that
+generates the required `.blend` / `.glb` / three-quarter PNG / descriptor bundle. The
+Blender smoke artifact is deliberately non-production and ignored; it proves the factory
+before the roster begins producing real model families.
+
+Files:
+
+- `src/render/gray-models/materials.ts` — neutral/warm/cool/debug material specifications
+  and per-scene material reuse.
+- `src/render/gray-models/primitives.ts` — bottom-contact box, cylinder/frustum, icosphere,
+  group, pickability, and traceability metadata helpers.
+- `src/render/gray-models/registry.ts` — 22 first-production definitions with ids, future
+  asset ids, metre dimensions, Art Bible refs, policy, and priority plus validation.
+- `src/scenes/AssetSwapLabScene.ts` — five visible fixture grayboxes now come from the core
+  registry and expose model id, dimensions, source refs, and collision policy telemetry.
+- `tools/blender/sturdy_asset.py`, `tools/blender/gml01_core_proof.py` — deterministic Blender
+  primitives, proof stage, GLB export, `.blend` save, descriptor, and smoke assembly.
+- `docs/BLENDER_ASSET_PIPELINE.md` — source/runtime bundle,
+  proof, coordinate/origin, command, and implemented-core documentation.
+- `tests/unit/gray-models.test.ts`, `tests/e2e/asset-swap-lab.spec.ts` — primitive dimensions,
+  bottom origins, shared materials, registry integrity, metadata, and desktop/mobile proof.
+
+**Acceptance criteria**
+
+- [x] Helpers create consistently named, base-contact, metre-scaled, non-pickable meshes
+  with scene-shared materials and Art Bible/replacement metadata.
+- [x] Registry ids are kebab-case, family-prefixed, unique, sports-free, dimensioned,
+  source-traceable, and mapped to one of the ten asset-contract families.
+- [x] Tests lock material reuse, primitive bounds/origins, group/mesh metadata, registry
+  integrity, and required world-poster landmark coverage.
+- [x] Asset Swap Lab visibly consumes the core on desktop and mobile and reports each
+  model's id, dimensions, source refs, and foundation/visual/hybrid policy.
+- [x] Blender 5.1 headless smoke emits all four proof-contract files and exits cleanly;
+  the 768×768 orthographic three-quarter PNG was visually inspected for silhouette,
+  intersections, framing, and ground shadow.
+- [x] The existing rejected Q-demo `.glb` files are not imported, cleaned, or reused.
+- [x] Full verify gate passes.
+
+**Decision record**
+
+- Base origin is calculated from actual mesh bounds rather than assumed radius/height; this
+  keeps low-subdivision icospheres exactly on the contact plane.
+- Materials are reused by stable scene-local names instead of a global scene cache.
+- The Blender smoke bundle remains under `.tmp/`: it is pipeline evidence, not a game model
+  and cannot be confused with one of the user's per-model production proofs.
+- Blender uses its 5.1 `BLENDER_EEVEE` identifier and `--python-exit-code 1`, so a script
+  exception fails automation instead of returning a misleading successful process code.
+
+**Verify gate** — Blender 5.1 bundle **4 files, exit 0** · both TypeScript configs 0 ·
+`eslint .` 0 · Vitest **764 passed** · `validate:assets` 0 · `build` 0 · focused
+Asset Swap Lab **8 passed** desktop+mobile · Playwright full suite **357 passed,
+1 pre-existing skip** desktop+mobile · GitDoctor **100/100**.
+
+**Visual evidence** — reproducible Blender proof command in `docs/BLENDER_ASSET_PIPELINE.md`;
+proof file `.tmp/blender-gml01-proof/sv_prop_gml01-core-proof_preview.png`; Playwright's
+Asset Swap Lab first test attaches screenshots for both configured projects.
+
 ## GML-00 — Art-library audit and gray model taxonomy (2026-07-02)
 
 The approved 230-board current-direction Art Bible now has a canonical 3D-production

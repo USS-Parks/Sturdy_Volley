@@ -1,7 +1,7 @@
 # Sturdy Volley — 230 Art Library Gray Model P-SPR
 
 Prepared: 2026-06-23  
-Status: **APPROVED 2026-07-02 — STS execution authorized; GML-00 active.**  
+Status: **APPROVED 2026-07-02 — STS active; GML-00–01 complete, GML-02 next.**  
 Phase shorthand: **GML** (Gray Model Library)  
 Primary art source: the 230-image `art-production/current-direction/` library, with
 `art-production/current-direction/P-marketing-and-reference-covers/sv_cover_230_world_poster_no_text.png`

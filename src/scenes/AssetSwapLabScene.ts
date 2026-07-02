@@ -18,10 +18,24 @@ import {
 } from '../render/asset-factory';
 import { ASSET_FIXTURES } from '../render/asset-fixtures';
 import type { AssetDescriptor } from '../render/asset-contract';
+import { createFacetedBox, metadataFor } from '../render/gray-models/primitives';
+import {
+  grayModelDefinition,
+  type GrayModelDefinition,
+} from '../render/gray-models/registry';
+
+const FIXTURE_MODELS: Readonly<Record<string, string>> = {
+  humanoid: 'character-player-proxy',
+  animal: 'animal-dog-proxy',
+  flora: 'flora-rock-cluster',
+  building: 'building-village-house',
+  prop: 'prop-crate',
+};
 
 /**
  * Asset-swap proving ground (WEF-11b, master Prompt 051). Spawns the five
- * reference fixtures (humanoid, animal, flora, building, prop) as graybox
+ * reference fixtures (humanoid, animal, flora, building, prop) through the
+ * source-traceable gray-model core, then swaps each one's render geometry for a validated asset
  * entities, then swaps each one's render geometry for a validated asset
  * stand-in via the swap factory — proving the entity's anchors / collision /
  * navigation / save identity survive the swap, the graybox is retained as a
@@ -38,6 +52,7 @@ interface LabEntity {
   family: AssetDescriptor['family'];
   manifest: AssetDescriptor;
   buildAsset: () => Mesh;
+  model: GrayModelDefinition;
 }
 
 export class AssetSwapLabScene extends GameScene {
@@ -75,10 +90,18 @@ export class AssetSwapLabScene extends GameScene {
       navId: `${key}-nav`,
     };
 
-    // Graybox render mesh (the placeholder).
-    const graybox = MeshBuilder.CreateBox(`graybox-${key}`, { width: 1.2, height: 1.8, depth: 1.2 }, scene);
-    graybox.position.set(x, 0.9, 0);
-    graybox.material = flatMaterial(scene, `graybox-${key}`, PALETTE.stone, 0.3);
+    const modelId = FIXTURE_MODELS[key];
+    const model = modelId ? grayModelDefinition(modelId) : undefined;
+    if (!model) throw new Error(`Missing gray-model registry entry for fixture: ${key}`);
+
+    // Source-traceable, base-origin graybox render mesh. Semantic collision/nav
+    // remains in the entity layer and never moves into render geometry.
+    const graybox = createFacetedBox(scene, model.dimensions, {
+      name: `graybox-${key}`,
+      material: model.policy === 'visual' ? 'debugVisual' : 'debugFoundation',
+      metadata: metadataFor(model),
+    });
+    graybox.position.set(x, 0, 0);
 
     // Asset stand-in builder (a visibly distinct mesh at the same anchor). A real
     // `.glb` loader plugs in here without changing the factory contract.
@@ -90,7 +113,7 @@ export class AssetSwapLabScene extends GameScene {
     };
 
     const entity = createSwappable<Mesh>({ id: key, saveId: `save-${key}`, semantic, graybox });
-    this.entities.set(key, { entity, family: manifest.family, manifest, buildAsset });
+    this.entities.set(key, { entity, family: manifest.family, manifest, buildAsset, model });
     this.syncVisibility(key);
   }
 
@@ -105,7 +128,7 @@ export class AssetSwapLabScene extends GameScene {
     const api = {
       meshCount: (): number => this.scene.meshes.length,
       keys: (): string[] => [...this.entities.keys()],
-      state: (key: string): { active: string; meshName: string; saveId: string; anchorIds: string[]; collisionId: string; navId: string; family: string } | null => {
+      state: (key: string): { active: string; meshName: string; saveId: string; anchorIds: string[]; collisionId: string; navId: string; family: string; modelId: string; dimensions: readonly number[]; sourceRefs: readonly string[]; policy: string } | null => {
         const le = this.entities.get(key);
         if (!le) return null;
         return {
@@ -116,6 +139,10 @@ export class AssetSwapLabScene extends GameScene {
           collisionId: le.entity.semantic.collisionId,
           navId: le.entity.semantic.navId,
           family: le.family,
+          modelId: le.model.id,
+          dimensions: le.model.dimensions,
+          sourceRefs: le.model.sourceRefs,
+          policy: le.model.policy,
         };
       },
       /** Swap to the validated asset; returns ok + whether the semantic layer held. */

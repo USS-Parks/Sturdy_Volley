@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-interface SwapState { active: string; meshName: string; saveId: string; anchorIds: string[]; collisionId: string; navId: string; family: string }
+interface SwapState { active: string; meshName: string; saveId: string; anchorIds: string[]; collisionId: string; navId: string; family: string; modelId: string; dimensions: readonly number[]; sourceRefs: readonly string[]; policy: string }
 
 declare global {
   interface Window {
@@ -34,6 +34,10 @@ test.describe('Asset swap factory (WEF-11b)', () => {
       const s = await page.evaluate((key) => window.sturdyVolleySwap!.state(key), k);
       expect(s?.active, `${k} starts as graybox`).toBe('graybox');
       expect(s?.meshName).toBe(`graybox-${k}`);
+      expect(s?.modelId).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+      expect(s?.dimensions.every((value) => value > 0)).toBe(true);
+      expect(s?.sourceRefs.length).toBeGreaterThan(0);
+      expect(['visual', 'hybrid', 'foundation']).toContain(s?.policy);
     }
 
     await page.waitForTimeout(300);
