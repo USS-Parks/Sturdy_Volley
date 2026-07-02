@@ -1,0 +1,34 @@
+{
+  "id": "sv_prop_crate",
+  "status": "production-candidate",
+  "family": "prop",
+  "sourceRefs": [
+    "J-140 item/prop master sheet",
+    "N-203\u2013212 props, decor, and interiors",
+    "P-230 world poster farm foreground",
+    "A-004 shape language",
+    "A-005 materials board"
+  ],
+  "dimensionsMetres": [
+    0.8,
+    0.68,
+    0.814
+  ],
+  "origin": "bottom-center",
+  "triangles": 312,
+  "materials": 1,
+  "runtimeFormat": "glb",
+  "editableSource": "sv_prop_crate.blend",
+  "interchange": "sv_prop_crate.obj",
+  "proof": {
+    "file": "sv_prop_crate_preview.png",
+    "camera": "orthographic-three-quarter",
+    "resolution": [
+      768,
+      768
+    ],
+    "neutralStudio": true
+  },
+  "collisionPolicy": "separate primitive proxy; render mesh is not collision",
+  "notes": "Original open produce crate with slatted sides, top rim, and opposed repair braces."
+}

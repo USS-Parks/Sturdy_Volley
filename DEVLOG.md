@@ -5,6 +5,61 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## GML-02 — World Poster Gray Library and first production Blender asset (2026-07-02)
+
+A direct-boot World Poster Gray Library now displays eight source-traceable models across
+farm, village, coast, wilds, character/animal, and prop zones. The scene uses the GML-01
+registry and primitives, exposes deterministic model telemetry, and captures desktop/mobile
+proofs. The user's reviewed crate is included as the first real Blender production bundle:
+editable `.blend`, runtime `.glb`, interchange `.obj`, descriptor, and 3/4 PNG.
+
+Files:
+
+- `src/render/gray-models/gallery.ts` — composed raised bed, village house, lighthouse,
+  marsh boardwalk, quarry gantry, player, dog, and crate silhouettes.
+- `src/scenes/WorldPosterGrayLibraryScene.ts` — neutral gallery ground/camera/light and
+  `window.sturdyVolleyGrayLibrary` telemetry.
+- `src/scenes/registry.ts`, `src/scenes/dev-route.ts` — `?scene=WorldPosterGrayLibrary`.
+- `tests/e2e/world-poster-gray-library.spec.ts` — zones, ids, dimensions, source refs,
+  mesh counts, canvas pixels, console safety, and desktop/mobile screenshots.
+- `tools/blender/generate_prop_crate.py` — deterministic crate source generator.
+- `art-production/3d-assets/props/sv_prop_crate/` — `.blend`, `.glb`, `.obj`, descriptor,
+  and reviewed `_preview.png` proof.
+
+**Acceptance criteria**
+
+- [x] Scene is reachable through the explicit production-preview-safe dev route.
+- [x] At least one model appears from every target zone: farm, village, coast, wilds,
+  character/animal, and prop; eight models and more than 35 component meshes ship.
+- [x] Telemetry exposes unique ids, asset families, metre dimensions, source references,
+  policy, zone, and per-model mesh counts.
+- [x] Desktop and Pixel 5 profiles confirm nonblank/nonuniform rendering, required zones,
+  valid telemetry, and no console errors; screenshots attach to the report.
+- [x] The crate ships as a real five-file Blender bundle with 312 triangles, one material,
+  bottom-center origin, and a neutral 768×768 three-quarter proof.
+- [x] No rejected Q-demo GLB geometry is imported or reused.
+- [x] Full verify gate passes.
+
+**Decision record**
+
+- GML-02 remains an isolated dev gallery; it does not disturb playable-map collision or
+  navigation. Live-map placement begins in GML-03.
+- Gallery shapes are registry-backed spatial silhouettes, while the crate is the first
+  committed source/runtime asset bundle. This preserves the GML→final-art distinction
+  without returning to fileless planning.
+- The crate stays open and honestly slatted (no hidden solid cube), uses one vertex-color
+  wood material, and separates collision from render geometry.
+
+**Verify gate** — Blender 5.1 crate bundle **5 files, 312 triangles, 1 material** · both
+TypeScript configs 0 · `eslint .` 0 · Vitest **764 passed** · `validate:assets` 0 ·
+`build` 0 · focused gallery **2 passed** desktop+mobile · Playwright full suite
+**359 passed, 1 pre-existing skip** desktop+mobile · GitDoctor **100/100**.
+
+**Visual evidence** — reviewed
+`art-production/3d-assets/props/sv_prop_crate/sv_prop_crate_preview.png`; Playwright attaches
+`world-poster-gray-library-desktop-chromium` and
+`world-poster-gray-library-mobile-chromium` screenshots.
+
 ## GML-01 — Core gray-model helper layer and Blender proof pipeline (2026-07-02)
 
 The reusable gray-model foundation now spans both runtime and source art: typed

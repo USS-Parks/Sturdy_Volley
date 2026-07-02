@@ -22,6 +22,7 @@ import { BallastBayTownScene } from './BallastBayTownScene';
 import { KlamityRiverScene } from './KlamityRiverScene';
 import { RainhallCavernScene } from './RainhallCavernScene';
 import { AssetSwapLabScene } from './AssetSwapLabScene';
+import { WorldPosterGrayLibraryScene } from './WorldPosterGrayLibraryScene';
 
 /** All game scenes, keyed by the names used in save.location.sceneKey + transitions. */
 export const SCENE_FACTORIES: Record<string, SceneFactory> = {
@@ -63,4 +64,6 @@ export const SCENE_FACTORIES: Record<string, SceneFactory> = {
   RainhallCavern: (ctx) => new RainhallCavernScene(ctx),
   // Dev-only asset-swap proving ground (WEF-11b, Prompt 051). `?scene=AssetSwapLab`.
   AssetSwapLab: (ctx) => new AssetSwapLabScene(ctx),
+  // Dev-only first gray-model gallery (GML-02).
+  WorldPosterGrayLibrary: (ctx) => new WorldPosterGrayLibraryScene(ctx),
 };
