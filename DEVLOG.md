@@ -5,6 +5,59 @@ Each entry: what shipped, how it was verified, and the commit.
 
 ---
 
+## GML-00 — Art-library audit and gray model taxonomy (2026-07-02)
+
+The approved 230-board current-direction Art Bible now has a canonical 3D-production
+taxonomy: priority families, scale targets, source-board traceability, first-scene ownership,
+collision policy, future asset ids, zone-composition requirements, and an explicit bridge
+from every identifiable Art Bible element to an item-level manifest disposition. Blender
+5.1 is locked as the production authoring environment, `.glb` as the Babylon runtime format,
+and a standardized 3/4 PNG as mandatory proof for every production model.
+
+Files:
+
+- `PLANNING/GRAY_MODEL_ART_LIBRARY_PSPR.md` — approved STS status.
+- `PLANNING/BLENDER_STS_APPROVAL_ADDENDUM.md` — sequential GML→AL authorization and direct
+  Blender, all-current-direction coverage, rejected-prototype, and proof-render refinements.
+- `docs/GRAY_MODEL_ART_LIBRARY.md` — canonical-reference policy, governing boards,
+  non-negotiable metrics/originality rules, priorities, and rejected Q-demo classification.
+- `docs/GRAY_MODEL_ART_LIBRARY_CATALOG.md` — production-family table, item-level expansion
+  requirements, zone checklist, collision matrix, and per-model artifact/proof contract.
+
+**Acceptance criteria**
+
+- [x] The taxonomy maps Prompt 230's farm, village/common, harbor/coast, marsh, quarry,
+  ridge, lighthouse, boats, lanterns, animals, characters, flora, crops, buildings, and
+  small-prop language to prioritized model families with scale and source references.
+- [x] Style constraints are explicit: original faceted late-1990s-console geometry,
+  painterly boards as atmosphere rather than polygon density, and the complete sports purge.
+- [x] Collision foundations, hybrid assemblies, and visual-only dressing are separated in
+  both the family table and the collision-owner matrix.
+- [x] Every identifiable element under `art-production/current-direction/` must receive a
+  unique asset, modular/variant asset, scene/reference, or non-mesh manifest disposition.
+- [x] The five existing Q-demo `.glb` files are classified **DO NOT USE**: rejected
+  non-production prototypes whose subjects must be rebuilt from scratch.
+- [x] Every production model requires `.blend`, `.glb`, `_preview.png`, and `.asset.json`;
+  the preview is a neutral orthographic 3/4 proof and is a blocking acceptance artifact.
+- [x] Full verify gate passes; no scene behavior changed in this documentation prompt.
+
+**Decision record**
+
+- GML and AL run sequentially under the user's 2026-07-02 STS authorization. Blender 5.1
+  is the authoring source of truth; `.obj` is optional interchange only.
+- All current-direction boards are canonical inputs, but one image does not imply one mesh:
+  maps, UI, portraits, lighting, motion, and covers contribute traceable non-mesh direction.
+- Existing Q-demo assets are preserved only as historical evidence until an approved prompt
+  retires them; they cannot enter the game or seed replacement geometry.
+- A simple consistent proof beats a flattering render: neutral studio light and ground
+  shadow expose silhouette, proportions, intersections, and execution quality.
+
+**Verify gate** — `tsc -p tsconfig.json` 0 · `tsc -p tsconfig.node.json` 0 ·
+`eslint .` 0 · Vitest **759 passed** · `validate:assets` 0 · `build` 0 · Playwright
+full suite **357 passed, 1 pre-existing skip** on `desktop-chromium` +
+`mobile-chromium` · GitDoctor **100/100**. No visual evidence required because GML-00
+changes documentation only.
+
 ## Prompt 061 — Audio architecture (legacy 035) (2026-06-21)
 
 A first-class **audio architecture**: a scene-spanning director picks music +
